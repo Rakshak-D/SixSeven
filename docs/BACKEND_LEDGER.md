@@ -2,6 +2,17 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M6 proposals and checklist verification
+
+- Timestamp: 2026-11-25 21:04:30+05:30
+- Branch: be/m6-workflows
+- Scope: project-scoped proposal decisions, deterministic checklist drafts, contractor photo evidence, engineer review and append-only checklist history.
+- API and database: contract PR #19 integrates request #7 and #8. Migration 0006 adds proposal, draft, checklist, item and event tables and project-scoped links to progress evidence. Seed adds deterministic proposal and checklist records.
+- Verification: local Biome, typecheck, 32 focused tests and production build passed. The initial implementation head passed PostgreSQL migrations, repeatable seed and the full API suite in [PR #20 CI](https://github.com/Rakshak-D/SixSeven/actions/runs/45646443031).
+- Frontend: retain legacy display status, use verificationStatus for workflow and supply progressId during review. Live PATCH renames only.
+- Limitations: checklist generation uses a deterministic template. Expenses and payments are unaffected by proposals. Demo checkout and database remain at their original baseline.
+- Next action: verify the final PR head before integration.
+
 ## Entry — M5 integrated and main CI verified
 
 - Timestamp: 2026-11-25 20:38:37+05:30

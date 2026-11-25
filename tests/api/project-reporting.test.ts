@@ -14,6 +14,7 @@ import {
 } from "@/server/services/photo-storage";
 import { loadEffectiveAttendance } from "@/server/services/wage-calculations";
 import { ErrorResponse } from "@/shared/errors";
+import { ActivityResponse } from "@/shared/schemas/activity";
 import { AttendanceListResponse, AttendanceResponse } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
 import {
@@ -762,6 +763,20 @@ describe("M6 proposals and checklist verification", () => {
       404,
       "NOT_FOUND",
     );
+    const plan = new FormData();
+    plan.append("plan", (await imageFile()).file);
+    const fallback = await api(`${draftPath}?source=ai`, engineer, plan);
+    expect(fallback.status).toBe(200);
+    expect(ChecklistDraftResponse.parse(await fallback.json())).toMatchObject({
+      source: "template",
+      fallbackReason: "unavailable",
+    });
+    const secondary = await api(`/projects/${project}/members`, contractor, {
+      email: "isolated@demo.invalid",
+      role: "engineer",
+    });
+    expect(secondary.status).toBe(201);
+    await expectError(await api(`${draftPath}/records`, outsider, payload), 404, "NOT_FOUND");
     const save = await api(`${draftPath}/records`, engineer, payload);
     expect(save.status).toBe(201);
     const record = VerifiedChecklistResponse.parse(await save.json());
@@ -769,7 +784,7 @@ describe("M6 proposals and checklist verification", () => {
     const [first] = record.items;
     if (!first) throw new Error("Checklist fixture missing");
     const path = `/checklist-items/${first.id}`;
-    await expectError(await api(`${path}/start`, outsider, undefined, "POST"), 404, "NOT_FOUND");
+    await expectError(await api(`${path}/start`, outsider, undefined, "POST"), 403, "FORBIDDEN");
     await expectError(
       await api(path, contractor, { status: "done" }, "PATCH"),
       400,
@@ -896,5 +911,15 @@ describe("M6 proposals and checklist verification", () => {
       .from(checklistEvents)
       .where(eq(checklistEvents.itemId, first.id));
     expect(events).toHaveLength(7);
+    const activity = ActivityResponse.parse(
+      await (await api(`/projects/${project}/activity`, owner)).json(),
+    );
+    expect(activity.filter((row) => row.entityId === first.id)).toHaveLength(7);
+    expect(activity.some((row) => row.entityId === first.id && row.action === "approved")).toBe(
+      true,
+    );
+    expect(activity.some((row) => row.entityId === first.id && row.action === "rejected")).toBe(
+      true,
+    );
   });
 });
