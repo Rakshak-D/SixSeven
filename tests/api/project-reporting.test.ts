@@ -196,8 +196,9 @@ describe("project financial summary", () => {
       expect(response.status).toBe(201);
     };
 
-    const cement = await createMaterial("Fractional cement", 1, 0, 0.899);
+    const cement = await createMaterial("Fractional cement", 1, 0, 0.898);
     const sand = await createMaterial("Tolerance boundary sand", 1, 10, 0.5);
+    const exactTolerance = await createMaterial("Exact tolerance boundary", 1, 10, 0);
     const zeroPlan = await createMaterial("Zero plan material", 0, 0, 0);
     const future = await createMaterial("Future delivery material", 1, 0, 0);
 
@@ -206,9 +207,12 @@ describe("project financial summary", () => {
     await correctStock(cementIn.id, 1.001);
     const cementUse = await recordUsage(cement.id, 0.101, today);
     await correctStock(cementUse.id, 0.102);
+    await correctStock(cementUse.id, 0.103);
 
     await recordDelivery(sand.id, 2, 1_000, weekBDate);
     await recordUsage(sand.id, 1.101, today);
+    await recordDelivery(exactTolerance.id, 1.1, 1_000, weekBDate);
+    await recordUsage(exactTolerance.id, 1.1, today);
     await recordDelivery(zeroPlan.id, 0.1, 1_000, weekBDate);
     await recordUsage(zeroPlan.id, 0.001, today);
     await recordDelivery(future.id, 1, 90_000, addDays(today, 1));
@@ -277,19 +281,22 @@ describe("project financial summary", () => {
     expect(ownerSummary).toMatchObject({
       role: "owner",
       budgetPaise: 25_000_000,
-      spendPaise: 118_602,
+      spendPaise: 119_702,
       burnRatePaisePerDay: Math.floor(
-        118_602 /
+        119_702 /
           (Math.floor(
             (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86_400_000,
           ) +
             1),
       ),
-      spendSplit: { materialsPaise: 3_602, labourPaise: 90_000, otherPaise: 25_000 },
+      spendSplit: { materialsPaise: 4_702, labourPaise: 90_000, otherPaise: 25_000 },
     });
     expect(
       ownerSummary.materialVariance.find(({ materialId }) => materialId === sand.id)?.overTolerance,
     ).toBe(true);
+    expect(
+      ownerSummary.materialVariance.find(({ materialId }) => materialId === exactTolerance.id),
+    ).toMatchObject({ plannedQty: 1, usedQty: 1.1, overTolerance: false });
     expect(
       ownerSummary.materialVariance.find(({ materialId }) => materialId === zeroPlan.id)
         ?.overTolerance,
@@ -298,18 +305,18 @@ describe("project financial summary", () => {
       ownerSummary.materialVariance.find(({ materialId }) => materialId === cement.id),
     ).toMatchObject({
       plannedQty: 1,
-      usedQty: 0.102,
+      usedQty: 0.103,
       overTolerance: false,
     });
     expect(ownerSummary.stockAlerts).toContainEqual({
       materialId: cement.id,
       name: "Fractional cement",
-      balance: 0.899,
-      lowStockQty: 0.899,
+      balance: 0.898,
+      lowStockQty: 0.898,
     });
     expect(ownerSummary.spendByWeek).toEqual([
       { weekStart: weekA, materialsPaise: 1_502, wagesPaise: 0, otherPaise: 0 },
-      { weekStart: monday(weekBDate), materialsPaise: 2_100, wagesPaise: 0, otherPaise: 0 },
+      { weekStart: monday(weekBDate), materialsPaise: 3_200, wagesPaise: 0, otherPaise: 0 },
       { weekStart: currentWeek, materialsPaise: 0, wagesPaise: 90_000, otherPaise: 25_000 },
     ]);
     const weeklyTotal = ownerSummary.spendByWeek.reduce(
@@ -321,14 +328,14 @@ describe("project financial summary", () => {
     const contractorSummary = SummaryResponse.parse(
       await (await api(`/projects/${projectId}/summary`, contractor)).json(),
     );
-    expect(contractorSummary).toMatchObject({ role: "contractor", spendPaise: 118_602 });
+    expect(contractorSummary).toMatchObject({ role: "contractor", spendPaise: 119_702 });
     const engineerResponse = await api(`/projects/${projectId}/summary`, engineer);
     const engineerRaw = await engineerResponse.json();
     const engineerSummary = SummaryResponse.parse(engineerRaw);
-    expect(engineerSummary).toMatchObject({ role: "engineer", spendPaise: 118_602 });
+    expect(engineerSummary).toMatchObject({ role: "engineer", spendPaise: 119_702 });
     expect(engineerSummary.spendByWeek).toEqual([
       { weekStart: weekA, spendPaise: 1_502 },
-      { weekStart: monday(weekBDate), spendPaise: 2_100 },
+      { weekStart: monday(weekBDate), spendPaise: 3_200 },
       { weekStart: currentWeek, spendPaise: 115_000 },
     ]);
     expect(engineerRaw).not.toHaveProperty("spendSplit");
