@@ -1,42 +1,44 @@
 # Slate: Every Detail is Accounted For
 
-Slate is a construction site progress and material tracker (hackathon problem 21). Contractors log deliveries,
-usage, attendance and wages; owners see verified spend, photos and approve changes. Nothing in the
-ledger can be quietly edited and stock can't go negative.
+The existing scaffold describes Slate as a construction-site progress and material tracker and labels it hackathon problem 21. The official problem statement is not in this repository yet. Treat that description, the route inventory, and product claims as provisional until the technical lead supplies the specification and the behavior is verified.
 
-Stack: Next.js 16 (App Router) · Hono REST API at `/api/v1` · Drizzle + Postgres 16 · Better Auth ·
-shadcn/ui + Tailwind · Vitest + Playwright.
+## Current architecture reference
 
-## Run it
+The scaffold contains one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth dependencies, shared Zod schemas, and OpenAPI generation. Confirm this stack against the forthcoming technical specification before expanding it.
 
-Needs Node 24 (`.nvmrc`), pnpm (`npm i -g pnpm`; the repo pins the version), and Docker for Postgres
-(or any local Postgres 16 via `DATABASE_URL`).
+## Run the scaffold
 
-```bash
-pnpm install
+Needs Node 24 (.nvmrc) and pnpm 12.23.0 as pinned in package.json. Do not install pnpm globally; configure project-local package-manager caches as described in docs/devops.md. Docker provides PostgreSQL 16, or use an approved disposable project-local PostgreSQL database.
+
+~~~sh
+corepack pnpm install --frozen-lockfile --store-dir .cache/pnpm-store
 cp .env.example .env
+# Replace the sanitized local values in .env before starting services.
+# Docker writes image/container state outside the workspace; use only when approved.
 docker compose up -d db
-pnpm db:migrate && pnpm db:seed
-pnpm dev            # http://localhost:3000  ·  API: /api/v1/health, /api/v1/doc
-```
+corepack pnpm db:migrate
+corepack pnpm dev
+~~~
 
-Checks before every commit: `pnpm lint:fix && pnpm typecheck && pnpm test`.
+The current seed script is a no-op. No demo accounts or demo records exist. GET /api/v1/health and GET /api/v1/doc have handlers in the scaffold, but M0 has not run them against a database. Other listed API route modules are empty routers.
 
-Demo users (after seeding): owner@demo, contractor@demo, engineer@demo. Password: _set by the seed_.
+## Checks
 
-## For contributors (people and agents)
+Use the non-mutating Biome CI command and typecheck before a commit. The full Vitest suite includes a health test that requires PostgreSQL; verify DATABASE_URL and use an isolated disposable database before database-backed checks. Do not use lint:fix as a check because it rewrites files.
 
-Rules live in [`AGENTS.md`](AGENTS.md) and in the `AGENTS.md` of each module folder. Routes and their
-status are in [`docs/API.md`](docs/API.md); Docker, CI and Tailscale in [`docs/devops.md`](docs/devops.md).
+The existing frontend ledger records no pages or live API integrations. Do not report screens, auth, database features, or API routes as implemented merely because files or route mounts exist.
 
-AI: the optional checklist drafter uses the provider and model named here once chosen (_TBD_);
-without a key it falls back to a template.
+## Contributor instructions
 
-## Dependency licences
+AGENTS.md is canonical. Root and nested CLAUDE.md files reference the corresponding AGENTS.md. docs/API.md is the canonical contract and is written by Codex. docs/FRONTEND_LEDGER.md is maintained only by Claude after its initialization. Read docs/devops.md for local tool and data paths.
 
-Adding a dependency? Add its row here in the same PR.
+AI SDK packages are present in the scaffold, but no provider, model, prompt, or AI workflow has been approved or implemented.
 
-| Package | Licence | Use |
+## Dependency licenses
+
+The following is the inherited declared dependency/license inventory. Codex maintains it with any future approved dependency change; licenses have not been independently re-audited in M0.
+
+| Package | Declared licence | Use |
 |---|---|---|
 | @ai-sdk/google | Apache-2.0 | runtime |
 | @ai-sdk/groq | Apache-2.0 | runtime |
@@ -76,6 +78,6 @@ Adding a dependency? Add its row here in the same PR.
 | typescript | Apache-2.0 | dev |
 | vitest | MIT | dev |
 
-## Licence
+## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see LICENSE.
