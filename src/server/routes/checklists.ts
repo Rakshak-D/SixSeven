@@ -5,13 +5,10 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { ErrorCode, ErrorResponse } from "@/shared/errors";
 import {
-  AddChecklistItemInput,
   ChecklistDraftQuery,
   ChecklistDraftRequest,
   ChecklistDraftResponse,
   CreateChecklistDraftInput,
-  RemoveChecklistItemInput,
-  RenameChecklistItemInput,
   ReviewChecklistItemInput,
   SaveChecklistInput,
   VerifiedChecklistItemResponse,
@@ -26,8 +23,6 @@ import { type AuthEnv, requireActor } from "../middleware/auth";
 import { ApiError } from "../middleware/errors";
 import {
   accessItem,
-  addItem,
-  editItem,
   generateDraft,
   listChecklists,
   reviewItem,
@@ -214,55 +209,6 @@ export const checklists = createRouter<AuthEnv>()
     async (c) =>
       c.json(
         await reviewItem(database(), c.get("actor"), c.req.valid("param").id, c.req.valid("json")),
-        200,
-      ),
-  )
-  .openapi(
-    createRoute({
-      method: "post",
-      path: "/projects/{id}/checklist-items",
-      middleware: projectAuth,
-      request: projectBody(AddChecklistItemInput),
-      responses: { 201: item, ...errors },
-    }),
-    async (c) =>
-      c.json(
-        await addItem(database(), c.get("actor"), c.req.valid("param").id, c.req.valid("json")),
-        201,
-      ),
-  )
-  .openapi(
-    createRoute({
-      method: "patch",
-      path: "/checklist-items/{id}",
-      middleware: projectAuth,
-      request: projectBody(RenameChecklistItemInput),
-      responses: { 200: item, ...errors },
-    }),
-    async (c) => {
-      const { reason, task } = c.req.valid("json");
-      return c.json(
-        await editItem(database(), c.get("actor"), c.req.valid("param").id, reason, task),
-        200,
-      );
-    },
-  )
-  .openapi(
-    createRoute({
-      method: "delete",
-      path: "/checklist-items/{id}",
-      middleware: projectAuth,
-      request: projectBody(RemoveChecklistItemInput),
-      responses: { 200: item, ...errors },
-    }),
-    async (c) =>
-      c.json(
-        await editItem(
-          database(),
-          c.get("actor"),
-          c.req.valid("param").id,
-          c.req.valid("json").reason,
-        ),
         200,
       ),
   );

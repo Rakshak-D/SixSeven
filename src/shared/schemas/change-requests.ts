@@ -49,7 +49,15 @@ export const MedicalExpenseFields = z.strictObject({
   note: Note,
 });
 const MedicalExpensePayload = MedicalExpenseFields.omit({ note: true }).extend({
-  billPhotos: z.array(PhotoResponse).min(1).max(3),
+  billPhotos: z
+    .array(
+      PhotoResponse.extend({
+        capturedAt: Timestamp.optional(),
+        receivedAt: Timestamp.optional(),
+      }),
+    )
+    .min(1)
+    .max(3),
 });
 const ChecklistAdd = z.strictObject({
   kind: z.literal("checklist_add"),
@@ -94,6 +102,7 @@ export const ChangeRequest = z.discriminatedUnion("kind", [
     kind: z.literal("medical_expense"),
     payload: MedicalExpensePayload,
     payPaise: PositivePaise.nullable(),
+    reimbursementProvider: z.literal("mock").optional(),
   }),
 ]);
 export const ChangeRequestResponse = ChangeRequest;

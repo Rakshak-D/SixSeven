@@ -245,7 +245,7 @@ export async function getProjectSummary(
       (spendByWeek.get(mondayOf(row.occurredOn)) ?? zeroSpend()).other += amount;
     }
     for (const row of laborRows) {
-      const amount = accruedPaise(BigInt(row.halfDays), BigInt(row.ratePaise));
+      const amount = accruedPaise(BigInt(row.paidHalfDays), BigInt(row.ratePaise));
       total.wages += amount;
       (spendByWeek.get(mondayOf(row.workDate)) ?? zeroSpend()).wages += amount;
     }
