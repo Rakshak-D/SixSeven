@@ -48,6 +48,38 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-26 IST · Contractor screens: Today, Stock, Wages
+
+- **Branch / commit:** `fe/contractor-screens`, with `main` merged in (M6: proposals, checklist
+  verification, Windows launcher; no frontend files conflicted).
+- **Done (all on mocks, MOCKED):**
+  - **Today** (`/projects/[id]`, contractor): tabs Delivery, Usage, Attendance, driven by `?log=`
+    so the centre Log sheet links straight to a tab. Each form shows the balance on site, checks blank
+    fields with a plain sentence, and shows the API's own refusal (duplicate challan, not enough
+    stock, attendance already saved). Attendance defaults everyone to Full and shows a count on the
+    save button; a date that is already saved is locked, and a person is changed with Fix.
+  - **Fix sheet** for stock entries, attendance and wage payments: new value plus a reason of at least
+    10 characters. The value in force is the newest correction for that record, else the original.
+  - **Stock** (contractor and engineer): per material, the balance, a low-stock flag and a 14-day area
+    chart rebuilt from the movements.
+  - **Wages**: range presets and date inputs, totals (earned, paid, advances, still due), per-worker
+    rows with Pay, a Record payment sheet, and the range's payments with Fix.
+- **Not done, needs the API:** the challan photo on a delivery and the Photo tile in the Log sheet
+  need multipart in `api()`; both say so on screen. Payment reference rules per mode wait on request 9.
+- **Files:** new `src/components/{forms.tsx,today/*,stock/*,wages/*}`; changed `project-home.tsx`,
+  `action-sheet.tsx` and the stock and wages route pages.
+- **Tests:**
+  - `pnpm lint`, `pnpm typecheck`: pass. `vitest run src`: 59 pass (new: parsing, first-problem,
+    effective value).
+  - Playwright against `next dev` (mocks) at 390 px light and 1440 px dark: delivery saves and shows
+    the new balance; blank field, duplicate challan, over-use (names the balance), short fix reason
+    and a saved fix; payment recorded. No horizontal overflow, no console errors, nothing tappable
+    under 40 px on Today, Stock and Wages.
+- **Backend since the last entry:** M6 is merged (requests 7 and 8 are in the contract); requests 4,
+  5, 6, 9, 11 to 19 are still open. Nothing here depends on them.
+- **Next:** the engineer side (Review, checklist status, Stock, Logs without money), then wiring
+  login so the mocks can be switched off.
+
 ### 2026-11-25 20:48 IST · Contractor groundwork, role badge, stock fix
 
 - **Branch / commit:** `fe/contractor-screens`, stacked on `fe/owner-screens` (PR #18).

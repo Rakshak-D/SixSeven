@@ -1,10 +1,5 @@
-import { SectionPlaceholder } from "@/components/shell/section-placeholder";
+import { StockPage } from "@/components/stock/stock-page";
 
-export default function StockPage() {
-  return (
-    <SectionPlaceholder
-      title="Stock"
-      what="What is on site for each material, and how it changed over time."
-    />
-  );
+export default function ProjectStockPage() {
+  return <StockPage />;
 }

@@ -1,10 +1,5 @@
-import { SectionPlaceholder } from "@/components/shell/section-placeholder";
+import { WagesPage } from "@/components/wages/wages-page";
 
-export default function WagesPage() {
-  return (
-    <SectionPlaceholder
-      title="Wages"
-      what="The wage sheet for any date range, payments made and what is still due."
-    />
-  );
+export default function ProjectWagesPage() {
+  return <WagesPage />;
 }

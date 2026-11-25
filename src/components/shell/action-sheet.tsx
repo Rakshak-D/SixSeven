@@ -1,16 +1,17 @@
 // Client-only: imported by the app shell.
 
 import { Camera, ClipboardList, PackageMinus, Truck } from "lucide-react";
+import Link from "next/link";
 import { ApprovalsList } from "@/components/owner/approvals-list";
 import { Sheet } from "@/components/sheet";
 import type { NavActionKind } from "./nav";
 
 const quickLogs = [
-  { label: "Delivery", note: "Needs the challan photo", icon: Truck },
-  { label: "Usage", note: "Takes from stock", icon: PackageMinus },
-  { label: "Attendance", note: "Who came today", icon: ClipboardList },
-  { label: "Photo", note: "Site progress", icon: Camera },
-];
+  { label: "Delivery", note: "Material arrived", log: "delivery", icon: Truck },
+  { label: "Usage", note: "Takes from stock", log: "usage", icon: PackageMinus },
+  { label: "Attendance", note: "Who came today", log: "attendance", icon: ClipboardList },
+  { label: "Photo", note: "Needs photo upload, not connected yet", log: null, icon: Camera },
+] as const;
 
 const copy: Record<NavActionKind, { title: string; description: string; empty: string }> = {
   log: {
@@ -52,25 +53,43 @@ export function ActionSheet({
     >
       {kind === "log" ? (
         <div className="grid grid-cols-2 gap-2.5">
-          {quickLogs.map(({ label, note, icon: Icon }) => (
-            <button
-              key={label}
-              type="button"
-              disabled
-              className="flex min-h-32 flex-col items-start justify-between gap-4 rounded-3xl border bg-secondary p-4 text-left disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Icon aria-hidden="true" className="size-6 text-primary" />
-              <span>
-                <span className="block font-semibold text-[17px]">{label}</span>
-                <span className="block text-[15px] text-muted-foreground">{note}</span>
-              </span>
-            </button>
-          ))}
+          {quickLogs.map(({ label, note, log, icon: Icon }) => {
+            const body = (
+              <>
+                <Icon aria-hidden="true" className="size-6 text-primary" />
+                <span>
+                  <span className="block font-semibold text-[17px]">{label}</span>
+                  <span className="block text-[15px] text-muted-foreground">{note}</span>
+                </span>
+              </>
+            );
+            const tile =
+              "flex min-h-32 flex-col items-start justify-between gap-4 rounded-3xl border bg-secondary p-4 text-left";
+            return log ? (
+              <Link
+                key={label}
+                href={`/projects/${encodeURIComponent(projectId)}?log=${log}`}
+                onClick={() => onOpenChange(false)}
+                className={tile}
+              >
+                {body}
+              </Link>
+            ) : (
+              <button
+                key={label}
+                type="button"
+                disabled
+                className={`${tile} cursor-not-allowed opacity-60`}
+              >
+                {body}
+              </button>
+            );
+          })}
         </div>
       ) : null}
       {kind === "approvals" ? (
         <ApprovalsList projectId={projectId} />
-      ) : (
+      ) : kind === "log" ? null : (
         <p className="mt-4 rounded-2xl border border-dashed px-4 py-3 text-[15px] text-muted-foreground">
           {text.empty}
         </p>
