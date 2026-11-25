@@ -19,8 +19,9 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 | Milestone | State | Dependency / exit condition |
 |---|---|---|
 | M0 — repository foundation and ownership | INTEGRATED | Approved PR #3 merged. The merged tree matches the reviewed tree, and local post-merge unit tests and typecheck passed. |
-| M1 — shared API contracts | VERIFIED | Shared tests, typecheck, lint and production/browser builds passed. Merge and main CI verify integration. |
-| Next — backend foundation and vertical slice | PLANNED | Requires M1 integration and an authorized scope. |
+| M1 — shared API contracts | INTEGRATED | PR #6 merged and main CI #14 passed. |
+| M2 — auth and project access | VERIFIED | PR #7 hosted PostgreSQL CI passed all 45 tests, including migration, demo provisioning, session revocation and project isolation. |
+| Next — stock operations | PLANNED | Requires M2 integration and an authorized scope. |
 | Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities
@@ -31,9 +32,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 ## Status snapshot
 
-- Overall: M0 integrated. M1 publishes core, reporting, progress, proposal and checklist contracts. Auth and domain routes await implementation.
-- Existing scaffold: one health handler and OpenAPI document generator. Database schemas are empty, the initial migration is SELECT 1, and the seed is a no-op. Shared schema tests now complement the health and money tests.
-- No business feature is recorded as implemented or integrated.
+- Overall: M2 implements cookie auth and project creation, listing, retrieval and membership. The core database includes materials, workers, stock movements and audit history. Delivery and usage handlers are planned.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
 
 ## Integration checkpoints
@@ -47,7 +46,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 ## Blockers
 
 - Event start/end time and confirmed schedule not supplied.
-- Auth wiring, scoped authorization, database schema and domain handlers are pending.
+- Remaining domain workflows require API handlers and their corresponding service and database checks.
 - GitHub reports main as unprotected. Repository rulesets were empty at M0 inspection; do not change settings without approval. Enforce PR-only behavior in agent instructions.
 - No project-local database was started or verified in M0.
 
@@ -70,4 +69,4 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 ## Next authorized milestone
 
-Recommended next scope is auth and project membership with isolated PostgreSQL tests, then a delivery-to-usage stock transaction. Begin under the next authorized milestone.
+Recommended next scope is material and worker APIs, then transactional delivery and usage with stock and movement history.

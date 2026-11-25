@@ -23,9 +23,10 @@ export const app = new OpenAPIHono({ defaultHook: validationHook }).basePath("/a
 app.onError(errorHandler);
 app.notFound(notFound);
 
+app.route("/", projects);
+
 for (const router of [
   health,
-  projects,
   materials,
   workers,
   deliveries,

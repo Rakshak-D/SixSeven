@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { sql } from "@/db/client";
+import { getDatabase } from "@/db/client";
 import { createRouter } from "../lib/router";
 
 const Health = z.object({ ok: z.boolean(), db: z.enum(["up", "down"]) });
@@ -16,7 +16,7 @@ const route = createRoute({
 export const health = createRouter().openapi(route, async (c) => {
   let db: "up" | "down" = "up";
   try {
-    await sql`select 1`;
+    await getDatabase().sql`select 1`;
   } catch {
     db = "down";
   }

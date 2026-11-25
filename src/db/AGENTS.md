@@ -2,7 +2,7 @@
 
 Codex exclusively owns database schemas, migrations, seed data, and database access. Read root AGENTS.md, PROJECT_LEDGER.md, BACKEND_LEDGER.md, and docs/API.md before changes.
 
-The checked-in Drizzle schemas are currently empty and the baseline migration is a no-op. Use docs/SPECIFICATION.md as the approved baseline when database work is authorized.
+The schema includes auth, projects, project memberships, materials, workers, stock movements and audit history. Use docs/SPECIFICATION.md as the approved baseline when database work is authorized.
 
 For authorized schema work, inspect migration history and the target database first. Never rewrite or delete a migration already on main; add a new migration. Generate migrations with the pinned project tooling and review the generated SQL. Use transactions for related mutations when required by the confirmed specification.
 
