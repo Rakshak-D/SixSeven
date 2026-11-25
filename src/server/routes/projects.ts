@@ -5,12 +5,20 @@ import { IdParams } from "@/shared/schemas/common";
 import {
   AddProjectMemberInput,
   CreateProjectInput,
+  CreateProjectInvitationInput,
+  ProjectInvitationResponse,
+  ProjectInvitationsResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectsResponse,
 } from "@/shared/schemas/projects";
 import { createRouter } from "../lib/router";
 import { type AuthEnv, requireActor } from "../middleware/auth";
+import {
+  acceptProjectInvitation,
+  createProjectInvitation,
+  listMyInvitations,
+} from "../services/invitations";
 import {
   addProjectMember,
   createProject,
@@ -98,5 +106,67 @@ export const projects = createRouter<AuthEnv>()
           c.req.valid("json"),
         ),
         201,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/projects/{id}/invitations",
+      tags: ["projects"],
+      middleware: auth,
+      request: {
+        params: IdParams,
+        body: { required: true, content: json(CreateProjectInvitationInput) },
+      },
+      responses: {
+        201: { description: "Invitation created", content: json(ProjectInvitationResponse) },
+        ...errors,
+        409: error("Account is already a member or invitee"),
+      },
+    }),
+    async (c) =>
+      c.json(
+        await createProjectInvitation(
+          getDatabase().db,
+          c.get("actor"),
+          c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        201,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/invitations",
+      tags: ["projects"],
+      middleware: auth,
+      responses: {
+        200: {
+          description: "Caller’s pending invitations",
+          content: json(ProjectInvitationsResponse),
+        },
+        ...errors,
+      },
+    }),
+    async (c) => c.json(await listMyInvitations(getDatabase().db, c.get("actor")), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/invitations/{id}/accept",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: IdParams },
+      responses: {
+        200: { description: "Invitation accepted", content: json(ProjectMemberResponse) },
+        ...errors,
+        409: error("Invitation already accepted or account already a member"),
+      },
+    }),
+    async (c) =>
+      c.json(
+        await acceptProjectInvitation(getDatabase().db, c.get("actor"), c.req.valid("param").id),
+        200,
       ),
   );

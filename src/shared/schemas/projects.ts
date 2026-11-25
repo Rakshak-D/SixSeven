@@ -1,5 +1,23 @@
 import { z } from "zod";
-import { Id, IsoDate, Label, Paise, Role } from "./common";
+import { Id, IsoDate, Label, Paise, Role, Timestamp } from "./common";
+
+const InvitationRole = z.enum(["owner", "contractor"]);
+export const CreateProjectInvitationInput = z.strictObject({
+  email: z.string().trim().pipe(z.email().max(254)),
+  role: InvitationRole,
+});
+export const ProjectInvitationResponse = z.strictObject({
+  id: Id,
+  projectId: Id,
+  projectName: Label,
+  email: z.email(),
+  role: InvitationRole,
+  createdAt: Timestamp,
+});
+export const ProjectInvitationsResponse = z.array(ProjectInvitationResponse);
+export type CreateProjectInvitationInput = z.infer<typeof CreateProjectInvitationInput>;
+export type ProjectInvitationResponse = z.infer<typeof ProjectInvitationResponse>;
+export type ProjectInvitationsResponse = z.infer<typeof ProjectInvitationsResponse>;
 
 export const AddProjectMemberInput = z.strictObject({
   email: z.email().max(254),

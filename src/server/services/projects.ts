@@ -57,7 +57,7 @@ export async function createProject(
   const id = crypto.randomUUID();
   return db.transaction(async (tx) => {
     const project = { id, ...input };
-    const role = "contractor";
+    const role = "engineer";
     await tx.insert(projects).values({ ...project, createdBy: actor.userId });
     await tx.insert(projectMembers).values({ projectId: id, userId: actor.userId, role });
     await tx.insert(auditLog).values([
@@ -91,6 +91,24 @@ export async function addProjectMember(
 ): Promise<ProjectMemberResponse> {
   return db.transaction(async (tx) => {
     await requireProjectAccess(tx, actor, projectId, ["contractor"]);
+    // Existing contractor-created projects retain their original enrollment workflow.
+    const [legacy] = await tx
+      .select({ id: projects.id })
+      .from(projects)
+      .innerJoin(
+        projectMembers,
+        and(
+          eq(projectMembers.projectId, projects.id),
+          eq(projectMembers.userId, projects.createdBy),
+        ),
+      )
+      .where(and(eq(projects.id, projectId), eq(projectMembers.role, "contractor")));
+    if (!legacy)
+      throw new ApiError(
+        403,
+        ErrorCode.FORBIDDEN,
+        "Ask a project engineer to create an invitation",
+      );
     const [account] = await tx
       .select({ id: user.id })
       .from(user)
