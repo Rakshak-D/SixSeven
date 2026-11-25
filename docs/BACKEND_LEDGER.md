@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M4 integrated and main CI verified
+
+- Timestamp: 2026-11-25 17:45:43+05:30
+- Milestone/task ID: M4 integration closure
+- Branch: chore/m4-integration-record
+- Scope: record the completed M4 merge and main CI verification.
+- Files affected: API, project and backend ledgers only.
+- API or database changes: none.
+- Verification commands and outcomes: PR #11 CI run #29 passed Biome, typecheck, PostgreSQL 16 migration, migration upgrade, two-run seed verification, and all 81 tests. Main CI run #30 passed the same workflow on merge commit `c34eb6e4077f1eeb38ef3312b55df3011007d416`. `git diff --check` will be run before this documentation commit.
+- Dependencies added: none.
+- Known limitations: PostgreSQL verification ran in hosted disposable CI; no local PostgreSQL service was started.
+- Frontend implications: no frontend implementation or frontend ledger changes.
+- Commit or PR reference: [PR #11](https://github.com/Rakshak-D/SixSeven/pull/11), merge `c34eb6e4077f1eeb38ef3312b55df3011007d416`, [PR CI #29](https://github.com/Rakshak-D/SixSeven/actions/runs/45611095977), [main CI #30](https://github.com/Rakshak-D/SixSeven/actions/runs/45611840467).
+- Next action: begin the next specification-authorized M5 scope for owner budget summary, progress/photo storage and project activity visibility.
+
 ## Entry — M4 PostgreSQL CI correction and verification
 
 - Timestamp: 2026-11-25 17:35:58+05:30
