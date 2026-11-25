@@ -1,6 +1,6 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Transaction } from "@/db/client";
-import { attendance } from "@/db/schema";
+import { adjustments, attendance } from "@/db/schema";
 
 export type EffectiveAttendanceRow = {
   workerId: string;
@@ -10,22 +10,18 @@ export type EffectiveAttendanceRow = {
 };
 
 /** Read original attendance with its latest append-only correction in the same DB snapshot. */
-export function loadEffectiveAttendance(
+export async function loadEffectiveAttendance(
   tx: Transaction,
   projectId: string,
   from: string,
   to: string,
 ) {
-  return tx
+  const rows = await tx
     .select({
+      id: attendance.id,
       workerId: attendance.workerId,
       workDate: attendance.workDate,
-      halfDays: sql<string>`coalesce((
-        select new_value::integer from adjustments
-        where project_id = ${attendance.projectId} and target_table = 'attendance'
-          and target_id = ${attendance.id}
-        order by sequence_no desc limit 1
-      ), ${attendance.halfDays})::text`,
+      halfDays: attendance.halfDays,
       ratePaise: sql<string>`${attendance.ratePaise}::text`,
     })
     .from(attendance)
@@ -36,6 +32,32 @@ export function loadEffectiveAttendance(
         sql`${attendance.workDate} <= ${to}::date`,
       ),
     );
+
+  const corrections = rows.length
+    ? await tx
+        .select({ targetId: adjustments.targetId, newValue: adjustments.newValue })
+        .from(adjustments)
+        .where(
+          and(
+            eq(adjustments.projectId, projectId),
+            eq(adjustments.targetTable, "attendance"),
+            inArray(
+              adjustments.targetId,
+              rows.map((row) => row.id),
+            ),
+          ),
+        )
+        .orderBy(asc(adjustments.sequenceNo))
+    : [];
+  const effective = new Map<string, string>();
+  for (const correction of corrections) effective.set(correction.targetId, correction.newValue);
+
+  return rows.map((row) => ({
+    workerId: row.workerId,
+    workDate: row.workDate,
+    halfDays: effective.get(row.id) ?? String(row.halfDays),
+    ratePaise: row.ratePaise,
+  }));
 }
 
 /** The schema requires an even-paise daily rate, making each half-day exactly divisible. */
