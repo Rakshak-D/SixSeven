@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CircleCheck, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, CircleCheck, SlidersHorizontal, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AreaChart, type AreaPoint, type AxisLabel } from "@/components/charts/area-chart";
@@ -25,6 +25,7 @@ import {
   useWagePayments,
   useWorkers,
 } from "@/hooks/use-project-data";
+import { usePayments } from "@/hooks/use-supplier-payments";
 import { describeActivity } from "@/lib/activity";
 import { actionFor, describeChange } from "@/lib/change-requests";
 import { activeItems } from "@/lib/checklist";
@@ -115,6 +116,8 @@ export function OwnerHome() {
   const activity = useActivity(id);
   const proposals = useProposals(id);
   const changes = useChangeRequests(id);
+  const supplierPayments = usePayments(id);
+  const heldPayments = supplierPayments.data?.payments.filter((p) => p.status === "pending") ?? [];
   const checklists = useChecklists(id);
   const payments = useWagePayments(id);
   const workers = useWorkers(id);
@@ -287,6 +290,25 @@ export function OwnerHome() {
                 </button>
               </li>
             ) : null}
+            {heldPayments.length > 0 ? (
+              <li>
+                <Link
+                  href={`/projects/${encodeURIComponent(id)}/money`}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-card p-3"
+                >
+                  <Wallet aria-hidden="true" className="size-6 shrink-0 text-primary" />
+                  <span>
+                    <span className="block font-semibold">
+                      {heldPayments.length} supplier{" "}
+                      {heldPayments.length === 1 ? "payment" : "payments"} waiting
+                    </span>
+                    <span className="block text-[15px] text-muted-foreground">
+                      Mock payments · open Money
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ) : null}
             {s.stockAlerts.map((a) => {
               const unit = materials.data?.find((m) => m.id === a.materialId)?.unit ?? "";
               return (
@@ -312,7 +334,10 @@ export function OwnerHome() {
                 </span>
               </li>
             ))}
-            {waitingCount === 0 && s.stockAlerts.length === 0 && over.length === 0 ? (
+            {waitingCount === 0 &&
+            heldPayments.length === 0 &&
+            s.stockAlerts.length === 0 &&
+            over.length === 0 ? (
               <li className="rounded-2xl border border-dashed p-3 text-muted-foreground">
                 Nothing needs you right now.
               </li>

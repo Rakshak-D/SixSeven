@@ -8,6 +8,7 @@ import { changeRoutes } from "./change-routes";
 import { checklistRoutes } from "./checklist-routes";
 import { projectRoutes } from "./project-routes";
 import { demoRoutes } from "./routes";
+import { supplierRoutes } from "./supplier-routes";
 import type { MockRoute } from "./types";
 import { writeRoutes } from "./write-routes";
 
@@ -22,4 +23,5 @@ export const mocks: MockRoute[] = [
   ...writeRoutes,
   ...checklistRoutes,
   ...changeRoutes,
+  ...supplierRoutes,
 ];

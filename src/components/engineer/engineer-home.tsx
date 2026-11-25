@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { VerifyDeliveries } from "@/components/payments/verify-deliveries";
 import { Sheet } from "@/components/sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,8 @@ export function EngineerHome() {
           )}
         </section>
       </div>
+
+      <VerifyDeliveries projectId={id} />
 
       <section className={card} aria-label="Recent activity">
         <h2 className="text-3xl">Recent activity</h2>
