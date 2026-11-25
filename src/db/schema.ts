@@ -181,6 +181,64 @@ export const changeRequestEvents = pgTable(
   ],
 );
 
+export const medicalClaims = pgTable(
+  "medical_claims",
+  {
+    projectId: text("project_id").notNull(),
+    requestId: text("request_id").primaryKey(),
+    workerId: text("worker_id").notNull(),
+    billPaise: paise("bill_paise").notNull(),
+    incidentOn: date("incident_on").notNull(),
+    reimbursementPaise: paise("reimbursement_paise"),
+  },
+  (t) => [
+    foreignKey({
+      name: "medical_claim_request_scope",
+      columns: [t.projectId, t.requestId],
+      foreignColumns: [changeRequests.projectId, changeRequests.id],
+    }),
+    foreignKey({
+      name: "medical_claim_worker_scope",
+      columns: [t.projectId, t.workerId],
+      foreignColumns: [workers.projectId, workers.id],
+    }),
+    unique("medical_claim_project_pair").on(t.projectId, t.requestId),
+    check(
+      "medical_claim_bill_bound",
+      sql`${t.billPaise} between 1 and 9007199254740991 and
+      (${t.reimbursementPaise} is null or ${t.reimbursementPaise} between 1 and ${t.billPaise})`,
+    ),
+  ],
+);
+
+export const medicalBillPhotos = pgTable(
+  "medical_bill_photos",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    requestId: text("request_id").notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    mime: text().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "medical_photo_claim_scope",
+      columns: [t.projectId, t.requestId],
+      foreignColumns: [medicalClaims.projectId, medicalClaims.requestId],
+    }),
+    index("medical_photo_claim_idx").on(t.projectId, t.requestId),
+    check("medical_photo_size_bound", sql`${t.sizeBytes} between 1 and 5000000`),
+    check("medical_photo_mime", sql`${t.mime} in ('image/jpeg','image/png','image/webp')`),
+    check(
+      "medical_photo_capture_window",
+      sql`${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds'`,
+    ),
+  ],
+);
+
 export const materials = pgTable(
   "materials",
   {

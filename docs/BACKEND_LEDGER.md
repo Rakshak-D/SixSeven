@@ -2,6 +2,12 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Medical claims and bill photo contract
+
+- Branch `be/medical-evidence`, requests #23 and #27. Medical bill submissions use one `capturedAt` part per `billPhotos` part in matching order. This confirms the frontend ledger's multipart convention. The author and authorized reviewers can fetch private bill images.
+- Migration `0012_medical_evidence` stores the claim and capture/receipt metadata. Approval inserts one mock expense in the owner decision transaction. Rejection and duplicate acceptance do not create another expense.
+- Local verification passed fresh migration, demo seed, and 13 PostgreSQL reporting and database tests. The medical test covers stale captures, cross-project access, private image bytes, amount bounds, concurrent approval and weekly reconciliation. This entry covers medical photos. Other upload routes have a separate rollout.
+
 ## Entry — Request #4 engineer-led project setup
 
 - Timestamp: 2026-11-26 IST. Branch: `be/project-invitations`.
