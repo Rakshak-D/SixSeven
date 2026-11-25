@@ -12,6 +12,7 @@ export const ActivityResponse = z.array(
       "material",
       "worker",
       "delivery",
+      "expectedDelivery",
       "usage",
       "attendance",
       "wagePayment",

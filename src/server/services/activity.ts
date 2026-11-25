@@ -12,6 +12,7 @@ const visibleEntities = new Set([
   "material",
   "worker",
   "delivery",
+  "expectedDelivery",
   "usage",
   "attendance",
   "wagePayment",
