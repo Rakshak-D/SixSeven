@@ -18,6 +18,7 @@ import { ErrorResponse } from "@/shared/errors";
 import { ActivityResponse } from "@/shared/schemas/activity";
 import { AttendanceListResponse, AttendanceResponse } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
+import { ChangeRequest, ChangeRequestsResponse } from "@/shared/schemas/change-requests";
 import {
   ChecklistDraftResponse,
   VerifiedChecklistItemResponse,
@@ -240,13 +241,22 @@ describe("project financial summary", () => {
     expect(attendanceResponse.status).toBe(201);
     const attendanceRecord = AttendanceResponse.parse(await attendanceResponse.json()).entries[0];
     if (!attendanceRecord) throw new Error("Missing created attendance");
-    const attendanceCorrection = await api(`/projects/${projectId}/adjustments`, contractor, {
-      targetTable: "attendance",
+    const attendanceCorrection = await api(`/projects/${projectId}/change-requests`, contractor, {
+      kind: "attendance_fix",
       targetId: attendanceRecord.id,
-      newValue: 2,
-      reason: "Verified the full-day signed register entry",
+      payload: { newValue: 2, reasonKind: "other", payFullDay: false },
+      note: "Verified the full-day signed register entry",
     });
     expect(attendanceCorrection.status).toBe(201);
+    const attendanceRequest = ChangeRequest.parse(await attendanceCorrection.json());
+    expect(
+      (
+        await api(`/change-requests/${attendanceRequest.id}/decision`, owner, {
+          accept: true,
+          note: "Approved verified attendance",
+        })
+      ).status,
+    ).toBe(200);
     const attendanceList = await api(
       `/projects/${projectId}/attendance?from=${today}&to=${today}`,
       owner,
@@ -873,34 +883,82 @@ describe("M6 proposals and checklist verification", () => {
       api(`${path}/review`, engineer, { decision: "accept", progressId: latest }),
     ]);
     expect(reviews.map((r) => r.status).sort()).toEqual([200, 409]);
-    const renamed = VerifiedChecklistItemResponse.parse(
-      await (
-        await api(
-          path,
-          engineer,
-          { task: "Inspect footing layout", reason: "Clarify the inspection scope" },
-          "PATCH",
-        )
-      ).json(),
+    const requestPath = `/projects/${project}/change-requests`;
+    const submitChange = async (input: unknown) => {
+      const result = await api(requestPath, engineer, input);
+      expect(result.status).toBe(201);
+      return `/change-requests/${ChangeRequest.parse(await result.json()).id}`;
+    };
+    const vote = (request: string, approve: boolean) =>
+      api(`${request}/vote`, contractor, {
+        approve,
+        note: approve ? "Reviewed by contractor" : "Refine request before approval",
+      });
+    const decide = (request: string) =>
+      api(`${request}/decision`, owner, {
+        accept: true,
+        note: "Owner approval recorded",
+      });
+    const readItem = async () => {
+      const rows = await (await api(draftPath, owner)).json();
+      return VerifiedChecklistItemResponse.parse(VerifiedChecklistResponse.parse(rows[0]).items[0]);
+    };
+    const rename = {
+      kind: "checklist_rename",
+      targetId: first.id,
+      payload: { task: "Inspect footing layout" },
+      note: "Clarify the inspection scope",
+    };
+    const renameRequest = await submitChange(rename);
+    const stale = await submitChange({ ...rename, payload: { task: "Stale proposed name" } });
+    await expectError(await decide(renameRequest), 409, "CONFLICT");
+    expect(ChangeRequest.parse(await (await vote(renameRequest, false)).json()).status).toBe(
+      "rejected_contractor",
     );
+    const ownerQueue = await api(`${requestPath}?status=pending_owner`, owner);
+    expect(ChangeRequestsResponse.parse(await ownerQueue.json())).toEqual([]);
+    await expectError(
+      await api(`${renameRequest}/reopen`, owner, { note: "Try to reopen" }),
+      403,
+      "FORBIDDEN",
+    );
+    expect(
+      (await api(`${renameRequest}/reopen`, engineer, { note: "Resubmitted by the author" }))
+        .status,
+    ).toBe(200);
+    expect((await vote(renameRequest, true)).status).toBe(200);
+    expect((await vote(stale, true)).status).toBe(200);
+    const decisions = await Promise.all([decide(renameRequest), decide(renameRequest)]);
+    expect(decisions.map(({ status }) => status).sort()).toEqual([200, 409]);
+    await expectError(await decide(stale), 409, "CONFLICT");
+    await expectError(
+      await api(path, engineer, { task: "Bypass", reason: "Should not be permitted" }, "PATCH"),
+      404,
+      "NOT_FOUND",
+    );
+    const renamed = await readItem();
     expect(renamed.history.at(-1)).toMatchObject({
       kind: "renamed",
       previous: first.task,
       next: "Inspect footing layout",
-      actorId: engineer.userId,
+      actorId: owner.userId,
     });
-    const added = await api(`/projects/${project}/checklist-items`, engineer, {
-      checklistId: record.id,
-      phase: "slab",
-      task: "Inspect slab work",
-      reason: "Add a second inspection point",
+    const added = await submitChange({
+      kind: "checklist_add",
+      payload: { checklistId: record.id, phase: "slab", task: "Inspect slab work" },
+      note: "Add a second inspection point",
     });
-    expect(added.status).toBe(201);
-    const removed = VerifiedChecklistItemResponse.parse(
-      await (
-        await api(path, engineer, { reason: "Retire the completed inspection" }, "DELETE")
-      ).json(),
-    );
+    expect((await vote(added, true)).status).toBe(200);
+    expect((await decide(added)).status).toBe(200);
+    const removal = await submitChange({
+      kind: "checklist_remove",
+      targetId: first.id,
+      payload: {},
+      note: "Retire the completed inspection",
+    });
+    expect((await vote(removal, true)).status).toBe(200);
+    expect((await decide(removal)).status).toBe(200);
+    const removed = await readItem();
     expect(removed.removedAt).toBeTruthy();
     expect(removed.verificationStatus).toBe("done");
     const records = (await (await api(draftPath, owner)).json()) as unknown[];

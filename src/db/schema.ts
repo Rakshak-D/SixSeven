@@ -75,6 +75,78 @@ export const projectMembers = pgTable(
   ],
 );
 
+export const changeRequests = pgTable(
+  "change_requests",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    kind: text().notNull(),
+    targetId: text("target_id"),
+    targetVersion: text("target_version"),
+    payload: jsonb().$type<unknown>().notNull(),
+    authorId: text("author_id").notNull(),
+    authorRole: projectRole("author_role").notNull(),
+    status: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("change_request_project_pair").on(t.projectId, t.id),
+    foreignKey({
+      name: "change_request_author_member",
+      columns: [t.projectId, t.authorId],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    index("change_request_project_queue").on(t.projectId, t.status, t.createdAt),
+    index("change_request_target_lookup").on(t.projectId, t.kind, t.targetId, t.status),
+    check(
+      "change_request_kind",
+      sql`${t.kind} in ('checklist_add','checklist_rename','checklist_remove','attendance_fix','medical_expense')`,
+    ),
+    check(
+      "change_request_status",
+      sql`${t.status} in ('pending_contractor','pending_owner','rejected_contractor','accepted','rejected_owner')`,
+    ),
+    check("change_request_author_role", sql`${t.authorRole} in ('engineer','contractor')`),
+  ],
+);
+
+export const changeRequestEvents = pgTable(
+  "change_request_events",
+  {
+    sequence: bigint("sequence", { mode: "bigint" }).generatedAlwaysAsIdentity().primaryKey(),
+    projectId: text("project_id").notNull(),
+    requestId: text("request_id").notNull(),
+    kind: text().notNull(),
+    actorId: text("actor_id").notNull(),
+    actorRole: projectRole("actor_role").notNull(),
+    note: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "change_event_scoped_request",
+      columns: [t.projectId, t.requestId],
+      foreignColumns: [changeRequests.projectId, changeRequests.id],
+    }),
+    foreignKey({
+      name: "change_event_actor_member",
+      columns: [t.projectId, t.actorId],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    index("change_event_request_sequence").on(t.projectId, t.requestId, t.sequence),
+    uniqueIndex("change_event_final_once")
+      .on(t.requestId)
+      .where(sql`${t.kind} in ('owner_accepted','owner_rejected')`),
+    check(
+      "change_event_kind",
+      sql`${t.kind} in ('created','contractor_approved','contractor_rejected','reopened','owner_accepted','owner_rejected')`,
+    ),
+    check("change_event_nonblank_note", sql`char_length(btrim(${t.note})) between 1 and 2000`),
+  ],
+);
+
 export const materials = pgTable(
   "materials",
   {

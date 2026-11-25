@@ -57,6 +57,13 @@
       "when": 1795646956289,
       "tag": "0007_worker_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795649129825,
+      "tag": "0008_change_request_workflow",
+      "breakpoints": true
     }
   ]
 }

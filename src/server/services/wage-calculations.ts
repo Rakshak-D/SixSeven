@@ -1,11 +1,12 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Transaction } from "@/db/client";
-import { adjustments, attendance } from "@/db/schema";
+import { adjustments, attendance, changeRequestEvents, changeRequests } from "@/db/schema";
 
 export type EffectiveAttendanceRow = {
   workerId: string;
   workDate: string;
   halfDays: string;
+  paidHalfDays: string;
   ratePaise: string;
 };
 
@@ -55,10 +56,40 @@ export async function loadEffectiveAttendance(
   const effective = new Map<string, string>();
   for (const correction of corrections) effective.set(correction.targetId, correction.newValue);
 
+  const overrides = rows.length
+    ? await tx
+        .select({
+          targetId: changeRequests.targetId,
+          payFullDay: sql<boolean>`(${changeRequests.payload}->>'payFullDay') = 'true'`,
+        })
+        .from(changeRequests)
+        .innerJoin(
+          changeRequestEvents,
+          and(
+            eq(changeRequestEvents.projectId, changeRequests.projectId),
+            eq(changeRequestEvents.requestId, changeRequests.id),
+            eq(changeRequestEvents.kind, "owner_accepted"),
+          ),
+        )
+        .where(
+          and(
+            eq(changeRequests.projectId, projectId),
+            eq(changeRequests.kind, "attendance_fix"),
+            inArray(
+              changeRequests.targetId,
+              rows.map(({ id }) => id),
+            ),
+          ),
+        )
+        .orderBy(asc(changeRequestEvents.sequence))
+    : [];
+  const fullPay = new Map(overrides.map(({ targetId, payFullDay }) => [targetId, payFullDay]));
+
   return rows.map((row) => ({
     workerId: row.workerId,
     workDate: row.workDate,
     halfDays: effective.get(row.id) ?? String(row.halfDays),
+    paidHalfDays: fullPay.get(row.id) ? "2" : (effective.get(row.id) ?? String(row.halfDays)),
     ratePaise: row.ratePaise,
   }));
 }

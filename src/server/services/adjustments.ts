@@ -69,160 +69,175 @@ export async function createAdjustment(
 ) {
   return db.transaction(async (tx) => {
     await requireProjectAccess(tx, actor, projectId, ["contractor"]);
-    const id = crypto.randomUUID();
-    let oldValue: number;
-    let newValue: number;
-    let createdAt: Date;
-
-    if (input.targetTable === "stock_movements") {
-      const [target] = await tx
-        .select({
-          id: stockMovements.id,
-          materialId: stockMovements.materialId,
-          type: stockMovements.type,
-          qty: stockMovements.qty,
-          occurredOn: stockMovements.occurredOn,
-        })
-        .from(stockMovements)
-        .where(and(eq(stockMovements.projectId, projectId), eq(stockMovements.id, input.targetId)))
-        .for("update");
-      if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, "Stock movement not found");
-      if (target.type === "adjustment") {
-        throw new ApiError(
-          400,
-          ErrorCode.VALIDATION_ERROR,
-          "A compensating stock movement cannot be corrected",
-        );
-      }
-      const originalMagnitude = decimalToMilli(target.qty);
-      const previous = decimalToMilli(
-        (await latestValue(tx, projectId, "stock_movements", target.id)) ??
-          milliToDecimal(originalMagnitude < BigInt(0) ? -originalMagnitude : originalMagnitude),
+    if (input.targetTable === "attendance") {
+      throw new ApiError(
+        403,
+        ErrorCode.FORBIDDEN,
+        "Submit an attendance change request for approval",
       );
-      const replacement = decimalToMilli(Qty.parse(input.newValue));
-      if (replacement === previous)
-        throw new ApiError(
-          409,
-          ErrorCode.CONFLICT,
-          "Correction does not change the effective quantity",
-        );
-      const direction = target.type === "delivery" ? BigInt(1) : BigInt(-1);
-      const delta = (replacement - previous) * direction;
-      oldValue = Number(milliToDecimal(previous));
-      newValue = Number(milliToDecimal(replacement));
-      await appendStockMovement(
-        tx,
-        actor,
-        projectId,
-        {
-          type: "adjustment",
-          materialId: target.materialId,
-          occurredOn: target.occurredOn,
-          note: "Compensating stock correction",
-          quantityMilli: delta,
-        },
-        crypto.randomUUID(),
-        { targetTable: input.targetTable, targetId: target.id },
-      );
-      const [inserted] = await tx
-        .insert(adjustments)
-        .values({
-          id,
-          projectId,
-          targetTable: input.targetTable,
-          targetId: target.id,
-          oldValue: milliToDecimal(previous),
-          newValue: milliToDecimal(replacement),
-          reason: input.reason,
-          actorId: actor.userId,
-        })
-        .returning({ createdAt: adjustments.createdAt });
-      createdAt = inserted.createdAt;
-    } else if (input.targetTable === "attendance") {
-      const [target] = await tx
-        .select({ id: attendance.id, halfDays: attendance.halfDays })
-        .from(attendance)
-        .where(and(eq(attendance.projectId, projectId), eq(attendance.id, input.targetId)))
-        .for("update");
-      if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, "Attendance record not found");
-      const previous = Number(
-        (await latestValue(tx, projectId, "attendance", target.id)) ?? String(target.halfDays),
-      );
-      if (input.newValue === previous)
-        throw new ApiError(
-          409,
-          ErrorCode.CONFLICT,
-          "Correction does not change the effective attendance",
-        );
-      oldValue = previous;
-      newValue = input.newValue;
-      const [inserted] = await tx
-        .insert(adjustments)
-        .values({
-          id,
-          projectId,
-          targetTable: input.targetTable,
-          targetId: target.id,
-          oldValue: String(previous),
-          newValue: String(newValue),
-          reason: input.reason,
-          actorId: actor.userId,
-        })
-        .returning({ createdAt: adjustments.createdAt });
-      createdAt = inserted.createdAt;
-    } else {
-      const [target] = await tx
-        .select({ id: wagePayments.id, amountPaise: wagePayments.amountPaise })
-        .from(wagePayments)
-        .where(and(eq(wagePayments.projectId, projectId), eq(wagePayments.id, input.targetId)))
-        .for("update");
-      if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, "Wage payment not found");
-      const previous = Number(
-        (await latestValue(tx, projectId, "wage_payments", target.id)) ??
-          String(target.amountPaise),
-      );
-      if (input.newValue === previous)
-        throw new ApiError(
-          409,
-          ErrorCode.CONFLICT,
-          "Correction does not change the effective payment",
-        );
-      oldValue = previous;
-      newValue = input.newValue;
-      const [inserted] = await tx
-        .insert(adjustments)
-        .values({
-          id,
-          projectId,
-          targetTable: input.targetTable,
-          targetId: target.id,
-          oldValue: String(previous),
-          newValue: String(newValue),
-          reason: input.reason,
-          actorId: actor.userId,
-        })
-        .returning({ createdAt: adjustments.createdAt });
-      createdAt = inserted.createdAt;
     }
+    return applyAdjustment(tx, actor, projectId, input);
+  });
+}
 
-    await recordAudit(tx, {
+export async function applyAdjustment(
+  tx: Transaction,
+  actor: Actor,
+  projectId: string,
+  input: CreateAdjustmentInput,
+) {
+  const id = crypto.randomUUID();
+  let oldValue: number;
+  let newValue: number;
+  let createdAt: Date;
+
+  if (input.targetTable === "stock_movements") {
+    const [target] = await tx
+      .select({
+        id: stockMovements.id,
+        materialId: stockMovements.materialId,
+        type: stockMovements.type,
+        qty: stockMovements.qty,
+        occurredOn: stockMovements.occurredOn,
+      })
+      .from(stockMovements)
+      .where(and(eq(stockMovements.projectId, projectId), eq(stockMovements.id, input.targetId)))
+      .for("update");
+    if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, "Stock movement not found");
+    if (target.type === "adjustment") {
+      throw new ApiError(
+        400,
+        ErrorCode.VALIDATION_ERROR,
+        "A compensating stock movement cannot be corrected",
+      );
+    }
+    const originalMagnitude = decimalToMilli(target.qty);
+    const previous = decimalToMilli(
+      (await latestValue(tx, projectId, "stock_movements", target.id)) ??
+        milliToDecimal(originalMagnitude < BigInt(0) ? -originalMagnitude : originalMagnitude),
+    );
+    const replacement = decimalToMilli(Qty.parse(input.newValue));
+    if (replacement === previous)
+      throw new ApiError(
+        409,
+        ErrorCode.CONFLICT,
+        "Correction does not change the effective quantity",
+      );
+    const direction = target.type === "delivery" ? BigInt(1) : BigInt(-1);
+    const delta = (replacement - previous) * direction;
+    oldValue = Number(milliToDecimal(previous));
+    newValue = Number(milliToDecimal(replacement));
+    await appendStockMovement(
+      tx,
+      actor,
       projectId,
-      actorId: actor.userId,
-      action: "corrected",
-      entity: "adjustment",
-      entityId: id,
-      payload: { targetTable: input.targetTable, targetId: input.targetId },
-    });
-    return AdjustmentResponse.parse({
-      id,
-      targetId: input.targetId,
-      targetTable: input.targetTable,
-      oldValue,
-      newValue,
-      reason: input.reason,
-      actorId: actor.userId,
-      createdAt: createdAt.toISOString(),
-    });
+      {
+        type: "adjustment",
+        materialId: target.materialId,
+        occurredOn: target.occurredOn,
+        note: "Compensating stock correction",
+        quantityMilli: delta,
+      },
+      crypto.randomUUID(),
+      { targetTable: input.targetTable, targetId: target.id },
+    );
+    const [inserted] = await tx
+      .insert(adjustments)
+      .values({
+        id,
+        projectId,
+        targetTable: input.targetTable,
+        targetId: target.id,
+        oldValue: milliToDecimal(previous),
+        newValue: milliToDecimal(replacement),
+        reason: input.reason,
+        actorId: actor.userId,
+      })
+      .returning({ createdAt: adjustments.createdAt });
+    createdAt = inserted.createdAt;
+  } else if (input.targetTable === "attendance") {
+    const [target] = await tx
+      .select({ id: attendance.id, halfDays: attendance.halfDays })
+      .from(attendance)
+      .where(and(eq(attendance.projectId, projectId), eq(attendance.id, input.targetId)))
+      .for("update");
+    if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, "Attendance record not found");
+    const previous = Number(
+      (await latestValue(tx, projectId, "attendance", target.id)) ?? String(target.halfDays),
+    );
+    if (input.newValue === previous)
+      throw new ApiError(
+        409,
+        ErrorCode.CONFLICT,
+        "Correction does not change the effective attendance",
+      );
+    oldValue = previous;
+    newValue = input.newValue;
+    const [inserted] = await tx
+      .insert(adjustments)
+      .values({
+        id,
+        projectId,
+        targetTable: input.targetTable,
+        targetId: target.id,
+        oldValue: String(previous),
+        newValue: String(newValue),
+        reason: input.reason,
+        actorId: actor.userId,
+      })
+      .returning({ createdAt: adjustments.createdAt });
+    createdAt = inserted.createdAt;
+  } else {
+    const [target] = await tx
+      .select({ id: wagePayments.id, amountPaise: wagePayments.amountPaise })
+      .from(wagePayments)
+      .where(and(eq(wagePayments.projectId, projectId), eq(wagePayments.id, input.targetId)))
+      .for("update");
+    if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, "Wage payment not found");
+    const previous = Number(
+      (await latestValue(tx, projectId, "wage_payments", target.id)) ?? String(target.amountPaise),
+    );
+    if (input.newValue === previous)
+      throw new ApiError(
+        409,
+        ErrorCode.CONFLICT,
+        "Correction does not change the effective payment",
+      );
+    oldValue = previous;
+    newValue = input.newValue;
+    const [inserted] = await tx
+      .insert(adjustments)
+      .values({
+        id,
+        projectId,
+        targetTable: input.targetTable,
+        targetId: target.id,
+        oldValue: String(previous),
+        newValue: String(newValue),
+        reason: input.reason,
+        actorId: actor.userId,
+      })
+      .returning({ createdAt: adjustments.createdAt });
+    createdAt = inserted.createdAt;
+  }
+
+  await recordAudit(tx, {
+    projectId,
+    actorId: actor.userId,
+    action: "corrected",
+    entity: "adjustment",
+    entityId: id,
+    payload: { targetTable: input.targetTable, targetId: input.targetId },
+  });
+  return AdjustmentResponse.parse({
+    id,
+    targetId: input.targetId,
+    targetTable: input.targetTable,
+    oldValue,
+    newValue,
+    reason: input.reason,
+    actorId: actor.userId,
+    createdAt: createdAt.toISOString(),
   });
 }
 
