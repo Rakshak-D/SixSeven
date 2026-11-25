@@ -108,3 +108,20 @@ SummaryResponse
 ```json
 {"role":"engineer","budgetPaise":250000000,"spendPaise":4180000,"burnRatePaisePerDay":209000,"materialVariance":[],"stockAlerts":[],"spendByWeek":[{"weekStart":"2026-11-23","spendPaise":4180000}]}
 ```
+
+### M6 verification contract
+
+All routes require a session. Item IDs resolve to their project before checking role. Inaccessible resources return 404, an insufficient project role returns 403, invalid input returns 400, and invalid state or a repeated decision returns 409.
+
+| Method and path | Role | Input | Result |
+|---|---|---|---|
+| POST /checklist-items/:id/start | Contractor | No body | 200 VerifiedChecklistItemResponse |
+| POST /checklist-items/:id/completion | Contractor | Multipart note and 1–10 photos, using progress upload limits | 200 VerifiedChecklistItemResponse |
+| POST /checklist-items/:id/review | Engineer | ReviewChecklistItemInput | 200 VerifiedChecklistItemResponse |
+| POST /projects/:id/checklist-items | Engineer | AddChecklistItemInput with the target checklist ID | 201 VerifiedChecklistItemResponse |
+| PATCH /checklist-items/:id | Engineer | RenameChecklistItemInput | 200 VerifiedChecklistItemResponse |
+| DELETE /checklist-items/:id | Engineer | RemoveChecklistItemInput | 200 VerifiedChecklistItemResponse |
+
+Checklist reads and saves retain the legacy display status and add verificationStatus, removedAt and history to items. Clients use verificationStatus for todo, doing, waiting, done and sent_back. Filter removed items using removedAt. History links submission evidence to progress IDs in the project timeline. The live PATCH accepts rename input only. The legacy status-write schema remains exported for existing development fixtures.
+
+Checklist drafts return source template. An AI request satisfying the existing input contract receives the deterministic template with fallbackReason unavailable. This milestone selects no provider and requires no AI credentials. These contracts are published ahead of the backend routes.
