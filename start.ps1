@@ -72,10 +72,10 @@ function Get-OwnedDatabase {
     if ($LASTEXITCODE) { throw 'Could not enumerate Slate database containers.' }
     if ($ids.Count -eq 0) { return $null }
     if ($ids.Count -ne 1) { throw 'There is more than one database container for this Compose project. Inspect it before continuing.' }
-    $format = '{{index .Config.Labels "com.docker.compose.project.working_dir"}}|{{index .Config.Labels "com.docker.compose.project.config_files"}}|{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Type}}:{{.Source}}{{end}}{{end}}|{{.State.Running}}|{{json (index .HostConfig.PortBindings "5432/tcp")}}'
+    $format = '{{index .Config.Labels "com.docker.compose.project.working_dir"}}|{{index .Config.Labels "com.docker.compose.project.config_files"}}|{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Type}}:{{.Source}}{{end}}{{end}}|{{.State.Running}}|{{.State.StartedAt}}|{{json (index .HostConfig.PortBindings "5432/tcp")}}'
     $details = docker inspect --format $format $ids[0] 2>$null
     if ($LASTEXITCODE) { throw 'Could not inspect the Slate database container.' }
-    $workingDir, $configFile, $mount, $running, $portJson = $details -split '\|', 5
+    $workingDir, $configFile, $mount, $running, $startedAt, $portJson = $details -split '\|', 6
     if ($workingDir -ine $root -or $configFile -ine $composeFile -or
         $mount -ine ('bind:' + (Join-Path $cache 'postgres'))) {
         throw 'The selected Compose project belongs to another checkout or data directory. Select a unique SLATE_COMPOSE_PROJECT.'
@@ -84,7 +84,7 @@ function Get-OwnedDatabase {
     if ($ports.Count -ne 1 -or $ports[0].HostIp -ne '127.0.0.1') {
         throw 'The owned PostgreSQL container must publish exactly one IPv4 loopback port.'
     }
-    return @{ Id = $ids[0]; Running = $running -eq 'true'; Port = [int]$ports[0].HostPort }
+    return @{ Id = $ids[0]; Running = $running -eq 'true'; Port = [int]$ports[0].HostPort; StartedAt = $startedAt }
 }
 
 function Assert-DatabaseDirectoryAvailable {
@@ -99,23 +99,35 @@ function Assert-DatabaseDirectoryAvailable {
     }
 }
 
-function Stop-Slate {
-    if (!(Test-Path -LiteralPath $dotenv -PathType Leaf)) {
-        Write-Host 'This checkout has no .env. Nothing to stop.'
-        return
-    }
+function Stop-SessionDatabase([string]$Id, [string]$StartedAt) {
+    if (!$Id) { return }
     Assert-Docker
     $database = Get-OwnedDatabase
-    if ($database -and $database.Running) {
-        Invoke-Compose stop db
-        if ($LASTEXITCODE) { throw 'Docker could not stop the Slate database.' }
+    if ($database -and $database.Running -and $database.Id -eq $Id -and $database.StartedAt -eq $StartedAt) {
+        docker stop $Id | Out-Null
+        if ($LASTEXITCODE) { throw 'Docker could not stop the launcher-started PostgreSQL session.' }
+        Write-Host 'Stopped PostgreSQL started by this launcher session. Local data is preserved.'
     }
-    Write-Host 'Slate launcher services stopped. Local data is preserved.'
 }
 
+function Test-AppListener($Process, [int]$Port) {
+    $listeners = @(Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1 -LocalPort $Port -ErrorAction SilentlyContinue)
+    foreach ($listener in $listeners) {
+        $pidToCheck = $listener.OwningProcess
+        while ($pidToCheck -gt 0) {
+            if ($pidToCheck -eq $Process.Id) { return !$Process.HasExited }
+            $info = Get-CimInstance Win32_Process -Filter "ProcessId=$pidToCheck" -ErrorAction SilentlyContinue
+            if (!$info -or $info.CreationDate -lt $Process.StartTime -or $info.ParentProcessId -eq $pidToCheck) { break }
+            $pidToCheck = $info.ParentProcessId
+        }
+    }
+    return $false
+}
+
+$token = $null
 $gate = Open-LauncherLock
 if (!$gate -and $Stop) {
-    $token, $activeProject = (Get-Content -LiteralPath $activePath -Raw -ErrorAction SilentlyContinue) -split '\|', 2
+    $token, $activeProject, $sessionDatabaseId, $sessionDatabaseStartedAt = (Get-Content -LiteralPath $activePath -Raw -ErrorAction SilentlyContinue) -split '\|', 4
     if ($activeProject -and $activeProject -ne $project) {
         throw "Use SLATE_COMPOSE_PROJECT=$activeProject in this terminal to stop the running launcher."
     }
@@ -177,8 +189,18 @@ $process = $null
 $activeWritten = $false
 Push-Location -LiteralPath $root
 try {
-    if ($Stop) { Stop-Slate; return }
+    if ($Stop) {
+        if (!$token) {
+            Write-Host 'No active launcher session in this checkout. Existing services were left running.'
+            return
+        }
+        Write-Host 'Stopped the application managed by this launcher.'
+        Stop-SessionDatabase $sessionDatabaseId $sessionDatabaseStartedAt
+        return
+    }
 
+    # A previous process may have exited without clearing its session marker.
+    [IO.File]::WriteAllText($activePath, '')
     foreach ($tool in @('node', 'corepack')) {
         if (!(Get-Command $tool -ErrorAction SilentlyContinue)) {
             throw "Missing $tool. Install Node 24 with Corepack, open a new PowerShell window, and retry."
@@ -218,6 +240,17 @@ try {
     console.log(JSON.stringify({
         origin: origin.origin, appPort: Number(origin.port || '80'), dbPort: port, database,
         mocks: env.NEXT_PUBLIC_USE_MOCKS === '1',
+        // Pass the exact validated values to every child, even when its dotenv loader differs.
+        pinnedEnv: {
+            DATABASE_URL: env.DATABASE_URL,
+            SLATE_MIGRATION_DATABASE: database,
+            POSTGRES_DB: database,
+            POSTGRES_PASSWORD: env.POSTGRES_PASSWORD,
+            DB_PORT: String(port),
+            BETTER_AUTH_URL: origin.origin,
+            BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+            SLATE_DEMO_PASSWORD: env.SLATE_DEMO_PASSWORD || '',
+        },
         seedReady: !!env.SLATE_DEMO_PASSWORD && env.SLATE_DEMO_PASSWORD.length >= 12 &&
             env.SLATE_DEMO_PASSWORD.length <= 64 && !env.SLATE_DEMO_PASSWORD.startsWith('replace-with-'),
     }));
@@ -227,26 +260,19 @@ try {
     if ($LASTEXITCODE) {
         throw 'Check .env: use the matching local Compose slate_demo database, migration name and DB_PORT, a loopback HTTP auth origin, and valid local credentials.'
     }
-    $config = $configJson | ConvertFrom-Json
+    try { $config = $configJson | ConvertFrom-Json }
+    catch { throw 'Could not read the launcher configuration from Node.' }
+    foreach ($setting in $config.pinnedEnv.PSObject.Properties) {
+        Set-LauncherEnv $setting.Name $setting.Value
+    }
     if (($AppPort -and $AppPort -ne $config.appPort) -or ($DatabasePort -and $DatabasePort -ne $config.dbPort)) {
         throw 'Port options initialize a new .env. Update your existing .env manually to change ports.'
     }
     if ($config.appPort -eq $config.dbPort) { throw 'The app and database require different ports.' }
     if (Test-PortInUse $config.appPort) {
-        try {
-            $health = Invoke-RestMethod "$($config.origin)/api/v1/health" -TimeoutSec 3
-            $api = Invoke-RestMethod "$($config.origin)/api/v1/doc" -TimeoutSec 3
-        } catch { throw "Application port $($config.appPort) is in use. Free it manually or configure another BETTER_AUTH_URL." }
-        if ($health.ok -ne $true -or $api.info.title -ne 'Slate API') {
-            throw "Application port $($config.appPort) is in use by another service."
-        }
-        if ($Prototype -or $Live -or $Seed) {
-            throw 'Slate is already running at this URL. Stop that instance before switching modes or seeding.'
-        }
-        Show-Addresses $config
-        Write-Host 'Slate is already listening. Its existing mode and database were preserved.'
-        return
+        throw "Application port $($config.appPort) is already in use. Stop its current listener yourself or configure another BETTER_AUTH_URL."
     }
+
     if ($Seed -and !$config.seedReady) {
         throw 'Set SLATE_DEMO_PASSWORD in .env to a local password of 12–64 characters before using -Seed.'
     }
@@ -283,10 +309,12 @@ try {
         [IO.File]::WriteAllText($dependencyStamp, $hash)
     }
 
+    $startedDatabase = $null
     if (!$database -or !$database.Running) {
         Invoke-Compose up -d --no-recreate db
         if ($LASTEXITCODE) { throw 'PostgreSQL startup failed. Inspect the Slate Compose service and port configuration.' }
         $database = Get-OwnedDatabase
+        $startedDatabase = $database
     }
     if (!$database -or !$database.Running) { throw 'The checkout-owned PostgreSQL container is not running.' }
 
@@ -342,7 +370,7 @@ const sql = postgres(uri.href, { max: 1, connect_timeout: 5, onnotice: () => {} 
 })();
 "@
     # Use the app's actual URL for the probe and compare its cluster to the owned container.
-    $databaseState = $probe | node --env-file=.env --input-type=module - $identity 2>$null
+    $databaseState = $probe | node --input-type=module - $identity 2>$null
     if ($LASTEXITCODE -or $databaseState -notin @('fresh', 'existing')) {
         throw 'Database verification failed. Check DATABASE_URL credentials and confirm this database is empty or has Slate migration history matching this checkout.'
     }
@@ -372,13 +400,33 @@ const sql = postgres(uri.href, { max: 1, connect_timeout: 5, onnotice: () => {} 
         $child.ArgumentList.Add($arg)
     }
     $token = [Guid]::NewGuid().ToString('N')
-    [IO.File]::WriteAllText($activePath, "$token|$project")
+    [IO.File]::WriteAllText($activePath, "$token|$project|$($startedDatabase.Id)|$($startedDatabase.StartedAt)")
     $activeWritten = $true
+    Write-Host 'Starting the Next.js development server. Waiting for application and database health.'
+    $process = [Diagnostics.Process]::Start($child)
+    $deadline = [Diagnostics.Stopwatch]::StartNew()
+    $ready = $false
+    while (!$process.HasExited -and $deadline.Elapsed.TotalSeconds -lt 90) {
+        if ((Get-Content -LiteralPath $stopPath -Raw -ErrorAction SilentlyContinue) -eq $token) { return }
+        if (Test-AppListener $process $config.appPort) {
+            try {
+                $health = Invoke-RestMethod "$($config.origin)/api/v1/health" -NoProxy -MaximumRedirection 0 -TimeoutSec 4
+                $ready = $health.ok -eq $true -and $health.db -eq 'up'
+            } catch { $ready = $false }
+            if ($ready) { break }
+            $ready = $false
+        }
+        Start-Sleep -Milliseconds 350
+    }
+    if (!$ready) {
+        if ($process.HasExited) { throw "Next.js exited before becoming healthy (code $($process.ExitCode))." }
+        throw 'Slate did not report healthy application and database status within 90 seconds.'
+    }
+    Write-Host 'Slate is ready. Application health confirmed PostgreSQL is up.'
     Show-Addresses $config
     if ($mocks -eq '1') { Write-Host 'Prototype mode. Frontend mocks are enabled.' }
     else { Write-Host 'Live mode. The frontend uses the real API.' }
-    Write-Host 'Press Ctrl+C to exit the app, or use stop.ps1 from another terminal to stop the app and database.'
-    $process = [Diagnostics.Process]::Start($child)
+    Write-Host 'Use stop.ps1 from another terminal to stop this launcher session, or press Ctrl+C to exit the app.'
     while (!$process.WaitForExit(350)) {
         if ((Get-Content -LiteralPath $stopPath -Raw -ErrorAction SilentlyContinue) -eq $token) { return }
     }

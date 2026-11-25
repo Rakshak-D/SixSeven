@@ -4,7 +4,7 @@ Slate is a construction-site progress and material tracker. The approved reposit
 
 ## Current architecture reference
 
-The scaffold contains one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth dependencies, shared Zod schemas, and OpenAPI generation. This is the approved stack for implementation.
+Slate uses one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth, shared Zod schemas, and OpenAPI generation. This is the approved stack for implementation.
 
 ## Run Slate on Windows
 
@@ -16,12 +16,12 @@ Install Node 24 with Corepack, PowerShell 7.2 or newer, and Docker Desktop in Li
 .\start.ps1 -Live       # Disable frontend mocks for this run
 .\start.ps1 -Seed       # Explicitly apply the repeatable demo seed, then start
 .\start.ps1 -Live -Seed # Combine live mode and demo seeding
-.\stop.ps1              # Stop the launcher-managed app and this checkout's PostgreSQL
+.\stop.ps1              # Stop this launcher session
 ```
 
-The launcher creates `.env` only when missing and stores the generated demo password there. It initializes a verified empty demo database when a valid demo password is configured. To sign in, use that password with `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid`. An existing database is seeded only when you pass `-Seed`. The launcher prints the app, health and OpenAPI URLs. The generated configuration defaults to prototype mode. Use `-Live` to exercise real API integration. No AI credentials are required.
+The launcher creates `.env` only when missing and stores the generated demo password there. It initializes a verified empty demo database when a valid demo password is configured. To sign in, use that password with `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid`. An existing database is seeded only when you pass `-Seed`. After the launcher confirms the app responds and PostgreSQL is up, it prints the app, health and OpenAPI URLs. The generated configuration defaults to prototype mode. Use `-Live` to exercise real API integration. No AI credentials are required.
 
-The app runs in the launcher terminal. Ctrl+C exits the app and leaves PostgreSQL running. Run `.\stop.ps1` from a second terminal to stop the launcher-managed app and the checkout's Compose database. Existing containers and data remain available for the next start.
+The app runs in the launcher terminal. Ctrl+C exits the app and leaves PostgreSQL running. Run `.\stop.ps1` from a second terminal while the launcher is active. It stops the app and stops PostgreSQL only if that launcher session started it. An already running database is reused and stays running. With no active launcher, the stop command leaves existing services running.
 
 For a separate checkout, choose a unique `SLATE_COMPOSE_PROJECT` and unused ports. The port flags initialize a missing `.env`. Keep the same Compose project setting in both terminals:
 
@@ -30,7 +30,7 @@ $env:SLATE_COMPOSE_PROJECT = 'slate-sandbox'
 .\start.ps1 -AppPort 3100 -DatabasePort 55432 -Live
 ```
 
-The launcher checks the authentication origin and database identity. It requires an empty database or the matching Slate migration history, and accepts only a loopback Compose `slate_demo` database (including suffixed demo names). For existing configurations, edit `.env` explicitly to change ports. Keep `DB_PORT` and `DATABASE_URL` in sync. Use a local Docker Desktop context. Project caches and PostgreSQL data are under `.cache`. Docker Desktop manages its images and container metadata.
+The launcher checks the authentication origin and database identity. It requires an empty database or the matching Slate migration history, and accepts only a loopback Compose `slate_demo` database (including suffixed demo names). For existing configurations, edit `.env` explicitly to change ports. Keep `DB_PORT` and `DATABASE_URL` in sync. Process environment values take precedence over `.env`. The launcher passes the resulting database credentials and identity to Compose, migrations, seeding and the app, ahead of Next.js dotenv overrides. Use a local Docker Desktop context. Project caches and PostgreSQL data are under `.cache`. Docker Desktop manages its images and container metadata.
 
 Run a script by absolute path from any working directory. See [development setup](docs/devops.md) for manual setup on other platforms and [API.md](docs/API.md) for endpoint status.
 
@@ -38,13 +38,15 @@ Run a script by absolute path from any working directory. See [development setup
 
 Use the non-mutating Biome CI command and typecheck before a commit. The full Vitest suite includes a health test that requires PostgreSQL; verify DATABASE_URL and use an isolated disposable database before database-backed checks. Do not use lint:fix as a check because it rewrites files.
 
-The existing frontend ledger records no pages or live API integrations. Do not report screens, auth, database features, or API routes as implemented merely because files or route mounts exist.
+The project switcher and project pages are present. Frontend requests go through the API client, which can serve supported development fixtures in prototype mode. Live mode sends those requests to the backend. For current screen and workflow coverage, see [the frontend ledger](docs/FRONTEND_LEDGER.md) and [API status](docs/API.md).
+
+Run the PowerShell launcher regressions from an isolated worktree with an initialized disposable Compose database and no running app. Pass the sandbox project and app port to `.\tests\windows-launcher.test.ps1 -Project slate-launcher-test-local -AppPort 3100`.
 
 ## Contributor instructions
 
 AGENTS.md is canonical. Root and nested CLAUDE.md files reference the corresponding AGENTS.md. docs/API.md is the canonical contract and is written by Codex. docs/FRONTEND_LEDGER.md is maintained only by Claude after its initialization. Read docs/devops.md for local tool and data paths.
 
-AI SDK packages are present in the scaffold, but no provider, model, prompt, or AI workflow has been approved or implemented.
+AI SDK packages remain available for deferred provider work.
 
 ## Dependency licenses
 
