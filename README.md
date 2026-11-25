@@ -6,21 +6,33 @@ Slate is a construction-site progress and material tracker. The approved reposit
 
 The scaffold contains one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth dependencies, shared Zod schemas, and OpenAPI generation. This is the approved stack for implementation.
 
-## Run the scaffold
+## Run Slate on Windows
 
-Needs Node 24 (.nvmrc) and pnpm 12.23.0 as pinned in package.json. Do not install pnpm globally; configure project-local package-manager caches as described in docs/devops.md. Docker provides PostgreSQL 16, or use an approved disposable project-local PostgreSQL database.
+Install Node 24 with Corepack, PowerShell 7.2 or newer, and Docker Desktop in Linux container mode. Open Docker Desktop and wait for the engine. From the repository root, run:
 
-~~~sh
-corepack pnpm install --frozen-lockfile --store-dir .cache/pnpm-store
-cp .env.example .env
-# Replace the sanitized local values in .env before starting services.
-# Docker writes image/container state outside the workspace; use only when approved.
-docker compose up -d db
-corepack pnpm db:migrate
-corepack pnpm dev
-~~~
+```powershell
+.\start.ps1             # Keep the frontend mode configured in .env
+.\start.ps1 -Prototype  # Enable frontend mocks for this run
+.\start.ps1 -Live       # Disable frontend mocks for this run
+.\start.ps1 -Seed       # Explicitly apply the repeatable demo seed, then start
+.\start.ps1 -Live -Seed # Combine live mode and demo seeding
+.\stop.ps1              # Stop the launcher-managed app and this checkout's PostgreSQL
+```
 
-Follow [development setup](docs/devops.md) to confirm the migration target and seed demo accounts. Better Auth and the project APIs use the configured PostgreSQL database. [API.md](docs/API.md) lists the implemented operations and planned features.
+The launcher creates `.env` only when missing and stores the generated demo password there. It initializes a verified empty demo database when a valid demo password is configured. To sign in, use that password with `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid`. An existing database is seeded only when you pass `-Seed`. The launcher prints the app, health and OpenAPI URLs. The generated configuration defaults to prototype mode. Use `-Live` to exercise real API integration. No AI credentials are required.
+
+The app runs in the launcher terminal. Ctrl+C exits the app and leaves PostgreSQL running. Run `.\stop.ps1` from a second terminal to stop the launcher-managed app and the checkout's Compose database. Existing containers and data remain available for the next start.
+
+For a separate checkout, choose a unique `SLATE_COMPOSE_PROJECT` and unused ports. The port flags initialize a missing `.env`. Keep the same Compose project setting in both terminals:
+
+```powershell
+$env:SLATE_COMPOSE_PROJECT = 'slate-sandbox'
+.\start.ps1 -AppPort 3100 -DatabasePort 55432 -Live
+```
+
+The launcher checks the authentication origin and database identity. It requires an empty database or the matching Slate migration history, and accepts only a loopback Compose `slate_demo` database (including suffixed demo names). For existing configurations, edit `.env` explicitly to change ports. Keep `DB_PORT` and `DATABASE_URL` in sync. Use a local Docker Desktop context. Project caches and PostgreSQL data are under `.cache`. Docker Desktop manages its images and container metadata.
+
+Run a script by absolute path from any working directory. See [development setup](docs/devops.md) for manual setup on other platforms and [API.md](docs/API.md) for endpoint status.
 
 ## Checks
 
