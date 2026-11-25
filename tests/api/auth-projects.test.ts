@@ -17,6 +17,7 @@ import {
   ProjectMemberResponse,
   ProjectResponse,
   ProjectsResponse,
+  ProjectTeamResponse,
 } from "@/shared/schemas/projects";
 import { testDatabase } from "./database-fixture";
 
@@ -169,6 +170,63 @@ describe("email/password authentication", () => {
 });
 
 describe("projects and scoped access", () => {
+  it("shares only an opted-in phone with project teammates and lets the caller clear it", async () => {
+    const owner = await login(DemoAccountEmail.owner);
+    const engineer = await login(DemoAccountEmail.engineer);
+    const outsider = await login("isolated@demo.invalid");
+    const update = (value: unknown, cookie?: string, origin = process.env.BETTER_AUTH_URL) =>
+      app.request("/api/v1/me", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          ...(cookie && { cookie }),
+          ...(origin && { origin }),
+        },
+        body: JSON.stringify(value),
+      });
+    const url = "/projects/demo-greenfield/members";
+    await error(await call(url), 401, "UNAUTHENTICATED");
+    await error(await call(url, outsider.cookie), 404, "NOT_FOUND");
+    await error(await update({ phone: "9876543210" }), 401, "UNAUTHENTICATED");
+    await error(await update({ phone: "12345" }, owner.cookie), 400, "VALIDATION_ERROR");
+    await error(
+      await update({ phone: "9876543210", userId: engineer.userId }, owner.cookie),
+      400,
+      "VALIDATION_ERROR",
+    );
+    await error(
+      await update({ phone: "9876543210" }, owner.cookie, "https://untrusted.invalid"),
+      403,
+      "FORBIDDEN",
+    );
+    try {
+      const changed = await update({ phone: "9876543210" }, owner.cookie);
+      expect(changed.status).toBe(200);
+      expect(await changed.json()).toEqual({ phone: "+919876543210" });
+      const members = await call(url, engineer.cookie);
+      expect(members.status).toBe(200);
+      const roster = ProjectTeamResponse.parse(await members.json());
+      expect(roster.find(({ userId }) => userId === owner.userId)).toEqual({
+        userId: owner.userId,
+        name: "Demo Owner",
+        role: "owner",
+        phone: "+919876543210",
+      });
+      expect(roster.find(({ userId }) => userId === engineer.userId)).not.toHaveProperty("phone");
+      expect(
+        SessionResponse.parse(
+          await (await authRequest("get-session", { cookie: owner.cookie })).json(),
+        )?.user,
+      ).not.toHaveProperty("phone");
+    } finally {
+      expect(await (await update({ phone: null }, owner.cookie)).json()).toEqual({ phone: null });
+    }
+    expect(
+      ProjectTeamResponse.parse(await (await call(url, engineer.cookie)).json()).find(
+        ({ userId }) => userId === owner.userId,
+      ),
+    ).not.toHaveProperty("phone");
+  });
   const input = {
     name: "Museum Annex",
     location: "Hassan",

@@ -2,6 +2,14 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Request #12 project team contacts
+
+- Timestamp: 2026-11-26 IST. Branch: `be/team-contacts`.
+- Added member-scoped `GET /api/v1/projects/:id/members` and caller-only `PATCH /api/v1/me`. The latter sets or clears an Indian mobile number. Only the caller and project teammates can receive it. Auth responses still omit it.
+- Migration `0007_team_contacts` adds a nullable phone column with a database format constraint. This was generated from main. If the worker lifecycle migration lands first, regenerate this unmerged migration from the new main.
+- Fresh PostgreSQL migration and seed, typecheck, scoped Biome, and the auth/projects and database suites passed (16 tests). The full lint job on main requires the frontend formatting handoff recorded in the live integration PR.
+- Frontend handoff: connect the Team panel query through `src/hooks/use-project-data.ts` with `ProjectTeamResponse`. Use `UpdateMyPhoneInput` for profile submission, and omit the call action if phone is absent.
+
 ## Entry — Request #11 engineer attendance roster
 
 - Timestamp: 2026-11-26 IST. Branch: `be/attendance-roster`.

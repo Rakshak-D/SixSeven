@@ -50,6 +50,13 @@
       "when": 1795620444886,
       "tag": "0006_m6_workflows",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795647199007,
+      "tag": "0007_team_contacts",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ One Next.js App Router application with Hono at `/api/v1`, `@hono/zod-openapi`, 
 ## Domain and integrity
 
 - Projects have a name, location, start date, nonnegative budget and creator. Contractors add owner and engineer memberships by existing account email. Materials have units, planned quantity, unit cost, tolerance and low stock threshold. Workers have category, active status and daily rate. Give forms a way to read materials and workers under the matching project access rules.
+- Project members may view their team's names and roles. Users can opt in to sharing an Indian mobile number with members of projects they belong to, and can clear it at any time.
 - Stock is a cached, nonnegative balance backed by append-only signed movements. Deliveries record supplier, challan, quantity and cost. Enforce one supplier/challan pair per project after normalization. Consumption and compensating decreases must use a guarded balance update in the same transaction as the movement and audit insert. Avoid read-before-decrement races.
 - Store money in integer paise and quantity in numeric(14,3). Prices and budgets are nonnegative. Use positive even-paise daily rates to produce exact half-day wages. Attendance is unique by worker and date, supports 0/1/2 half-day units and snapshots the worker rate. Submit a day's batch atomically.
 - Engineers may read the project attendance roster with worker names, dates and effective half-day units. Keep wage rates, amounts and adjustment details restricted to the owner and contractor.
