@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sixseven
+          POSTGRES_PASSWORD: sixseven
+          POSTGRES_DB: sixseven
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sixseven -d sixseven"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://sixseven:sixseven@localhost:5432/sixseven
+      BETTER_AUTH_SECRET: ci-only-secret-not-used-anywhere-else
+      BETTER_AUTH_URL: http://localhost:3000
+      UPLOAD_DIR: /tmp/uploads
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint + format (Biome)
+        run: pnpm exec biome ci
+      - run: pnpm typecheck
+      - name: Migrate (Postgres 16)
+        run: pnpm db:migrate
+      - name: Tests (Vitest)
+        run: pnpm test
