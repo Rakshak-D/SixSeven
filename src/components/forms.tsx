@@ -1,6 +1,13 @@
 "use client";
 
-import { type ReactNode, useId } from "react";
+import { Children, isValidElement, type ReactElement, type ReactNode, useId } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** Same look as the Input primitive, shared by native selects and textareas. */
 export const controlClass =
@@ -28,7 +35,10 @@ export function Field({
   );
 }
 
-/** Native select: the best picker on a phone, and styled like the other controls. */
+/**
+ * Select with our own menu, so the open list matches the app in light and dark instead of the
+ * browser's. Pass `<option value>` children; they are read as the choices.
+ */
 export function NativeSelect({
   id,
   value,
@@ -42,16 +52,31 @@ export function NativeSelect({
   children: ReactNode;
   disabled?: boolean;
 }) {
+  const options = Children.toArray(children).filter(isValidElement) as ReactElement<{
+    value: string | number;
+    children: ReactNode;
+  }>[];
   return (
-    <select
-      id={id}
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      className={`${controlClass} h-12`}
-    >
-      {children}
-    </select>
+    <Select value={value} onValueChange={onChange} disabled={disabled}>
+      <SelectTrigger id={id} className="h-12 w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent
+        position="popper"
+        sideOffset={6}
+        className="rounded-2xl border bg-popover p-1.5"
+      >
+        {options.map((option) => (
+          <SelectItem
+            key={String(option.props.value)}
+            value={String(option.props.value)}
+            className="min-h-11 rounded-xl py-2 pr-10 pl-3 text-base"
+          >
+            {option.props.children}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
