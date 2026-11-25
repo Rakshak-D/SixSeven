@@ -1,22 +1,9 @@
-# Contract: `src/shared/`
+# Shared frontend-safe API contract: src/shared/
 
-Imported by both the browser and the server: no Node-only imports, no DB, no Hono here.
+Codex exclusively owns exported API schemas, shared error contracts, and shared domain types here. Claude consumes these files but does not create competing client-side or server-side definitions.
 
-- `schemas/<resource>.ts`: Zod request and response schemas, one file per resource, named exports
-  (`CreateDeliveryInput`, `StockResponse`, ...). Plain `zod`, so the frontend can import them.
-  No `index.ts` barrel. `schemas/common.ts` has `Paise`, `Qty`, `IsoDate`, `Role`.
-- `errors.ts`: every API error code and the `{ error: { code, message, details } }` schema.
-- `money.ts`: the only place paise ↔ rupees happens (`rupeesToPaise`, `formatINR`).
+Keep browser-imported modules free of database drivers, Hono, Node-only modules, secrets, and server-only imports. Define request and response schemas from the approved specification; do not infer them from placeholder route names or old scaffold plans.
 
-## Changing the contract
+Before dependent frontend or backend work begins, publish and integrate contract changes in src/shared/** and docs/API.md. Breaking changes require an explicit handoff recorded in FRONTEND_LEDGER.md or a GitHub issue, then a contract-only PR. After integration, each owner updates its own lane.
 
-- **Adding** a new schema file or a new optional field: anyone, anytime.
-- **Changing or removing** an exported schema or field: post in team chat, then a PR touching only
-  `src/shared/` (and `docs/API.md`), merged before the code that uses it. Both sides fix their code
-  on their own branches after.
-- Request and response schemas are separate even when they look alike (ids, `created_at`,
-  computed fields only exist in responses).
-
-## Tests
-
-Unit-test any helper with logic (`money.test.ts` is the pattern), next to the file.
+Contract availability, backend readiness, and frontend integration are separate states. A schema existing in this directory does not mean an endpoint is implemented or integrated. Codex owns adjacent shared contract tests.

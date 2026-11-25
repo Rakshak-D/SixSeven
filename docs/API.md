@@ -1,35 +1,41 @@
-# API routes (`/api/v1`)
+# API contract and route inventory
 
-Update this table **in the same PR** as any route change. Status: `planned` (not started) →
-`mocked` (frontend has a mock in `src/mocks/`) → `live` (merged on `main` with tests; frontend
-deletes its mock). Schemas are the export names in `src/shared/schemas/<file>.ts`.
-The machine-readable spec is served at `GET /api/v1/doc`.
+Codex is the sole writer of this file. The endpoint list below is inherited from the repository scaffold. The full official problem statement has not yet been supplied, so proposed roles, errors, and workflows are provisional and are not a frozen contract.
 
-Errors are always `{ "error": { "code", "message", "details" } }` (codes in `src/shared/errors.ts`).
+Contract availability, backend readiness, and frontend integration are independent statuses. A route name or mounted router does not mean the API is implemented. Before feature work, Codex publishes the approved method, path, authentication, authorization, request schema, response schema, and error behavior here and in the shared Zod/OpenAPI contract.
 
-| Method + path | Role | Lane | Request → response schema | Errors | Status |
-|---|---|---|---|---|---|
-| GET /health | public | A | → `{ ok, db }` | | live |
-| GET /doc | public | A | → OpenAPI JSON | | live |
-| POST /projects | contractor | A | | 400 | planned |
-| GET /projects | members | A | (only member projects) | | planned |
-| GET /projects/:id | members | A | | 404 | planned |
-| POST /projects/:id/members | contractor | A | invite owner/engineer by email | 400 404 | planned |
-| POST /projects/:id/materials | contractor | A | | 400 403 404 | planned |
-| POST /projects/:id/workers | contractor | A | | 400 403 404 | planned |
-| POST /projects/:id/deliveries | contractor | A | | 409 DUPLICATE_CHALLAN | planned |
-| POST /projects/:id/usages | contractor | A | | 409 INSUFFICIENT_STOCK (+balance) | planned |
-| POST /projects/:id/attendance | contractor | A | bulk for one date, snapshots rate | 400 409 | planned |
-| GET /projects/:id/stock | members | A | balances | 404 | planned |
-| GET /projects/:id/movements | members | A | history | 404 | planned |
-| POST /projects/:id/wage-payments | contractor | C | kind wage/advance, mode cash/UPI/bank | 400 403 | planned |
-| POST /projects/:id/adjustments | contractor | C | target, new value, reason ≥ 10 | 400 403 | planned |
-| GET /projects/:id/summary | members | C | budget, spend split, burn rate, alerts (no wage split for engineer) | 404 | planned |
-| GET /projects/:id/wage-sheet?from&to&format=pdf\|csv\|json | owner, contractor | C | | 403 404 | planned |
-| POST /projects/:id/progress (multipart) | engineer, contractor | C | note + photos (jpg/png/webp ≤ 5 MB) | 400 403 | planned |
-| GET /projects/:id/timeline | members | C | photos by day | 404 | planned |
-| POST /projects/:id/proposals | engineer, contractor | C | | 400 403 | planned |
-| POST /proposals/:id/decision | owner | C | approve / reject | 403 404 409 | planned |
-| GET /projects/:id/activity | members | C | from audit_log | 404 | planned |
-| POST /projects/:id/checklists?source=template\|ai | engineer | D | `ChecklistDraft` (checklist.ts) | 400 403 | planned |
-| PATCH /checklist-items/:id | engineer | D | status only | 400 403 404 | planned |
+Status meanings:
+- Contract: AVAILABLE means the current source exposes a usable schema; PARTIAL means only some contract material exists; DRAFT means a route proposal without complete schemas.
+- Backend: IMPLEMENTED means a handler exists; verification is recorded separately. SCAFFOLD ONLY means an empty route module or placeholder.
+- Frontend: NOT STARTED, MOCKED (explicit development fixture), IMPLEMENTED, VERIFIED, or INTEGRATED. INTEGRATED requires a live backend route and exercised frontend flow.
+
+| Method + path | Authentication | Authorization in scaffold | Request schema | Response schema | Error behavior in scaffold | Contract | Backend readiness | Frontend integration |
+|---|---|---|---|---|---|---|---|---|
+| GET /health | Public | None | None | { ok: boolean, db: "up" or "down" } | A failed DB probe returns HTTP 200 with db=down; generic 404 for unknown routes | AVAILABLE (local route schema) | IMPLEMENTED; execution NOT_RUN in M0 | NOT STARTED |
+| GET /doc | Public | None | None | Generated OpenAPI 3.0 document | Generic 404 for unknown routes | PARTIAL (document generated from registered handlers) | IMPLEMENTED; execution NOT_RUN in M0 | NOT STARTED |
+| POST /projects | TBD | Proposed: contractor | TBD | TBD | Proposed 400 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects | TBD | Proposed: project members | None | TBD | Not specified | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects/:id | TBD | Proposed: project members | None | TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/members | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/materials | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/workers | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/deliveries | TBD | Proposed: contractor | TBD | TBD | Proposed 409 DUPLICATE_CHALLAN | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/usages | TBD | Proposed: contractor | TBD | TBD | Proposed 409 INSUFFICIENT_STOCK with balance | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/attendance | TBD | Proposed: contractor | Bulk date is a scaffold note; schema TBD | TBD | Proposed 400, 409 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects/:id/stock | TBD | Proposed: project members | None | Balance description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects/:id/movements | TBD | Proposed: project members | None | History description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/wage-payments | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/adjustments | TBD | Proposed: contractor | Target, new value, and reason are scaffold notes; schema TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects/:id/summary | TBD | Proposed: project members | None | Budget/spend description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects/:id/wage-sheet | TBD | Proposed: owner or contractor | from, to, format query note; schema TBD | TBD | Proposed 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/progress | TBD | Proposed: engineer or contractor | Multipart note/photo description; schema TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects/:id/timeline | TBD | Proposed: project members | None | Photos-by-day description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/proposals | TBD | Proposed: engineer or contractor | TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /proposals/:id/decision | TBD | Proposed: owner | Approve/reject note; schema TBD | TBD | Proposed 403, 404, 409 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| GET /projects/:id/activity | TBD | Proposed: project members | None | Audit-log description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| POST /projects/:id/checklists | TBD | Proposed: engineer | source query note; full request TBD | ChecklistDraft exists, direction and full response TBD | Proposed 400, 403 | PARTIAL (one shared draft schema) | SCAFFOLD ONLY (empty router) | NOT STARTED |
+| PATCH /checklist-items/:id | TBD | Proposed: engineer | Status-only note; schema TBD | TBD | Proposed 400, 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+
+The non-public auth and authorization entries above are proposals copied from the scaffold API table. No auth middleware is present and both Drizzle schema files are currently empty; do not represent those policies as implemented. The existing frontend ledger reports that no UI feature or endpoint integration has started.
+
+A frontend endpoint or schema request is recorded by Claude in docs/FRONTEND_LEDGER.md or a GitHub issue. Codex evaluates the request, updates this canonical file and shared schemas, and coordinates a contract-only merge before dependent implementation. Mocks must validate against the agreed shared schemas and be labeled as development fixtures.

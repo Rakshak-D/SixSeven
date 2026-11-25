@@ -1,7 +1,12 @@
 node_modules
 .next
 .git
-.env
+.env*
+.cache
+.artifacts
 uploads
 test-results
 playwright-report
+coverage
+*.log
+*.dump

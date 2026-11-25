@@ -8,110 +8,94 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# Slate (Every Detail is Accounted For): rules for every lane
+# Slate by SixSeven: project rules
 
-Problem 21: construction site progress + material tracker. One Next.js 16 app (App Router) with a
-Hono REST API at `/api/v1`, Drizzle on Postgres 16, Better Auth, shadcn/ui. Our pitch is a
-tamper-evident ledger: nothing can be quietly edited, stock can't go negative, owners approve changes.
+## Scope and authority
 
-**This file is the source of the rules.** Every `CLAUDE.md` only imports the `AGENTS.md` beside it.
-Edit `AGENTS.md`, never `CLAUDE.md`. Before editing a folder, read the `AGENTS.md` in that folder.
+M0 establishes repository coordination only. Do not implement business features until the technical lead supplies the complete problem statement, architecture, dependency constraints, and feature requirements, then authorizes the next milestone.
 
-## Lanes and file ownership
+The existing README describes a construction-site tracker and calls it hackathon problem 21. Those are scaffold claims, not the supplied official prompt. Preserve that history, but do not treat it as an accepted specification. Do not infer requirements from empty route files, placeholder schemas, prior plans, or external artifact links. An external link counts as read only after it is successfully accessed.
 
-Touch only your lane's files. Need a change in someone else's file? Ask in team chat first.
+## Repository architecture currently present
 
-| Lane | Owner | Owns |
-|---|---|---|
-| A: Data + backend core | _name_ (Codex) | `src/db/schema.ts`, `src/db/migrations/`, `src/db/seed.ts`, `src/server/middleware/errors.ts`, routes `projects materials workers deliveries usages attendance stock`, `services/ledger.ts` |
-| B: Frontend | _name_ (Claude) | `src/app/**` (except `api/`), `src/components/`, `src/hooks/`, `src/lib/api/`, `src/mocks/` |
-| C: Backend features + reports | _name_ (Codex) | `src/db/auth-schema.ts`, `src/server/middleware/{auth,requireRole}.ts`, routes `wagePayments adjustments summary wageSheet progress proposals activity`, `services/{wages,reports}.ts` |
-| D: AI + DevOps + docs | _name_ (Claude) | `src/server/ai/`, route `checklists`, `.github/`, `Dockerfile`, `docker-compose.yml`, `tests/e2e/`, `README.md`, `docs/devops.md` |
-| Shared (anyone, see rules) | all | `src/shared/`, `docs/API.md`, `package.json` + `pnpm-lock.yaml`, this file |
+The scaffold uses one Next.js App Router application with Hono mounted at /api/v1, Drizzle and PostgreSQL, Better Auth dependencies, shared Zod schemas, and generated OpenAPI documentation. Keep this topology unless the technical lead's specification changes it. This describes the repository; it does not mean each subsystem or feature is implemented.
 
-Every router is already mounted in `src/server/app.ts`; add routes inside your own route file and
-never edit `app.ts`. No barrel `index.ts` files: import from the exact file (they cause conflicts).
+The repository is public. Treat every committed file as public. The current default branch is main. At M0 inspection, GitHub reported main as unprotected and no repository rulesets; the PR-only process below is therefore required.
 
-## Never break these
+## Canonical instructions
 
-- Money is integer **paise**: Postgres `bigint` (Drizzle `mode: "number"`), plain integers in JSON.
-  Convert only with `src/shared/money.ts`. Never floats, never rupees in storage.
-- Ledger tables are append-only: `stock_movements`, `attendance`, `wage_payments`, `adjustments`,
-  `audit_log`. Never UPDATE or DELETE them (DB triggers block it). Corrections are new `adjustments` rows.
-- Every route: Zod schema from `src/shared/schemas/`, `requireRole(projectId, roles)`, the standard
-  error shape `{ error: { code, message, details } }`. Another project's id → 404, not 403.
-- Only contractors create ledger entries. Owners read and approve proposals. Engineers do checklists,
-  progress photos and proposals.
-- No hard-coded data in UI; data comes from the API (or `src/mocks/` until the route is live).
-  Demo data comes from `pnpm db:seed`.
-- Never commit `.env`, keys, or uploads. Secrets live only in `.env`.
+AGENTS.md is the canonical instruction source. Root and nested CLAUDE.md files must continue to import or reference the AGENTS.md beside them using the repository's existing @AGENTS.md mechanism. Codex maintains AGENTS.md files. Do not edit CLAUDE.md unless the import mechanism needs a coordinated correction.
 
-## Commands (run in this order)
+Before editing a directory, read its AGENTS.md and the root PROJECT_LEDGER.md, BACKEND_LEDGER.md, FRONTEND_LEDGER.md, DECISIONS.md, and docs/API.md as relevant. An instruction file does not prove the feature it describes exists.
 
-```bash
-pnpm install                      # once, and after pulling a package.json change
-cp .env.example .env              # once
-docker compose up -d db           # Postgres 16 on :5432
-pnpm db:migrate && pnpm db:seed
-pnpm dev                          # http://localhost:3000 ; `pnpm dev:lan` to share over Tailscale
-pnpm lint:fix && pnpm typecheck && pnpm test   # before every commit; must pass before "done"
-pnpm exec vitest run tests/api/health.test.ts  # one file;  add  -t "name"  for one test
-```
+## Ownership
 
-## Contract between frontend and backend
+| Owner | Paths and responsibilities |
+|---|---|
+| Codex | src/db/**; src/server/** including src/server/ai/**; src/app/api/[[...route]]/route.ts; src/shared/** and shared API schemas; docs/API.md; backend and integration tests including tests/api/** and backend/shared unit tests; package.json, pnpm-lock.yaml, pnpm-workspace.yaml; CI, build, database, container, deployment and repository hygiene configuration; README.md and docs/devops.md; every AGENTS.md file; PROJECT_LEDGER.md, BACKEND_LEDGER.md, DECISIONS.md, DISCLOSURES.md; overall coordination. |
+| Claude | Frontend implementation files in src/app/** except src/app/api/**; src/components/**; src/hooks/**; src/lib/api/**; src/mocks/**; frontend-specific tests and tests/e2e/**; docs/FRONTEND_LEDGER.md after initialization. AGENTS.md and CLAUDE.md instruction files are excluded. |
 
-- `src/shared/schemas/<resource>.ts` holds the Zod request/response schemas both sides import.
-  Adding a new schema file: anyone, anytime. **Changing an exported schema**: say it in team chat,
-  then a PR that touches only `src/shared/`, merged before the code that relies on it.
-- `docs/API.md` lists every route with status `planned → mocked → live`. Update it **in the same PR**
-  as any route change. The OpenAPI JSON at `/api/v1/doc` is generated from the same Zod.
+Codex maintains all AGENTS.md files, including nested guidance located inside Claude-owned directories. Claude reads those instructions but does not edit them.
 
-## Git, PRs and CI
+Codex must not edit frontend-owned implementation files without an explicitly coordinated handoff. Claude must not implement API routes, database access, authentication or authorization logic, or competing request/response schemas.
 
-- Branch from fresh `main`: `<lane>/<topic>` with lanes `db/ be/ fe/ ai/ ops/` (e.g. `fe/today-screen`).
-  Never commit to `main` directly. Merge `main` into your branch every 1–2 h; `main` must always run.
-- Commits: conventional messages (`feat(stock): block usage beyond balance`). **No `Co-Authored-By`
-  and no AI-assisted lines or trailers of any kind.** Commit from your own GitHub account.
-- Push, open a PR (`gh pr create --fill`), then watch CI in the background:
-  `gh pr checks <n> --watch; echo $?`. Judge by the exit code, never a tail of the output. Red →
-  read the failing log (`gh run view --log-failed`), fix, push again, repeat until green.
-- Self-review non-trivial PRs (Claude: `/code-review` or the `pr-review` agent; Codex: `/review`) and
-  fix what it finds. No human review is required: squash-merge your own PR once CI is green.
-- `git status` before every push. Never force-push to `main`; never delete someone else's branch.
+### Mixed concerns and handoffs
 
-## Dependencies
+- src/app/api/[[...route]]/route.ts is the Next.js-to-Hono server bridge and is owned by Codex. src/server/app.ts and route modules are also Codex-owned.
+- src/app/layout.tsx, page files, client providers, and visual components are Claude-owned. A change there that alters server wiring or an API assumption needs a handoff before editing.
+- Root manifests, lockfiles, .env.example, GitHub workflows, Docker files, and shared build/lint configuration are Codex-owned. Claude records dependency or config requests in FRONTEND_LEDGER.md; Codex reviews and implements them.
+- src/shared/** and docs/API.md are Codex-owned contract sources. Claude requests changes in FRONTEND_LEDGER.md or a GitHub issue; Codex evaluates and updates the canonical contract.
+- tests/api/** and backend integration tests are Codex-owned. Frontend-specific tests are Claude-owned. Cross-stack end-to-end acceptance work must be assigned in PROJECT_LEDGER.md before either side edits shared test setup.
+- docs/FRONTEND_LEDGER.md is exclusively written by Claude after initialization. Codex reads it and records responses in BACKEND_LEDGER.md or the API contract without editing Claude's ledger.
 
-All planned dependencies are installed already. Adding one: its own small PR touching only
-`package.json`, `pnpm-lock.yaml` and the README licence table, merged right away. Lockfile conflict:
-never hand-merge it; take `main`'s `pnpm-lock.yaml` and rerun `pnpm install`.
+A handoff names the files, reason, expected change, branch/commit, and checks. Keep the change in the receiving owner's lane where possible. For a file with unavoidable mixed ownership, agree on the handoff in the relevant ledger or issue before editing; review both sides before integration.
 
-## Module guides (read the one for the folder you're in)
+## Contract-first parallel work
 
-`src/app/AGENTS.md` frontend · `src/server/AGENTS.md` API · `src/server/ai/AGENTS.md` AI checklist ·
-`src/db/AGENTS.md` data · `src/shared/AGENTS.md` contract · `tests/AGENTS.md` testing ·
-`docs/API.md` route table · `docs/devops.md` Docker, CI, Tailscale.
-Decisions (read-only): [Final Decisions](https://claude.ai/artifact/Nfi1VESoFrZ5WGyScxnQqq) ·
-[Build Plan](https://claude.ai/artifact/1itfmL6qd1KP7AWUkcgtzX). Feature freeze H18 (05:30), code freeze 11:30.
+The shared Zod schemas in src/shared/** and docs/API.md are the single API contract. Codex defines method, path, authentication, authorization, request and response schemas, and errors before feature implementation. Keep frontend-safe schemas free of database drivers, server-only modules, secrets, and runtime-only imports.
 
-## Not built (on purpose)
+Claude may use only development fixtures derived from the agreed shared contract. Mark mock data clearly in the UI and in FRONTEND_LEDGER.md; never return a fake success that looks live. Keep contract availability, backend readiness, and frontend integration as separate statuses. Breaking contract changes require coordination and a contract-only integration step before dependent work is merged.
 
-Offline/PWA, GPS or biometrics on attendance, blockchain, invoice/challan OCR, PF/ESI, GST invoices,
-multi-organisation, UPI reconciliation, AI image recognition of progress. Don't add them.
+## Branches and integration
 
-## Gotchas
+Use:
+- main for the stable integrated application
+- chore/coordination for repository workflow and coordination
+- db/<topic> for database work
+- be/<topic> for backend features
+- ai/<topic> for AI integrations
+- ops/<topic> for infrastructure
+- fe/<topic> for frontend work owned exclusively by Claude
 
-Add one line each time a mistake costs a retry: what went wrong and the habit that prevents it.
+Before each implementation task:
+1. Verify the branch and clean working-tree status.
+2. Fetch remote changes and confirm the exact main base.
+3. Read the latest API contract and both relevant ledgers.
+4. Check whether main or an active branch changed the intended files.
+5. Confirm every planned file belongs to the current owner's lane.
 
-- Sub-routers don't inherit `defaultHook`: build every router with `createRouter()` from
-  `src/server/lib/router.ts`, or Zod errors skip the standard error shape.
-- `next dev` rewrites the Next.js block at the top of this file; commit it, don't fight it.
-- `next.config.ts` needs its `turbopack.rules["*.css"]` loader (`@tailwindcss/turbopack`); without
-  it the build fails with "Can't resolve 'tw-animate-css'". Edit the config, don't replace it.
-- Postgres: Docker is only for Postgres 16 parity with CI. Native Postgres is fine; point
-  `DATABASE_URL` at it.
+Create feature branches from the latest verified main. Do not create a branch for Claude's lane on Claude's behalf. Never commit or push directly to main. Use pull requests and merge commits so active branch ancestry remains synchronizable. When an active branch needs main, merge main into it with a merge commit; do not rebase or force-push shared work. Do not assume squash-merging keeps a long-lived local branch synchronized.
 
-## CI skips
+On conflicts, identify the files and commits. Resolve only conflicts fully inside your ownership where the right result is clear. Stop for cross-ownership conflicts and coordinate. Never resolve blindly with ours or theirs. Do not delete remote branches.
 
-If a CI step stays broken for more than 15 min, skip it in `ci.yml` and log it here (step, why, who).
+## Dependency and repository hygiene
 
-- _none yet_
+Codex is the sole writer of shared dependency manifests and lockfiles. Inspect current packages before considering a change. Use the pinned package manager and lockfile; do not install global packages, upgrade unnecessarily, overlap libraries, or hand-merge generated lockfiles. Keep package-manager stores, caches, Corepack data, and temp files under ignored .cache/ paths inside this workspace where supported.
+
+Keep real environment files, credentials, node_modules, build outputs, test reports, logs, local databases and dumps, generated uploads, caches, and temporary files ignored. Track only sanitized environment examples and required lockfiles. Inspect the exact diff and staged paths for secrets and generated content before every commit.
+
+Do not start Docker, create databases, or run migrations against an external or production database without explicit approval. Verify DATABASE_URL before any database command and use only a disposable project-local database. Do not stop or delete processes, containers, or data created by another contributor.
+
+## Engineering and verification
+
+For authorized backend work, validate external input, enforce authorization on the server, preserve database integrity, use consistent error handling, test critical success and failure cases, avoid logging secrets, and use transactions for related financial or stock mutations when required by the confirmed specification.
+
+The scaffold documents integer paise and append-only ledger ideas. Preserve them only as applicable to the supplied specification. Database append-only constraints are not cryptographic tamper evidence; never claim stronger guarantees than the implementation provides.
+
+Do not modify unrelated code to make a check pass. Do not disable lint, tests, security checks, or CI to manufacture a pass. If a check cannot run, record NOT_RUN with the exact reason. Skipping or disabling a broken check requires explicit technical-lead approval and a recorded limitation.
+
+## Project records
+
+Codex maintains PROJECT_LEDGER.md, BACKEND_LEDGER.md, DECISIONS.md, DISCLOSURES.md, docs/API.md, and all AGENTS.md files. Claude maintains FRONTEND_LEDGER.md after its existing initialization.
+
+Use PLANNED, IN_PROGRESS, BLOCKED, IMPLEMENTED, VERIFIED, and INTEGRATED precisely. VERIFIED requires actual verification. INTEGRATED requires the work to be merged and integration-tested. Record backend checkpoints with an IST timestamp, milestone, branch, scope, files, API/database changes, verification commands and outcomes, dependencies, limitations, frontend effects, commit/PR reference when available, and next action.
