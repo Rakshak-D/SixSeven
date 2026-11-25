@@ -58,6 +58,8 @@ export function AssistantSheet({
       const { reply } = await api<{ reply: string }>("POST", `/projects/${project.id}/ai/chat`, {
         body: { messages: historyToSend(next) },
       });
+      // The route refuses empty messages, so a stored empty reply would fail every later request.
+      if (!reply.trim()) throw new Error("Empty reply");
       setTurns([...next, { role: "assistant", content: reply }]);
     } catch {
       // Kept out of the conversation, so a failure is never sent back as something it said.
