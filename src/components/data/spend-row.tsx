@@ -15,10 +15,12 @@ export function SpendRow({ spend, showDate = true }: { spend: Spend; showDate?: 
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-semibold">{spend.title}</span>
-        <span className="block truncate text-[15px] text-muted-foreground">
-          {spend.detail}
-          {spend.fixed ? " · fixed" : ""}
-        </span>
+        <span className="block truncate text-[15px] text-muted-foreground">{spend.detail}</span>
+        {spend.fixReason ? (
+          <span className="block break-words text-[15px] text-muted-foreground">
+            Fixed: {spend.fixReason}
+          </span>
+        ) : null}
       </span>
       <span className="shrink-0 text-right">
         <span className="num block font-semibold">−{formatPaise(spend.amountPaise)}</span>
@@ -56,12 +58,12 @@ export function WageDayRow({ rows, amountPaise }: { rows: Spend[]; amountPaise: 
         <ul className="mb-2 ml-14 divide-y border-l pl-3">
           {rows.map((r) => (
             <li key={r.id} className="flex items-baseline justify-between gap-3 py-2 text-[15px]">
-              <span className="min-w-0 truncate">
+              <span className="min-w-0 break-words">
                 {r.title.replace(/^Wages · /, "")}
                 <span className="text-muted-foreground">
                   {" "}
                   · {r.detail}
-                  {r.fixed ? " · fixed" : ""}
+                  {r.fixReason ? ` · fixed: ${r.fixReason}` : ""}
                 </span>
               </span>
               <span className="num shrink-0">{formatPaise(r.amountPaise)}</span>

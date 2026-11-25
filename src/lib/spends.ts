@@ -15,8 +15,8 @@ export type Spend = {
   detail: string;
   date: string;
   amountPaise: number;
-  /** True when a fix changed this record; the original value stays in the log. */
-  fixed: boolean;
+  /** The latest fix's reason when a fix changed this record; the original stays in the log. */
+  fixReason: string | null;
 };
 
 const modeLabel = { cash: "Cash", upi: "UPI", bank: "Bank" } as const;
@@ -30,8 +30,13 @@ export function buildSpends(input: {
   adjustments?: AdjustmentListResponse;
 }): Spend[] {
   const fixedQty = new Map<string, number>();
-  for (const a of input.adjustments ?? []) {
+  const reasons = new Map<string, string>();
+  const oldestFirst = [...(input.adjustments ?? [])].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  );
+  for (const a of oldestFirst) {
     if (a.targetTable === "stock_movements") fixedQty.set(a.targetId, a.newValue);
+    reasons.set(a.targetId, a.reason);
   }
   const spends: Spend[] = [];
   for (const m of input.movements ?? []) {
@@ -44,10 +49,10 @@ export function buildSpends(input: {
       title: material
         ? `${material.name} · ${formatQty(qty)} ${material.unit}`
         : "Material delivery",
-      detail: `${m.supplier} · challan ${m.challanNo}`,
+      detail: [m.supplier, `challan ${m.challanNo}`, m.note].filter(Boolean).join(" · "),
       date: m.occurredOn,
       amountPaise: Math.round(qty * m.unitCostPaise),
-      fixed: fixedQty.has(m.id),
+      fixReason: reasons.get(m.id) ?? null,
     });
   }
   for (const p of input.payments ?? []) {
@@ -59,7 +64,9 @@ export function buildSpends(input: {
       detail: [modeLabel[p.mode], p.reference].filter(Boolean).join(" · "),
       date: p.paidOn,
       amountPaise: p.effectiveAmountPaise,
-      fixed: p.effectiveAmountPaise !== p.amountPaise,
+      // The engineer cannot read fixes, so a changed amount still says it was fixed.
+      fixReason:
+        reasons.get(p.id) ?? (p.effectiveAmountPaise !== p.amountPaise ? "amount changed" : null),
     });
   }
   return spends.sort((a, b) =>

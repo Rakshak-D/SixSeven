@@ -56,6 +56,29 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-26 IST · Fix reasons, required notes, payment proof, live camera
+
+- **Branch:** `fe/fixes-notes-camera`, stacked on `fe/approvals-payments` (PR #32).
+- **Bug fixed:** the reason typed for a stock fix was lost in stock history. The mock now writes
+  `Fix: <reason>` on the correction line, and spends show `Fixed: <reason>`. The live server still
+  writes a fixed sentence (request 26). Delivery notes now show in Logs, Today and spends.
+- **Required notes (form checks only until request 21):** delivery, usage, and both review
+  decisions. The engineer's review now has one note box used by Accept and Send back / Reject (the
+  button label was already edited in the working tree).
+- **Wage payments:** UPI needs a 12-digit ID and Bank needs 6 to 22 letters or digits. Cash hides
+  the reference and requires a note. **Until request 22, the cash note is sent as `reference`**,
+  because the schema has no note field. Please move those values when `note` lands.
+- **Also fixed:** the selected tab's label vanished while hovered or tapped (`ui/tabs.tsx`).
+- **Waiting on the contract:** the Cheque mode (`be/wage-payment-modes`) and a note on UPI and bank
+  payments (request 22). Proposal decision notes arrive with the approval chain (request 20).
+- **Camera:** `components/photos/camera-view.tsx`. A live viewfinder, back camera preferred, with the
+  time printed on the picture. The gallery file input is gone. A blocked or missing camera blocks
+  the upload with a plain message. It needs https or localhost, so `pnpm dev:lan` on a phone cannot
+  open the camera.
+- **Checks:** Biome, typecheck, `vitest run src`. Playwright on mocks: cash and UPI payment, camera
+  blocked and capture (with a stand-in video stream, not real camera hardware), photo upload, usage
+  note, stock fix reason in Logs, review note. Screenshots at 390 light, 768 dark and 1440.
+
 ### 2026-11-26 IST · Lint fix for frontend files that arrived through main
 
 - **Why:** CI's Biome step failed on PR #32 because of two files already on `main` (the assistant
