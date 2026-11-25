@@ -9,7 +9,7 @@ checks pass) · **VERIFIED** (exercised in a browser at phone and desktop sizes)
 
 | Screen / feature | Route | API it needs | Status |
 |---|---|---|---|
-| All main screens (prototype page, not app code) | n/a | none, demo data | MOCKED (prototype) |
+| All main screens, round 2 (prototype page, not app code) | n/a | demo data; needs requests 4–11 | MOCKED (prototype) |
 
 ## Backend requests
 
@@ -18,11 +18,50 @@ proposed method + path, fields, priority / blocking.
 
 | # | Request | Journey | Priority | Status |
 |---|---|---|---|---|
-| 1 | Shared Zod schemas (`src/shared/schemas/<resource>.ts`) for the Must routes in `docs/API.md`, starting with projects, materials, workers, deliveries, usages, attendance and stock | All Must screens: the frontend builds forms and mocks from these | High; frontend mocks wait on it, design work doesn't | Open |
-| 2 | Auth flow agreement: Better Auth session endpoints the login screen calls, and how the 3 demo users log in | Login + demo role picker | High; login screen | Open |
-| 3 | Root `AGENTS.md` still describes 4 lanes; update it to the 2-team ownership when the coordination docs land | Agents read the wrong ownership table | Medium | Open |
+| 1 | Shared Zod schemas for the Must routes | All Must screens | High | Done: published in `src/shared/schemas/` and `docs/API.md` |
+| 2 | Auth flow agreement for login | Login + demo accounts | High | Done: Better Auth routes in `docs/API.md` |
+| 3 | Root `AGENTS.md` to the 2-team ownership | Agents read ownership | Medium | Done |
+| 4 | **Engineer creates projects and invites the owner and contractor.** Today `POST /projects` makes the creator the contractor and `POST /projects/:id/members` is contractor-only for existing accounts. Proposed: creator becomes engineer; members route is engineer-only; invitations by email with a pending state (`GET /invitations` for the signed-in user, `POST /invitations/:id/accept`). Owner and engineer may belong to many projects. Contractor still adds materials and workers. | Project setup, project list, invitations | High; changes a P0 rule in `SPECIFICATION.md` | Open |
+| 5 | **Remove a worker with a reason** (soft: `active:false`, reason ≥ 5 chars, kept with attendance and wages). Proposed `POST /projects/:id/workers/:workerId/deactivate {reason}`; worker list returns `removedReason`, `removedOn`. Adding workers mid-project already works. | Team screen | Medium | Open |
+| 6 | **Expected deliveries with accept / reject.** Contractor or engineer schedules: `POST /projects/:id/expected-deliveries {materialId, qty, supplier, expectedOn, note?}`; `GET` lists open ones. Contractor on arrival: `POST /expected-deliveries/:id/accept` with the normal delivery fields (creates the delivery, same challan rules), or `POST /expected-deliveries/:id/reject {reason ≥ 10, newDate?}`. A rejection never touches stock, shows in activity, and is readable by all members. | Today → Delivery, owner and engineer logs | Medium; differentiator | Open |
+| 7 | **Task completion with photo proof, checked by the engineer.** Item status `todo / doing / waiting / done / sent_back`. Contractor: `POST /checklist-items/:id/start`, `POST /checklist-items/:id/completion` (multipart, 1 photo required, note required) → `waiting`. Engineer: `POST /checklist-items/:id/review {decision: accept / send_back, note}` (note ≥ 10 chars for send back). Proof photos join the timeline. | Today → Tasks, Site, owner progress | High; core of the owner view | Open |
+| 8 | **Checklist edits need a reason and keep history.** Engineer: add item `POST /projects/:id/checklist-items {phase, task, reason}`, rename `PATCH /checklist-items/:id {task, reason}`, delete (soft) with reason. Each item returns its change history. | Site checklist | Medium | Open |
+| 9 | **Payment modes and references:** add `Cheque`; reference required by mode: UPI 12-digit transaction ID, Bank UTR/reference 6–22 letters or digits, Cheque 6-digit number, Cash none. Changes `wages.CreateWagePaymentInput`. | Wages → record payment | Medium | Open |
+| 10 | **Weekly spend series in the summary** for the overview chart: `spendByWeek: [{weekStart, materialsPaise, wagesPaise, otherPaise}]` (engineer gets totals only). Stock-over-time and checklist progress the frontend can derive from movements and checklist reads. | Owner overview charts | Medium | Open |
+| 11 | **Engineer can read the dated attendance log without money fields** (who came each day), so the engineer's Logs screen matches the owner's. | Logs screen | Low | Open |
 
 ## Entries
+
+### 2026-11-25 16:40 IST · Prototype round 2 from the frontend developer's review
+
+- **Branch / commit:** `fe/workflow-requests` (ledger only). Prototype page updated in place (not app code).
+- **Done:** worked through the developer's 13 review comments and their answers. New in the prototype:
+  engineer creates projects and invites the owner and contractor (pending invitations with Accept);
+  owner and engineer see several projects; expected deliveries the contractor accepts (opens the
+  delivery form with the challan) or rejects with a reason and optional new date; Today tabs Delivery,
+  Usage, Attendance, Tasks, each with its own dated log including older days and a Fix button per
+  entry; owner and engineer get a read-only Logs screen; tasks are ticked off with a required photo
+  (camera or gallery) and the engineer accepts or sends them back; checklist add / rename / delete
+  needs a reason and keeps history; owner sees work progress per phase; Team screen adds workers
+  mid-project and removes them with a reason (records kept); payments add Cheque and ask for the
+  reference that matches the mode; payments grouped by date; charts: budget ring, spend per week,
+  materials used vs in stock, checklist progress, stock over time, wages per day; big numbers in
+  short Indian units (₹22.3 L) with the exact value on tap.
+- **Parked:** checklist import from a Revit export (developer will describe it later).
+- **Files changed:** `docs/FRONTEND_LEDGER.md` (backend requests 4–11, this entry).
+- **API dependencies:** requests 4–11 above; the rest maps to routes already in `docs/API.md`.
+- **Mocked vs live:** prototype only, demo data.
+- **Tests:** scripted Playwright run over every new flow (engineer accepts a proof, adds and renames
+  a task with reason; contractor accepts an invitation, accepts an expected delivery, duplicate
+  challan blocked, rejects a delivery with reason and new date, usage over stock blocked, fix opened
+  from a log entry pre-selects that entry, task done requires a photo, worker added and removed with
+  reason, UPI reference validated; engineer sends a task back; owner approves a change, reads logs,
+  taps a short number to see it exact). Screenshots of every screen at 390, 768 and 1440 px in light
+  and dark: no horizontal overflow, no console errors.
+- **Design decisions:** the final visual design will change; this round settles UX and features.
+- **Blockers:** requests 4 and 7 change backend rules; frontend can build against mocks meanwhile.
+- **Next:** developer confirms the workflow; then build the real screens in `src/app/` against the
+  published contracts, mocking requests 4–11 until they land.
 
 ### 2026-11-25 15:06 IST · Design direction B + clickable prototype
 
