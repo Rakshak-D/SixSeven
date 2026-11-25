@@ -56,6 +56,14 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-26 IST · Lint fix for frontend files that arrived through main
+
+- **Why:** CI's Biome step failed on PR #32 because of two files already on `main` (the assistant
+  widget commit and the sign-in page).
+- **Changed:** `src/app/(auth)/sign-in/page.tsx` and `src/components/shell/ai-assistant-widget.tsx`,
+  with `biome check --write` only: formatting, import order and one quote style. No behaviour change.
+- **Checks:** Biome, typecheck and `vitest run src` (71 pass) are clean.
+
 ### 2026-11-26 IST · Requests for Codex: approvals, autopay, medical, invites
 
 - **Branch:** `fe/approvals-payments`. This entry changes only this ledger; the UI follows in later PRs.
