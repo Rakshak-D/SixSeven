@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M5 integrated and main CI verified
+
+- Timestamp: 2026-11-25 20:38:37+05:30
+- Milestone/task ID: M5 integration closure
+- Branch: `chore/m5-integration-record`
+- Scope: record the completed M5 merge and verification of the merged main tree.
+- Files affected: API, backend and project ledgers only.
+- API or database changes: none.
+- Verification commands and outcomes: PR #14 CI run #49 passed Biome, typecheck, PostgreSQL 16 migration, repeatable demo seed, and all 102 tests across 14 files at `a721c52e2d971f184bbe976d289b2dc5ee543bdb`. Main CI run #50 passed the same checks on merge commit `1a81e780fbba7a47012f928a0b86b1f64d56770e`. Local main was fast-forwarded to that merge commit and has a clean working tree.
+- Dependencies added: none.
+- Known limitations: filesystem and PostgreSQL writes are not distributed-atomic; process termination between file promotion and metadata commit can leave an orphan. Checklist references remain unavailable until M6. No local PostgreSQL service was started; database checks used disposable hosted PostgreSQL 16.
+- Frontend implications: no frontend implementation or frontend ledger changes. M5 code diff contains no frontend-owned implementation files.
+- Commit or PR reference: [PR #14](https://github.com/Rakshak-D/SixSeven/pull/14) merged as `1a81e780fbba7a47012f928a0b86b1f64d56770e`; [PR CI #49](https://github.com/Rakshak-D/SixSeven/actions/runs/45641035558); [main CI #50](https://github.com/Rakshak-D/SixSeven/actions/runs/45641473492).
+- Next action: await the next authorized milestone.
+
 ## Entry — M5 reporting and progress verified before integration
 
 - Timestamp: 2026-11-25 20:32:51+05:30
