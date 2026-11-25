@@ -19,7 +19,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 | Milestone | State | Dependency / exit condition |
 |---|---|---|
-| M0 — repository foundation and ownership | VERIFIED — branch and reviewable PR are published; local checks and CI runs #6 and #7 passed for the foundation and ledger publication commits. PR remains unmerged pending technical-lead approval. | Complete when the branch and reviewable PR are published. Do not merge without user approval. |
+| M0 — repository foundation and ownership | INTEGRATED | Approved PR #3 merged. The merged tree matches the reviewed tree, and local post-merge unit tests and typecheck passed. |
 | M1 — specification intake | PLANNED | Requires the full official problem statement, architecture, dependencies, features, event deadline, and acceptance criteria. |
 | M2 — API and data contract | PLANNED | Requires M1; define and review the shared contract before dependent frontend/backend work. |
 | M3 — authorized vertical slice | PLANNED | Requires M2 and a technical-lead-approved milestone. Scope comes only from the supplied specification. |
@@ -29,7 +29,7 @@ This is an ordering for coordination, not a feature commitment. Re-plan M1 onwar
 
 ## Priorities
 
-- P0: publish and review the M0 foundation; receive the complete specification and exact event deadline before feature work.
+- P0: receive the complete specification and exact event deadline before feature work.
 - P1: after M1, agree the first API/data contract and build only the authorized user journey.
 - P2: after a complete journey works, address specification-approved polish and remaining lower-priority work.
 
@@ -37,8 +37,7 @@ Feature-level priority is not assigned until the official brief is available.
 
 ## Status snapshot
 
-- Overall: IN_PROGRESS — M0 is verified on PR #3; it is unmerged and not integration-tested.
-- M0 changes: VERIFIED — PR #3 is open; local checks passed, and PR CI runs #6 and #7 passed for commits 7941f25 and 7306ca8 respectively.
+- Overall: M0 integrated. M1 specification intake is planned pending the technical-lead handoff.
 - Existing scaffold: one health handler and OpenAPI document generator; all other route modules are empty routers. Database schemas are empty, initial migration is SELECT 1, seed is a no-op, and current tests cover health plus the shared money helper.
 - No business feature is recorded as implemented or integrated.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
@@ -70,12 +69,11 @@ Feature-level priority is not assigned until the official brief is available.
 ## Git baseline and publication
 
 - Previously observed reference main: d8aadaabe53233a724b421693ac6cdbb9f1f326d (historical reference only).
-- Last verified main: 29b06094031f1fab470aa3c648c2ff2734af7e73.
-- M0 branch: chore/coordination, created from the verified main above.
+- Verified M0 merge on main: ac00d971e80b42508a3a85c9b184a1b70b47b0bf.
+- M0 branch: chore/coordination, created from pre-M0 main 29b06094031f1fab470aa3c648c2ff2734af7e73.
 - M0 foundation commit: 7941f25fe38365cb851732ffd1c0996d6c3f30ac.
 - Ledger publication commit: 7306ca846a2390a976cdd5574259ab9758b1ae05; CI run #7 passed for this head.
-- Pull request: [#3 — coordination foundation](https://github.com/Rakshak-D/SixSeven/pull/3), open against main; GitHub reports mergeable. Do not merge before technical-lead approval.
-- Merge status: not merged. INTEGRATED is prohibited until merge and integration testing.
+- [PR #3 — coordination foundation](https://github.com/Rakshak-D/SixSeven/pull/3) was merged with a merge commit after [CI run #8](https://github.com/Rakshak-D/SixSeven/actions/runs/45586356601) passed on reviewed head aa1b3c6d97b8c7bb225998adf8247b599b982ea0. Local main was synchronized by fast-forward. See the backend ledger for verification.
 
 ## Next authorized milestone
 
