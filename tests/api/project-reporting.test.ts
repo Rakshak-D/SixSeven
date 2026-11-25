@@ -13,7 +13,7 @@ import {
   validateImageUpload,
 } from "@/server/services/photo-storage";
 import { ErrorResponse } from "@/shared/errors";
-import { AttendanceResponse } from "@/shared/schemas/attendance";
+import { AttendanceListResponse, AttendanceResponse } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
 import { DeliveryResponse } from "@/shared/schemas/deliveries";
 import { ProgressResponse, TimelineResponse } from "@/shared/schemas/progress";
@@ -238,6 +238,19 @@ describe("project financial summary", () => {
       reason: "Verified the full-day signed register entry",
     });
     expect(attendanceCorrection.status).toBe(201);
+    const attendanceList = await api(
+      `/projects/${projectId}/attendance?from=${today}&to=${today}`,
+      owner,
+    );
+    expect(attendanceList.status).toBe(200);
+    expect(AttendanceListResponse.parse(await attendanceList.json())).toContainEqual(
+      expect.objectContaining({
+        id: attendanceRecord.id,
+        halfDays: 1,
+        effectiveHalfDays: 2,
+        ratePaise: 90_000,
+      }),
+    );
 
     const wageResponse = await api(`/projects/${projectId}/wage-payments`, contractor, {
       workerId: worker.id,

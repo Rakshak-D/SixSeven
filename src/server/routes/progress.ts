@@ -19,10 +19,11 @@ import { ApiError } from "../middleware/errors";
 import { createProgressUpdate, getProjectPhoto, getProjectTimeline } from "../services/progress";
 import { requireProjectAccess } from "../services/projects";
 
+const OpenApiPhotoFile = PhotoFile.openapi({ type: "string", format: "binary" });
 const MultipartProgressInput = z.strictObject({
   note: Note,
   checklistItemId: IdParams.shape.id.optional(),
-  photos: z.union([PhotoFile, z.array(PhotoFile).min(1).max(10)]),
+  photos: z.union([OpenApiPhotoFile, z.array(OpenApiPhotoFile).min(1).max(10)]),
 });
 const MAX_PROGRESS_REQUEST_BYTES = 51_000_000;
 const uploadAccess = createMiddleware<AuthEnv>(async (c, next) => {
