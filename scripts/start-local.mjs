@@ -207,9 +207,8 @@ async function main() {
   let container = findDatabase();
   if (!container) {
     const mounted = run("docker", ["ps", "-aq", "--filter", "volume=/var/lib/postgresql/data"]);
-    if (
-      mounted?.split(/\s+/).some((id) => inspect(id).Mounts.some((mount) => mount.Source === data))
-    ) {
+    const mountedIds = mounted ? mounted.split(/\s+/) : [];
+    if (mountedIds.some((id) => inspect(id).Mounts.some((mount) => mount.Source === data))) {
       throw new Error("Another container already owns this checkout's PostgreSQL data directory.");
     }
   }
