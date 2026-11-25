@@ -699,6 +699,20 @@ describe("attendance and wage accounting", () => {
       reason: "Reverse delivery after stock return",
     });
     expect(reverseDelivery.status).toBe(201);
+    const history = await call(projectId, `movements?materialId=${material.id}`, owner);
+    expect(history.status).toBe(200);
+    expect(await history.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "adjustment",
+          note: "Reverse the original consumption entry",
+        }),
+        expect.objectContaining({
+          type: "adjustment",
+          note: "Reverse delivery after stock return",
+        }),
+      ]),
+    );
     const { sql } = getDatabase();
     const [current] = await sql`select material.stock_qty::text as balance,
       coalesce(sum(movement.qty), 0)::numeric(14, 3)::text as total

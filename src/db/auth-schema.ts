@@ -1,16 +1,24 @@
-import { boolean, index, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, check, index, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
 
 const authTime = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 
-export const user = pgTable("user", {
-  id: text().primaryKey(),
-  name: text().notNull(),
-  email: text().notNull().unique(),
-  emailVerified: boolean("email_verified").notNull().default(false),
-  image: text(),
-  createdAt: authTime("created_at").notNull().defaultNow(),
-  updatedAt: authTime("updated_at").notNull().defaultNow(),
-});
+export const user = pgTable(
+  "user",
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    email: text().notNull().unique(),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    image: text(),
+    phone: text(),
+    createdAt: authTime("created_at").notNull().defaultNow(),
+    updatedAt: authTime("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    check("user_indian_mobile", sql`${t.phone} is null or ${t.phone} ~ '^[+]91[6-9][0-9]{9}$'`),
+  ],
+);
 
 export const session = pgTable(
   "session",

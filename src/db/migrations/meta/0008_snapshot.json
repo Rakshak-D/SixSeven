@@ -1,5 +1,5 @@
 {
-  "id": "2d6f492f-617f-444a-a73b-ae7407c1f1fc",
+  "id": "1d4a9fbb-9778-4159-a82a-c9779a064f94",
   "prevId": "844b4f19-566c-48fd-b342-352e6e6bb3cc",
   "version": "7",
   "dialect": "postgresql",
@@ -483,351 +483,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.change_request_events": {
-      "name": "change_request_events",
-      "schema": "",
-      "columns": {
-        "sequence": {
-          "name": "sequence",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "change_request_events_sequence_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "request_id": {
-          "name": "request_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_role": {
-          "name": "actor_role",
-          "type": "project_role",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "change_event_request_sequence": {
-          "name": "change_event_request_sequence",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "request_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sequence",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "change_event_final_once": {
-          "name": "change_event_final_once",
-          "columns": [
-            {
-              "expression": "request_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"change_request_events\".\"kind\" in ('owner_accepted','owner_rejected')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "change_event_scoped_request": {
-          "name": "change_event_scoped_request",
-          "tableFrom": "change_request_events",
-          "tableTo": "change_requests",
-          "columnsFrom": [
-            "project_id",
-            "request_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "change_event_actor_member": {
-          "name": "change_event_actor_member",
-          "tableFrom": "change_request_events",
-          "tableTo": "project_members",
-          "columnsFrom": [
-            "project_id",
-            "actor_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "user_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "change_event_kind": {
-          "name": "change_event_kind",
-          "value": "\"change_request_events\".\"kind\" in ('created','contractor_approved','contractor_rejected','reopened','owner_accepted','owner_rejected')"
-        },
-        "change_event_nonblank_note": {
-          "name": "change_event_nonblank_note",
-          "value": "char_length(btrim(\"change_request_events\".\"note\")) between 1 and 2000"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.change_requests": {
-      "name": "change_requests",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target_id": {
-          "name": "target_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "target_version": {
-          "name": "target_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payload": {
-          "name": "payload",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "author_id": {
-          "name": "author_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "author_role": {
-          "name": "author_role",
-          "type": "project_role",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "change_request_project_queue": {
-          "name": "change_request_project_queue",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "change_request_target_lookup": {
-          "name": "change_request_target_lookup",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "target_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "change_requests_project_id_projects_id_fk": {
-          "name": "change_requests_project_id_projects_id_fk",
-          "tableFrom": "change_requests",
-          "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "change_request_author_member": {
-          "name": "change_request_author_member",
-          "tableFrom": "change_requests",
-          "tableTo": "project_members",
-          "columnsFrom": [
-            "project_id",
-            "author_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "user_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "change_request_project_pair": {
-          "name": "change_request_project_pair",
-          "nullsNotDistinct": false,
-          "columns": [
-            "project_id",
-            "id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "change_request_kind": {
-          "name": "change_request_kind",
-          "value": "\"change_requests\".\"kind\" in ('checklist_add','checklist_rename','checklist_remove','attendance_fix','medical_expense')"
-        },
-        "change_request_status": {
-          "name": "change_request_status",
-          "value": "\"change_requests\".\"status\" in ('pending_contractor','pending_owner','rejected_contractor','accepted','rejected_owner')"
-        },
-        "change_request_author_role": {
-          "name": "change_request_author_role",
-          "value": "\"change_requests\".\"author_role\" in ('engineer','contractor')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.checklist_drafts": {
@@ -2858,6 +2513,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2886,7 +2547,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "user_indian_mobile": {
+          "name": "user_indian_mobile",
+          "value": "\"user\".\"phone\" is null or \"user\".\"phone\" ~ '^[+]91[6-9][0-9]{9}$'"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.verification": {
