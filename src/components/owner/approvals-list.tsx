@@ -1,8 +1,10 @@
 // Client-only: imported from client components.
 import { toast } from "sonner";
+import { ChangeList } from "@/components/approvals/change-list";
 import { Button } from "@/components/ui/button";
-import { useDecideProposal, useProposals } from "@/hooks/use-project-data";
+import { useChangeRequests, useDecideProposal, useProposals } from "@/hooks/use-project-data";
 import { ApiClientError } from "@/lib/api/client";
+import { actionFor } from "@/lib/change-requests";
 import { istDateOf } from "@/lib/dates";
 import { formatPaise, formatShortDate } from "@/lib/format";
 import type { ProposalResponse } from "@/shared/schemas/proposals";
@@ -18,6 +20,8 @@ function impact(p: ProposalResponse) {
 export function ApprovalsList({ projectId }: { projectId: string }) {
   const proposals = useProposals(projectId);
   const decide = useDecideProposal(projectId);
+  const changes = useChangeRequests(projectId);
+  const waitingChanges = (changes.data ?? []).filter((r) => actionFor("owner", r)).length;
 
   if (proposals.isPending) return <p className="text-muted-foreground">Loading proposals…</p>;
   if (proposals.isError) return <p className="text-destructive">{proposals.error.message}</p>;
@@ -39,11 +43,12 @@ export function ApprovalsList({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      {pending.length === 0 ? (
+      <ChangeList projectId={projectId} viewer="owner" mine />
+      {pending.length === 0 && waitingChanges === 0 ? (
         <p className="rounded-2xl border border-dashed px-4 py-3 text-muted-foreground">
           Nothing is waiting for you.
         </p>
-      ) : (
+      ) : pending.length === 0 ? null : (
         <ul className="space-y-3">
           {pending.map((p) => {
             const busy = decide.isPending && decide.variables?.proposalId === p.id;

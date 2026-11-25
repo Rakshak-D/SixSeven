@@ -20,6 +20,7 @@ import { StockMovementsResponse, StockResponse } from "@/shared/schemas/stock";
 import { SummaryResponse } from "@/shared/schemas/summary";
 import { WagePaymentListResponse, WageSheetResponse } from "@/shared/schemas/wages";
 import { WorkersResponse } from "@/shared/schemas/workers";
+import { seedChangeRequests } from "./change-seed";
 import { MockError, type MockRoute, parseBody } from "./types";
 import {
   accruedOf,
@@ -86,6 +87,7 @@ export function world(projectId: string): DemoWorld {
   let w = worlds.get(projectId);
   if (!w) {
     w = buildWorld(config.id, config.seed, config.days, config.scale, config.share);
+    seedChangeRequests(w);
     worlds.set(projectId, w);
   }
   return w;

@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   useActivity,
   useAdjustments,
+  useChangeRequests,
   useChecklists,
   useMaterials,
   useMovements,
@@ -25,6 +26,7 @@ import {
   useWorkers,
 } from "@/hooks/use-project-data";
 import { describeActivity } from "@/lib/activity";
+import { actionFor, describeChange } from "@/lib/change-requests";
 import { activeItems } from "@/lib/checklist";
 import { addDays, daysBetween, istDateOf, todayIst } from "@/lib/dates";
 import {
@@ -112,6 +114,7 @@ export function OwnerHome() {
   const materials = useMaterials(id);
   const activity = useActivity(id);
   const proposals = useProposals(id);
+  const changes = useChangeRequests(id);
   const checklists = useChecklists(id);
   const payments = useWagePayments(id);
   const workers = useWorkers(id);
@@ -152,6 +155,8 @@ export function OwnerHome() {
   const underway = activeItems(checklists.data).find((i) => i.verificationStatus === "doing");
   const chart = spentOverTime(s, project.startDate, today);
   const pending = proposals.data?.filter((p) => p.status === "pending") ?? [];
+  const toDecide = (changes.data ?? []).filter((r) => actionFor("owner", r));
+  const waitingCount = pending.length + toDecide.length;
   const over = s.materialVariance.filter((v) => v.overTolerance);
 
   const lookups = {
@@ -260,7 +265,7 @@ export function OwnerHome() {
         <div className="min-w-0 flex-[0.9_1_280px]">
           <h2 className="text-3xl">Needs you</h2>
           <ul className="mt-3 space-y-2">
-            {pending.length > 0 ? (
+            {waitingCount > 0 ? (
               <li>
                 <button
                   type="button"
@@ -270,10 +275,13 @@ export function OwnerHome() {
                   <CircleCheck aria-hidden="true" className="size-6 shrink-0 text-primary" />
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold">
-                      {pending.length} {pending.length === 1 ? "change" : "changes"} to approve
+                      {waitingCount} {waitingCount === 1 ? "change" : "changes"} to approve
                     </span>
                     <span className="block truncate text-[15px] text-muted-foreground">
-                      {pending.map((p) => p.title).join(", ")}
+                      {[
+                        ...toDecide.map((r) => describeChange(r, {}).title),
+                        ...pending.map((p) => p.title),
+                      ].join(", ")}
                     </span>
                   </span>
                 </button>
@@ -304,7 +312,7 @@ export function OwnerHome() {
                 </span>
               </li>
             ))}
-            {pending.length === 0 && s.stockAlerts.length === 0 && over.length === 0 ? (
+            {waitingCount === 0 && s.stockAlerts.length === 0 && over.length === 0 ? (
               <li className="rounded-2xl border border-dashed p-3 text-muted-foreground">
                 Nothing needs you right now.
               </li>

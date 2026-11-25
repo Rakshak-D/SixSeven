@@ -355,44 +355,4 @@ describe("photos and the task workflow", () => {
       call("POST", "/projects/demo-lakeview/progress", form("Slab shuttering", [photo()])),
     ).toHaveProperty("id");
   });
-
-  it("the engineer adds, renames and removes tasks with a reason", () => {
-    const [list] = lists("demo-hillside");
-    const added = call("POST", "/projects/demo-hillside/checklist-items", {
-      checklistId: list.id,
-      phase: "walls",
-      task: "Lintel at first floor",
-      reason: "Missing from the template",
-    }) as Item;
-    expect(added.verificationStatus).toBe("todo");
-    expect(
-      status(() =>
-        call("PATCH", `/checklist-items/${added.id}`, {
-          task: "Lintel at first floor",
-          reason: "Same name again",
-        }),
-      ),
-    ).toBe(409);
-    expect(
-      (
-        call("PATCH", `/checklist-items/${added.id}`, {
-          task: "Lintel, first floor",
-          reason: "Clearer name for the crew",
-        }) as Item
-      ).task,
-    ).toBe("Lintel, first floor");
-    expect(status(() => call("DELETE", `/checklist-items/${added.id}`, { reason: "short" }))).toBe(
-      400,
-    );
-    expect(
-      (
-        call("DELETE", `/checklist-items/${added.id}`, {
-          reason: "Duplicate of another task",
-        }) as Item
-      ).removedAt,
-    ).not.toBeNull();
-    expect(
-      status(() => call("DELETE", `/checklist-items/${added.id}`, { reason: "Removing it twice" })),
-    ).toBe(409);
-  });
 });

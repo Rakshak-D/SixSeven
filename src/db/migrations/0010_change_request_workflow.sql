@@ -35,7 +35,6 @@ ALTER TABLE "change_requests" ADD CONSTRAINT "change_request_author_member" FORE
 CREATE INDEX "change_event_request_sequence" ON "change_request_events" USING btree ("project_id","request_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "change_event_final_once" ON "change_request_events" USING btree ("request_id") WHERE "change_request_events"."kind" in ('owner_accepted','owner_rejected');--> statement-breakpoint
 CREATE INDEX "change_request_project_queue" ON "change_requests" USING btree ("project_id","status","created_at");--> statement-breakpoint
-CREATE INDEX "change_request_target_lookup" ON "change_requests" USING btree ("project_id","kind","target_id","status");
---> statement-breakpoint
+CREATE INDEX "change_request_target_lookup" ON "change_requests" USING btree ("project_id","kind","target_id","status");--> statement-breakpoint
 CREATE TRIGGER change_request_events_append_only BEFORE UPDATE OR DELETE OR TRUNCATE ON change_request_events
 FOR EACH STATEMENT EXECUTE FUNCTION slate_reject_ledger_mutation();
