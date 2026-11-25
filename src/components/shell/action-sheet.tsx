@@ -1,6 +1,7 @@
 // Client-only: imported by the app shell.
 
 import { Camera, ClipboardList, PackageMinus, Truck } from "lucide-react";
+import { ApprovalsList } from "@/components/owner/approvals-list";
 import { Sheet } from "@/components/sheet";
 import type { NavActionKind } from "./nav";
 
@@ -32,10 +33,12 @@ const copy: Record<NavActionKind, { title: string; description: string; empty: s
 /** What the centre button opens for each role. Nothing here pretends to be live. */
 export function ActionSheet({
   kind,
+  projectId,
   open,
   onOpenChange,
 }: {
   kind: NavActionKind;
+  projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -65,9 +68,13 @@ export function ActionSheet({
           ))}
         </div>
       ) : null}
-      <p className="mt-4 rounded-2xl border border-dashed px-4 py-3 text-[15px] text-muted-foreground">
-        {text.empty}
-      </p>
+      {kind === "approvals" ? (
+        <ApprovalsList projectId={projectId} />
+      ) : (
+        <p className="mt-4 rounded-2xl border border-dashed px-4 py-3 text-[15px] text-muted-foreground">
+          {text.empty}
+        </p>
+      )}
     </Sheet>
   );
 }

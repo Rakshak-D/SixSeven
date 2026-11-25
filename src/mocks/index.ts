@@ -1,10 +1,10 @@
 /**
- * Frontend mocks, one entry per API route that is not live yet.
+ * Frontend mocks, one entry per API route the UI calls before it can use the live one.
  * The API client answers from here when NEXT_PUBLIC_USE_MOCKS=1 and the route is listed.
- * Delete an entry the moment docs/API.md marks its route `live`.
- * Fixtures must pass the route's shared Zod schema (src/shared/schemas/*).
+ * Delete an entry the moment the live route works for the UI (most need login first).
+ * Every response is parsed with the route's shared Zod schema (src/shared/schemas/*).
  */
-import { projectMocks } from "./projects";
+import { demoRoutes } from "./routes";
 import type { MockRoute } from "./types";
 
 export type { MockRoute } from "./types";
@@ -12,5 +12,4 @@ export type { MockRoute } from "./types";
 /** True when the app is running on these fixtures; the UI must say so. */
 export const mocksEnabled = process.env.NEXT_PUBLIC_USE_MOCKS === "1";
 
-// GET /projects is live, but it needs a session and login is not built yet.
-export const mocks: MockRoute[] = [...projectMocks];
+export const mocks: MockRoute[] = demoRoutes;

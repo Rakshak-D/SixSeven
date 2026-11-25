@@ -1,10 +1,5 @@
-import { SectionPlaceholder } from "@/components/shell/section-placeholder";
+import { LogsPage } from "@/components/logs/logs-page";
 
-export default function LogsPage() {
-  return (
-    <SectionPlaceholder
-      title="Logs"
-      what="Every delivery, usage, attendance and payment, by date, with the fixes made to each."
-    />
-  );
+export default function ProjectLogsPage() {
+  return <LogsPage />;
 }
