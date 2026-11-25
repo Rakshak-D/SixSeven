@@ -86,3 +86,49 @@ export type UpdateChecklistItemInput = z.infer<typeof UpdateChecklistItemInput>;
 export type ChecklistItemResponse = z.infer<typeof ChecklistItemResponse>;
 export type ChecklistResponse = z.infer<typeof ChecklistResponse>;
 export type ChecklistsResponse = z.infer<typeof ChecklistsResponse>;
+export const ChecklistVerificationStatus = z.enum([
+  "todo",
+  "doing",
+  "waiting",
+  "done",
+  "sent_back",
+]);
+export const ChecklistChangeReason = z.string().trim().min(10).max(2000);
+export const ReviewChecklistItemInput = z.discriminatedUnion("decision", [
+  z.strictObject({
+    decision: z.literal("accept"),
+    progressId: Id,
+    note: z.string().trim().max(2000).optional(),
+  }),
+  z.strictObject({ decision: z.literal("send_back"), progressId: Id, note: ChecklistChangeReason }),
+]);
+export const RenameChecklistItemInput = z.strictObject({
+  task: ApprovedItem.shape.task,
+  reason: ChecklistChangeReason,
+});
+export const AddChecklistItemInput = ApprovedItem.extend({
+  checklistId: Id,
+  materials: ApprovedItem.shape.materials.default([]),
+  reason: ChecklistChangeReason,
+});
+export const RemoveChecklistItemInput = z.strictObject({ reason: ChecklistChangeReason });
+export const ChecklistEvent = z.strictObject({
+  id: Id,
+  kind: z.enum(["started", "submitted", "accepted", "sent_back", "added", "renamed", "removed"]),
+  actorId: Id,
+  createdAt: Timestamp,
+  note: z.string().nullable(),
+  previous: z.string().nullable(),
+  next: z.string().nullable(),
+  progressId: Id.nullable(),
+});
+export const VerifiedChecklistItemResponse = ChecklistItemResponse.extend({
+  verificationStatus: ChecklistVerificationStatus,
+  removedAt: Timestamp.nullable(),
+  history: z.array(ChecklistEvent),
+});
+export const VerifiedChecklistResponse = ChecklistResponse.extend({
+  source: z.literal("template"),
+  items: z.array(VerifiedChecklistItemResponse).min(1).max(40),
+});
+export const VerifiedChecklistsResponse = z.array(VerifiedChecklistResponse);
