@@ -34,11 +34,18 @@ describe("parseAnswer", () => {
     expect(blocks).toEqual([
       { kind: "heading", text: "Slab" },
       { kind: "text", text: "Volume is **14.2 m³**." },
-      { kind: "list", ordered: false, items: ["Cement", "Sand"] },
-      { kind: "list", ordered: true, items: ["Check formwork"] },
+      { kind: "list", ordered: false, start: 1, items: ["Cement", "Sand"] },
+      { kind: "list", ordered: true, start: 1, items: ["Check formwork"] },
       { kind: "table", head: ["Material", "Qty"], rows: [["Cement", "114 bags"]] },
       { kind: "text", text: "Done" },
     ]);
+  });
+
+  it("keeps step numbers when a sub-point splits the list", () => {
+    const lists = parseAnswer("1. Formwork\n   - check props\n2. Steel").filter(
+      (b) => b.kind === "list" && b.ordered,
+    );
+    expect(lists.map((b) => b.kind === "list" && b.start)).toEqual([1, 2]);
   });
 
   it("keeps a line that only starts with bold as text", () => {

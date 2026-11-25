@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { type Block, boldParts, parseAnswer } from "@/lib/assistant";
 
 function Inline({ text }: { text: string }) {
@@ -30,6 +31,7 @@ function AnswerBlock({ block }: { block: Block }) {
     const List = block.ordered ? "ol" : "ul";
     return (
       <List
+        start={block.ordered ? block.start : undefined}
         className={`flex flex-col gap-1.5 pl-5 marker:text-muted-foreground ${block.ordered ? "list-decimal" : "list-disc"}`}
       >
         {block.items.map((item, i) => (
@@ -74,9 +76,11 @@ function AnswerBlock({ block }: { block: Block }) {
 
 /** One assistant answer, laid out as a document and not as a chat bubble. */
 export function Answer({ source }: { source: string }) {
+  // Typing in the question box re-renders the sheet; don't re-read every past answer.
+  const blocks = useMemo(() => parseAnswer(source), [source]);
   return (
     <div className="flex flex-col gap-2.5">
-      {parseAnswer(source).map((block, i) => (
+      {blocks.map((block, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: an answer never changes after it arrives
         <AnswerBlock key={i} block={block} />
       ))}

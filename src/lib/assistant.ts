@@ -22,11 +22,11 @@ export function historyToSend(turns: ChatTurn[]): ChatTurn[] {
 export type Block =
   | { kind: "heading"; text: string }
   | { kind: "text"; text: string }
-  | { kind: "list"; ordered: boolean; items: string[] }
+  | { kind: "list"; ordered: boolean; start: number; items: string[] }
   | { kind: "table"; head: string[]; rows: string[][] };
 
 const BULLET = /^(?:[-*•])\s+(.*)$/;
-const NUMBERED = /^\d+[.)]\s+(.*)$/;
+const NUMBERED = /^(\d+)[.)]\s+(.*)$/;
 const HEADING = /^#{1,6}\s+(.*)$/;
 const DIVIDER = /^\|[\s|:-]+\|$/;
 
@@ -59,12 +59,14 @@ export function parseAnswer(source: string): Block[] {
     }
 
     const bullet = BULLET.exec(line);
-    const item = bullet ?? NUMBERED.exec(line);
-    if (item) {
+    const numbered = NUMBERED.exec(line);
+    const item = bullet?.[1] ?? numbered?.[2];
+    if (item !== undefined) {
       const ordered = !bullet;
       const last = blocks.at(-1);
-      if (last?.kind === "list" && last.ordered === ordered) last.items.push(item[1]);
-      else blocks.push({ kind: "list", ordered, items: [item[1]] });
+      if (last?.kind === "list" && last.ordered === ordered) last.items.push(item);
+      // The source number is kept, so steps split by a sub-point don't restart at 1.
+      else blocks.push({ kind: "list", ordered, start: Number(numbered?.[1] ?? 1), items: [item] });
       continue;
     }
 

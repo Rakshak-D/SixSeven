@@ -4,7 +4,7 @@ import { ArrowUp, ArrowUpRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api/client";
+import { ApiClientError, api } from "@/lib/api/client";
 import { type ChatTurn, historyToSend, MAX_MESSAGE_CHARS } from "@/lib/assistant";
 import { mocksEnabled } from "@/mocks";
 import type { ProjectResponse } from "@/shared/schemas/projects";
@@ -56,14 +56,23 @@ export function AssistantSheet({
     setBusy(true);
     try {
       const { reply } = await api<{ reply: string }>("POST", `/projects/${project.id}/ai/chat`, {
-        body: { messages: historyToSend(next) },
+        body: {
+          messages: historyToSend(next),
+          // The server builds its prompt from these until it reads them itself (ledger request 30).
+          projectContext: { name: project.name, location: project.location },
+        },
       });
       // The route refuses empty messages, so a stored empty reply would fail every later request.
       if (!reply.trim()) throw new Error("Empty reply");
       setTurns([...next, { role: "assistant", content: reply }]);
-    } catch {
+    } catch (cause) {
       // Kept out of the conversation, so a failure is never sent back as something it said.
-      setError("No answer came back. Check your connection and try again.");
+      // A 4xx (signed out, not a member) says why; anything else gets the general line.
+      setError(
+        cause instanceof ApiClientError && cause.status < 500
+          ? cause.message
+          : "No answer came back. Check your connection and try again.",
+      );
     } finally {
       setBusy(false);
     }
