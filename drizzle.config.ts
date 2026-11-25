@@ -11,7 +11,7 @@ export default defineConfig({
   schema: ["./src/db/schema.ts", "./src/db/auth-schema.ts"],
   out: "./src/db/migrations",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://sixseven:sixseven@localhost:5432/sixseven",
+    url: process.env.DATABASE_URL ?? "postgres://slate:slate@localhost:5432/slate",
   },
   strict: true,
 });

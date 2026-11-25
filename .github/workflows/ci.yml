@@ -17,15 +17,15 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: sixseven
-          POSTGRES_PASSWORD: sixseven
-          POSTGRES_DB: sixseven
+          POSTGRES_USER: slate
+          POSTGRES_PASSWORD: slate
+          POSTGRES_DB: slate
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U sixseven -d sixseven"
+          --health-cmd "pg_isready -U slate -d slate"
           --health-interval 3s --health-timeout 3s --health-retries 20
     env:
-      DATABASE_URL: postgres://sixseven:sixseven@localhost:5432/sixseven
+      DATABASE_URL: postgres://slate:slate@localhost:5432/slate
       BETTER_AUTH_SECRET: ci-only-secret-not-used-anywhere-else
       BETTER_AUTH_URL: http://localhost:3000
       UPLOAD_DIR: /tmp/uploads

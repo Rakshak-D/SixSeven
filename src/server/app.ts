@@ -46,7 +46,7 @@ for (const router of [
 
 app.doc("/doc", {
   openapi: "3.0.0",
-  info: { title: "SixSeven API", version: "0.1.0" },
+  info: { title: "Slate API", version: "0.1.0" },
 });
 
 export type App = typeof app;

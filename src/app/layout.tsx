@@ -7,7 +7,7 @@ const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "SixSeven",
+  title: "Slate: Every Detail is Accounted For",
   description: "Construction site progress and material tracker",
 };
 

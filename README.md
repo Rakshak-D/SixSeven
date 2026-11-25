@@ -1,6 +1,6 @@
-# SixSeven
+# Slate: Every Detail is Accounted For
 
-Construction site progress and material tracker (hackathon problem 21). Contractors log deliveries,
+Slate is a construction site progress and material tracker (hackathon problem 21). Contractors log deliveries,
 usage, attendance and wages; owners see verified spend, photos and approve changes. Nothing in the
 ledger can be quietly edited and stock can't go negative.
 

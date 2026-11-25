@@ -8,7 +8,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# SixSeven: rules for every lane
+# Slate (Every Detail is Accounted For): rules for every lane
 
 Problem 21: construction site progress + material tracker. One Next.js 16 app (App Router) with a
 Hono REST API at `/api/v1`, Drizzle on Postgres 16, Better Auth, shadcn/ui. Our pitch is a
