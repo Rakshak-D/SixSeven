@@ -9,7 +9,7 @@ checks pass) · **VERIFIED** (exercised in a browser at phone and desktop sizes)
 
 | Screen / feature | Route | API it needs | Status |
 |---|---|---|---|
-| _none started_ | | | |
+| All main screens (prototype page, not app code) | n/a | none, demo data | MOCKED (prototype) |
 
 ## Backend requests
 
@@ -23,6 +23,35 @@ proposed method + path, fields, priority / blocking.
 | 3 | Root `AGENTS.md` still describes 4 lanes; update it to the 2-team ownership when the coordination docs land | Agents read the wrong ownership table | Medium | Open |
 
 ## Entries
+
+### 2026-11-25 15:06 IST · Design direction B + clickable prototype
+
+- **Branch / commit:** `fe/prototype-ledger` (ledger only; the prototype is a standalone page, not app code)
+- **Done:** the frontend developer picked direction B, "Slate and chalk": slate ground, chalk text,
+  pastel chalk status colours, Instrument Serif for headings and money, Schibsted Grotesk for UI, with
+  a light variant for outdoor use. Built every main screen as a clickable single-page prototype on the
+  Greenfield Home demo data, to decide the real workflow from:
+  login + demo roles, projects, new project, Today (delivery, usage, attendance, photo), stock,
+  overview (KPIs, budget split, daily spend chart, alerts, photo timeline, activity), wage sheet (range,
+  totals, payments, CSV and PDF previews), fixes (adjustments), site (checklist, progress update,
+  propose change), changes (owner approve / reject).
+- **Files changed:** `docs/FRONTEND_LEDGER.md`. Prototype lives outside git in `.artifacts/` and is
+  shared as a private page.
+- **API dependencies:** none (prototype runs on in-page demo data).
+- **Mocked vs live:** everything in the prototype is demo data; nothing is in `src/` yet.
+- **Tests:** scripted Playwright run of the demo flow: duplicate challan blocked, usage of 70 with 60
+  in stock blocked, attendance total ₹2,700 for P/P/½/P/A, adjustment of a half day raises earned
+  wages by ₹300, engineer sees no wage entries and gets "Not available" on wages, owner approval
+  recorded. Screenshots of every screen at 390, 768 and 1440 px (light and dark): no horizontal
+  overflow, no console errors.
+- **Design decisions:** contractor screens phone-first with a bottom tab bar (rail on desktop);
+  one yellow action colour; coral = blocked, orange = low stock, mint = fine; stock and wage numbers
+  are always derived from entries; every correction is a "fix" with a reason and the old value stays
+  visible.
+- **Blockers:** none.
+- **Backend requests:** still requests 1 and 2 (shared schemas, auth flow).
+- **Next:** frontend developer reviews the prototype and gives the workflow; then build the real
+  screens in `src/app/` against mocks.
 
 ### 2026-11-25 14:05 IST · Frontend foundation and working agreement
 
