@@ -8,4 +8,6 @@ Build only against an agreed API contract in src/shared/** and docs/API.md. Do n
 
 Use docs/SPECIFICATION.md for authorized frontend milestones. For root layout or provider changes that affect API wiring, authentication, environment variables, or server integration, record a handoff before editing and coordinate with Codex.
 
+Planned anti-fraud and payments screens (root AGENTS.md; not yet authorized): the contractor never sees payment, approval or bank-detail screens. Bag scanning uses the camera with a typed-code fallback. Every mock payment is labelled in the UI as a demo in which no real money moves. The owner gets one pending list with approve all, a pause for auto-pay, and the fraud flags.
+
 Claude records pages/components, endpoints consumed, mocked versus live behavior, backend requests, integration failures, frontend verification, and commit/PR references in FRONTEND_LEDGER.md. Do not record a feature as verified without exercising it.
