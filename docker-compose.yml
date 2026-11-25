@@ -1,0 +1,41 @@
+# Dev: `docker compose up -d db` (Postgres only; run the app with `pnpm dev`).
+# Demo: `docker compose --profile app up -d --build`, then `pnpm db:migrate && pnpm db:seed` from the host.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sixseven
+      POSTGRES_PASSWORD: sixseven
+      POSTGRES_DB: sixseven
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sixseven -d sixseven"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    profiles: ["app"]
+    build: .
+    environment:
+      DATABASE_URL: postgres://sixseven:sixseven@db:5432/sixseven
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      UPLOAD_DIR: /app/uploads
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
