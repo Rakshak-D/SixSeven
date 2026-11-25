@@ -145,6 +145,18 @@ Checklist reads and saves retain the legacy display status and add verificationS
 Checklist drafts return source template. An AI request satisfying the existing input contract receives the deterministic template with fallbackReason unavailable. This milestone selects no provider and requires no AI credentials. Proposal and checklist handlers are implemented in M6. A checklist can hold forty historical items, including soft removals. Drafts can be saved once, by their creating engineer. Proposals record one owner decision without changing budget or creating a payment.
 ## Change requests
 
+## Delivery verification and bag usage
+
+| Operation | Role | Input | Success |
+| --- | --- | --- | --- |
+| GET /projects/:id/deliveries-to-verify | Engineer | Project ID | 200 `DeliveryVerificationQueue`, without prices |
+| POST /projects/:id/deliveries/:deliveryId/verify | Engineer | `VerifyDeliveryInput` | 200 `DeliveryVerificationResponse` |
+| POST /deliveries/:id/bag-codes | Engineer | `RegisterBagCodesInput` | 200 `DeliveryVerificationResponse` |
+
+Set `tracksBags: true` when creating a material to require whole-bag deliveries and one registered code per used bag. Existing materials and bulk quantities retain their original quantity workflows. Supply `bagCodes` on a tracked usage. Codes are trimmed and case-sensitive, unique within a project. A 409 with `BAG_CODE_UNKNOWN`, `BAG_CODE_USED`, or `BAG_CODE_WRONG_MATERIAL` identifies the failed constraint. Wrong counts and duplicate codes in one input return 400. Codes and usage movements commit together. A tracked or verified movement cannot be corrected using a quantity-only stock adjustment. A delivery recorded by accepting an expected arrival enters the same verification queue. Members can access the delivery's existing protected challan photo where present. Verification attests to the engineer's record of issued identifiers. It does not establish the physical material's authenticity.
+
+## Change requests
+
 The shared schemas and inferred types are available in `src/shared/schemas/change-requests.ts`. The JSON routes cover checklist and attendance changes. Medical expense requests use the multipart route below. Use a note of at least ten characters when submitting a checklist or attendance request. Frontend integration is tracked separately.
 
 | Method and path | Caller | Input | Success |

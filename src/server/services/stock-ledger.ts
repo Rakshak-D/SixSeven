@@ -9,6 +9,7 @@ import type { CreateDeliveryInput, DeliveryResponse } from "@/shared/schemas/del
 import { StockMovementResponse, type StockResponse } from "@/shared/schemas/stock";
 import type { CreateUsageInput, UsageResponse } from "@/shared/schemas/usages";
 import { recordAudit } from "./audit";
+import { claimBagCodes, consumeBagCodes } from "./bag-verification";
 import { requireProjectAccess } from "./projects";
 
 type ExactStockAdjustment = {
@@ -38,7 +39,7 @@ const materialScope = (projectId: string, materialId: string) =>
 
 async function requireMaterial(db: Db | Transaction, projectId: string, materialId: string) {
   const [material] = await db
-    .select({ balance: materials.stockQty })
+    .select({ balance: materials.stockQty, tracksBags: materials.tracksBags })
     .from(materials)
     .where(materialScope(projectId, materialId));
   if (!material) throw new ApiError(404, ErrorCode.NOT_FOUND, "Material not found");
@@ -91,7 +92,14 @@ export async function appendStockMovement(
   if (qty === 0)
     throw new ApiError(400, ErrorCode.VALIDATION_ERROR, "Movement quantity must be nonzero");
 
-  await requireMaterial(tx, projectId, materialId);
+  const material = await requireMaterial(tx, projectId, materialId);
+  if (type === "delivery" && material.tracksBags && (!Number.isInteger(qty) || qty > 5000)) {
+    throw new ApiError(
+      400,
+      ErrorCode.VALIDATION_ERROR,
+      "A tracked delivery must contain 1–5000 whole bags",
+    );
+  }
   const delta = type === "usage" ? `-${quantityText}` : quantityText;
   const delivery =
     movement.type === "delivery"
@@ -195,7 +203,12 @@ export async function recordUsage(
 ): Promise<UsageResponse> {
   return db.transaction(async (tx) => {
     await requireProjectAccess(tx, actor, projectId, ["contractor"]);
-    return appendStockMovement(tx, actor, projectId, { ...input, type: "usage" });
+    const material = await requireMaterial(tx, projectId, input.materialId);
+    const codes = input.bagCodes ?? [];
+    await claimBagCodes(tx, projectId, input.materialId, input.qty, material.tracksBags, codes);
+    const movement = await appendStockMovement(tx, actor, projectId, { ...input, type: "usage" });
+    await consumeBagCodes(tx, projectId, movement.id, codes);
+    return movement;
   });
 }
 
