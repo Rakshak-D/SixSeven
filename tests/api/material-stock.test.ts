@@ -484,13 +484,13 @@ describe("stock ledger", () => {
   });
 
   it("preserves seeded unit, fractional and low-stock examples", async () => {
-    for (const [id, unit, balance, lowStock] of [
-      ["demo-cement", "bag", 16, true],
-      ["demo-sand", "tonne", 9.25, false],
-      ["demo-steel", "kg", 525, false],
+    for (const [id, unit, balance, lowStock, movements] of [
+      ["demo-cement", "bag", 14, true, 3],
+      ["demo-sand", "tonne", 9.25, false, 2],
+      ["demo-steel", "kg", 525, false, 2],
     ] as const) {
       expect(await stock(id)).toMatchObject({ unit, balance, lowStock });
-      expect(await ledger(id)).toMatchObject({ movements: 2, usages: 1, audits: 2 });
+      expect(await ledger(id)).toMatchObject({ movements, usages: 1, audits: movements });
     }
   });
 

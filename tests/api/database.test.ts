@@ -49,12 +49,83 @@ it("upgrades a separate empty database with only the original baseline applied",
     expect(await upgrade`select to_regclass('public.projects') is not null as present`).toEqual([
       { present: true },
     ]);
-    const guards =
-      await upgrade`select tgname from pg_trigger where tgname in ('stock_movements_append_only', 'audit_log_append_only')`;
-    expect(guards).toHaveLength(2);
+    const guards = await upgrade`select tgname from pg_trigger where tgname in (
+        'stock_movements_append_only', 'audit_log_append_only',
+        'attendance_append_only', 'wage_payments_append_only', 'adjustments_append_only',
+        'adjustments_project_target_guard'
+      )`;
+    expect(guards).toHaveLength(6);
   } finally {
     await upgrade.end();
     await sql`drop database ${sql(database)}`;
+  }
+});
+
+it("creates project-scoped append-only attendance, wage and correction tables", async () => {
+  const { sql } = getDatabase();
+  const tables = await sql`select table_name from information_schema.tables
+    where table_schema = 'public' and table_name in ('attendance', 'wage_payments', 'adjustments')`;
+  expect(tables.map(({ table_name }) => table_name).sort()).toEqual([
+    "adjustments",
+    "attendance",
+    "wage_payments",
+  ]);
+
+  const [contractor] = await sql`select id from "user" where email = 'contractor@demo.invalid'`;
+  const workerId = `ledger-worker-${crypto.randomUUID()}`;
+  await sql`insert into workers (id, project_id, name, category, daily_rate_paise)
+    values (${workerId}, 'demo-greenfield', 'Ledger fixture', 'mason', 90000)`;
+  const attendanceId = crypto.randomUUID();
+  await sql`insert into attendance (id, project_id, worker_id, work_date, half_days, rate_paise, created_by)
+    values (${attendanceId}, 'demo-greenfield', ${workerId}, '2026-11-25', 1, 90000, ${contractor.id})`;
+  await expect(sql`insert into attendance (id, project_id, worker_id, work_date, half_days, rate_paise, created_by)
+    values (${crypto.randomUUID()}, 'demo-greenfield', ${workerId}, '2026-11-25', 2, 90000, ${contractor.id})`).rejects.toMatchObject(
+    { code: "23505", constraint_name: "attendance_project_worker_date_unique" },
+  );
+  await expect(sql`insert into attendance (id, project_id, worker_id, work_date, half_days, rate_paise, created_by)
+    values (${crypto.randomUUID()}, 'demo-greenfield', ${workerId}, '2026-11-26', 3, 90000, ${contractor.id})`).rejects.toMatchObject(
+    { code: "23514" },
+  );
+
+  const paymentId = crypto.randomUUID();
+  await sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, created_by)
+    values (${paymentId}, 'demo-greenfield', ${workerId}, 25000, 'wage', 'upi', '2026-11-25', ${contractor.id})`;
+  const adjustmentId = crypto.randomUUID();
+  await sql`insert into adjustments (id, project_id, target_table, target_id, old_value, new_value, reason, actor_id)
+    values (${adjustmentId}, 'demo-greenfield', 'attendance', ${attendanceId}, 1, 2, 'Verified signed site sheet', ${contractor.id})`;
+  await expect(sql`insert into adjustments (id, project_id, target_table, target_id, old_value, new_value, reason, actor_id)
+    values (${crypto.randomUUID()}, 'demo-isolated', 'attendance', ${attendanceId}, 1, 2, 'Wrong project target check', ${contractor.id})`).rejects.toMatchObject(
+    { code: "23503" },
+  );
+  await expect(
+    sql`insert into adjustments (id, project_id, target_table, target_id, old_value, new_value, reason, actor_id)
+      values (${crypto.randomUUID()}, 'demo-greenfield', 'stock_movements', 'demo-stock-cement-correction', 1, 2, 'Cannot correct a compensation', ${contractor.id})`,
+  ).rejects.toMatchObject({ code: "23503", constraint_name: "adjustments_project_target_fk" });
+  await expect(
+    sql`insert into adjustments (id, project_id, target_table, target_id, old_value, new_value, reason, actor_id)
+      values (${crypto.randomUUID()}, 'demo-greenfield', 'attendance', ${attendanceId}, 1, 1, 'Same value is not a correction', ${contractor.id})`,
+  ).rejects.toMatchObject({ code: "23514", constraint_name: "adjustment_values_differ" });
+  await expect(
+    sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, created_by)
+      values (${crypto.randomUUID()}, 'demo-greenfield', ${workerId}, 0, 'wage', 'cash', '2026-11-25', ${contractor.id})`,
+  ).rejects.toMatchObject({ code: "23514", constraint_name: "wage_payment_amount_paise_valid" });
+  await expect(
+    sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, created_by)
+      values (${crypto.randomUUID()}, 'demo-greenfield', ${workerId}, 100, 'wage', 'crypto', '2026-11-25', ${contractor.id})`,
+  ).rejects.toMatchObject({ code: "22P02" });
+
+  for (const [table, id] of [
+    ["attendance", attendanceId],
+    ["wage_payments", paymentId],
+    ["adjustments", adjustmentId],
+  ] as const) {
+    await expect(sql`update ${sql(table)} set id = id where id = ${id}`).rejects.toMatchObject({
+      code: "55000",
+    });
+    await expect(sql`delete from ${sql(table)} where id = ${id}`).rejects.toMatchObject({
+      code: "55000",
+    });
+    await expect(sql`truncate table ${sql(table)}`).rejects.toMatchObject({ code: "55000" });
   }
 });
 

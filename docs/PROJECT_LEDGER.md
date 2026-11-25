@@ -22,17 +22,18 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 | M1 — shared API contracts | INTEGRATED | PR #6 merged and main CI #14 passed. |
 | M2 — auth and project access | INTEGRATED | PR #7 merged and main CI #18 passed all 45 tests. |
 | M3 — material, worker and stock operations | VERIFIED | PR #8 PostgreSQL CI passed all 64 tests, including concurrent ledger writes and repeated demo seeding. |
+| M4 — attendance, wage accounting and corrections | VERIFIED | PR #11 CI #28 passed migrations, repeated seed, and all 81 PostgreSQL-backed tests at head b324994; merge and main CI remain pending. |
 | Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities
 
-- P0: implement auth, project membership and core site operations after contract integration.
-- P1: financial reporting, progress and audit operations.
+- P0: complete attendance and project-scoped operational records.
+- P1: labour accounting, corrections, financial reporting, progress and audit operations.
 - P2: proposals and reviewed checklist drafts.
 
 ## Status snapshot
 
-- Overall: M3 adds the material and worker APIs plus transactional deliveries, usage, stock balances and movement history.
+- Overall: M4 attendance, wage payments, append-only corrections, exact wage calculations and JSON/CSV/PDF wage sheets are implemented and verified against PostgreSQL CI; PR #11 merge and main CI remain pending.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
 
 ## Integration checkpoints
@@ -46,7 +47,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 ## Blockers
 
 - Event start/end time and confirmed schedule not supplied.
-- Remaining domain workflows require API handlers and their corresponding service and database checks.
+- M4 PR #11 is ready to merge after CI #28 passed; verify main CI after integration.
 - GitHub reports main as unprotected. Repository rulesets were empty at M0 inspection; do not change settings without approval. Enforce PR-only behavior in agent instructions.
 - No project-local database was started or verified in M0.
 
@@ -66,7 +67,8 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 - M0 foundation commit: 7941f25fe38365cb851732ffd1c0996d6c3f30ac.
 - Ledger publication commit: 7306ca846a2390a976cdd5574259ab9758b1ae05; CI run #7 passed for this head.
 - [PR #3 — coordination foundation](https://github.com/Rakshak-D/SixSeven/pull/3) was merged with a merge commit after [CI run #8](https://github.com/Rakshak-D/SixSeven/actions/runs/45586356601) passed on reviewed head aa1b3c6d97b8c7bb225998adf8247b599b982ea0. Local main was synchronized by fast-forward. See the backend ledger for verification.
+- Latest synchronized main for M4: `56c8786770ebc88593b3098f049e2c79f4ba858e`, the merge of PR #10, which changed only `docs/FRONTEND_LEDGER.md`. GitHub reported no status checks for that merge commit. PR #11 CI run #28 passed migration, upgrade, repeatable seed and all 81 PostgreSQL-backed tests at head `b324994428648d33a430c56cb1790cb9a7815f15`; merge and post-merge main CI verification remain pending.
 
 ## Next authorized milestone
 
-Recommended next scope is attendance with daily-rate snapshots and append-only corrections, including compensating stock movements through the existing ledger service.
+After M4 is merged and main CI is verified, the next scope is the owner budget summary, progress/photo storage and project activity visibility.

@@ -11,10 +11,27 @@ import type { CreateUsageInput, UsageResponse } from "@/shared/schemas/usages";
 import { recordAudit } from "./audit";
 import { requireProjectAccess } from "./projects";
 
+type ExactStockAdjustment = {
+  type: "adjustment";
+  materialId: string;
+  occurredOn: string;
+  note?: string;
+  quantityMilli: bigint;
+};
 type Movement =
   | (CreateDeliveryInput & { type: "delivery" })
-  | (CreateUsageInput & { type: "usage" | "adjustment" });
+  | (CreateUsageInput & { type: "usage" | "adjustment" })
+  | ExactStockAdjustment;
 const MAX_STOCK = "99999999999.999";
+const MAX_STOCK_MILLI = BigInt("99999999999999");
+
+function milliToDecimal(value: bigint) {
+  const sign = value < BigInt(0) ? "-" : "";
+  const absolute = value < BigInt(0) ? -value : value;
+  const whole = absolute / BigInt(1_000);
+  const fraction = String(absolute % BigInt(1_000)).padStart(3, "0");
+  return `${sign}${whole}.${fraction}`;
+}
 
 const materialScope = (projectId: string, materialId: string) =>
   and(eq(materials.projectId, projectId), eq(materials.id, materialId));
@@ -48,15 +65,34 @@ export async function appendStockMovement(
   projectId: string,
   movement: Movement,
   id = crypto.randomUUID().toString(),
+  auditContext?: { targetTable: string; targetId: string },
 ) {
   const { materialId, occurredOn, type, note } = movement;
-  const qty =
-    type === "adjustment" ? SignedQty.parse(movement.qty) : PositiveQty.parse(movement.qty);
+  let qty: number;
+  let quantityText: string;
+  if ("quantityMilli" in movement) {
+    const exactMilli = movement.quantityMilli;
+    const absolute = exactMilli < BigInt(0) ? -exactMilli : exactMilli;
+    if (exactMilli === BigInt(0) || absolute > MAX_STOCK_MILLI) {
+      throw new ApiError(
+        400,
+        ErrorCode.VALIDATION_ERROR,
+        "Movement quantity is outside the supported range",
+      );
+    }
+    quantityText = milliToDecimal(exactMilli);
+    qty = Number(quantityText);
+  } else {
+    qty = type === "adjustment" ? SignedQty.parse(movement.qty) : PositiveQty.parse(movement.qty);
+    if (qty === 0)
+      throw new ApiError(400, ErrorCode.VALIDATION_ERROR, "Movement quantity must be nonzero");
+    quantityText = String(qty);
+  }
   if (qty === 0)
     throw new ApiError(400, ErrorCode.VALIDATION_ERROR, "Movement quantity must be nonzero");
 
   await requireMaterial(tx, projectId, materialId);
-  const delta = type === "usage" ? `-${qty}` : String(qty);
+  const delta = type === "usage" ? `-${quantityText}` : quantityText;
   const delivery =
     movement.type === "delivery"
       ? {
@@ -121,6 +157,7 @@ export async function appendStockMovement(
     action: "created",
     entity: type,
     entityId: id,
+    ...(auditContext && { payload: auditContext }),
   });
   return {
     id,
