@@ -36,9 +36,16 @@ export function ProjectList() {
         </output>
       ) : projects.isError ? (
         <p className="mt-8 text-ink-2">
-          {projects.error instanceof ApiClientError && projects.error.status === 401
-            ? "Sign in to see your projects. The sign-in screen comes in a later stage."
-            : projects.error.message}
+          {projects.error instanceof ApiClientError && projects.error.status === 401 ? (
+            <>
+              Sign in to see your projects.{" "}
+              <Link href="/login" className="font-semibold text-primary underline">
+                Sign in
+              </Link>
+            </>
+          ) : (
+            projects.error.message
+          )}
         </p>
       ) : projects.data.length === 0 ? (
         <p className="mt-8 text-ink-2">You aren&apos;t part of any project yet.</p>

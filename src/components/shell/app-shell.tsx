@@ -19,16 +19,23 @@ import { TopNav } from "./top-nav";
 
 const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 
-function ShellMessage({ title, body }: { title: string; body: string }) {
+function ShellMessage({
+  title,
+  body,
+  href = "/projects",
+  link = "See your projects",
+}: {
+  title: string;
+  body: string;
+  href?: string;
+  link?: string;
+}) {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-3 px-6 py-16">
       <h1 className="text-4xl">{title}</h1>
       <p className="text-ink-2">{body}</p>
-      <Link
-        href="/projects"
-        className="font-semibold text-primary underline-offset-4 hover:underline"
-      >
-        See your projects
+      <Link href={href} className="font-semibold text-primary underline-offset-4 hover:underline">
+        {link}
       </Link>
     </main>
   );
@@ -54,7 +61,9 @@ export function AppShell({ projectId, children }: { projectId: string; children:
     return needsSignIn ? (
       <ShellMessage
         title="Sign in needed"
-        body="Your projects show once you're signed in. The sign-in screen comes in a later stage."
+        body="Your projects show once you're signed in."
+        href="/login"
+        link="Sign in"
       />
     ) : (
       <ShellMessage title="Couldn't load your projects" body={projects.error.message} />

@@ -3,9 +3,9 @@ import { ActivityResponse } from "@/shared/schemas/activity";
 import { AdjustmentListResponse } from "@/shared/schemas/adjustments";
 import { AttendanceListResponse } from "@/shared/schemas/attendance";
 import {
-  ChecklistItemResponse,
-  ChecklistsResponse,
-  UpdateChecklistItemInput,
+  ReviewChecklistItemInput,
+  VerifiedChecklistItemResponse,
+  VerifiedChecklistsResponse,
 } from "@/shared/schemas/checklist";
 import type { Role } from "@/shared/schemas/common";
 import { MaterialsResponse } from "@/shared/schemas/materials";
@@ -20,7 +20,7 @@ import { StockMovementsResponse, StockResponse } from "@/shared/schemas/stock";
 import { SummaryResponse } from "@/shared/schemas/summary";
 import { WagePaymentListResponse, WageSheetResponse } from "@/shared/schemas/wages";
 import { WorkersResponse } from "@/shared/schemas/workers";
-import { MockError, type MockRoute } from "./types";
+import { MockError, type MockRoute, parseBody } from "./types";
 import {
   accruedOf,
   balanceOf,
@@ -97,10 +97,12 @@ function roleIn(projectId: string): Role {
   return config.role;
 }
 
-export function allow(projectId: string, roles: Role[]) {
-  if (!roles.includes(roleIn(projectId))) {
+export function allow<R extends Role>(projectId: string, roles: R[]): R {
+  const role = roleIn(projectId);
+  if (!(roles as Role[]).includes(role)) {
     throw new MockError(403, "FORBIDDEN", "Your role in this project can't see this");
   }
+  return role as R;
 }
 
 function project(projectId: string) {
@@ -247,7 +249,7 @@ function findProposal(proposalId: string) {
   throw new MockError(404, "NOT_FOUND", "Proposal not found");
 }
 
-function findChecklistItem(itemId: string) {
+export function findChecklistItem(itemId: string) {
   for (const c of demoProjectConfigs) {
     const w = world(c.id);
     for (const list of w.checklists) {
@@ -441,24 +443,49 @@ export const demoRoutes: MockRoute[] = [
   {
     method: "GET",
     path: "/projects/:id/checklists",
-    respond: ({ params }) => ChecklistsResponse.parse(world(params.id).checklists),
+    respond: ({ params }) => VerifiedChecklistsResponse.parse(world(params.id).checklists),
   },
   {
-    method: "PATCH",
-    path: "/checklist-items/:id",
+    method: "POST",
+    path: "/checklist-items/:id/review",
     respond: ({ params, body }) => {
       const { w, item, projectId } = findChecklistItem(params.id);
       allow(projectId, ["engineer"]);
-      item.status = UpdateChecklistItemInput.parse(body).status;
+      const input = parseBody(ReviewChecklistItemInput, body);
+      if (item.verificationStatus !== "waiting") {
+        throw new MockError(409, "CONFLICT", "This task is not waiting for review");
+      }
+      const latest = [...item.history].reverse().find((e) => e.kind === "submitted");
+      if (latest?.progressId !== input.progressId) {
+        throw new MockError(
+          409,
+          "CONFLICT",
+          "The contractor sent newer proof. Reload and review that",
+        );
+      }
+      const accept = input.decision === "accept";
+      item.verificationStatus = accept ? "done" : "sent_back";
+      item.status = accept ? "done" : "inProgress";
+      const createdAt = new Date().toISOString();
+      item.history.push({
+        id: `${item.id}-ev${item.history.length + 1}`,
+        kind: accept ? "accepted" : "sent_back",
+        actorId: demoPeople.engineer.id,
+        createdAt,
+        note: input.note ?? null,
+        previous: null,
+        next: null,
+        progressId: input.progressId,
+      });
       w.activity.unshift({
-        id: `${item.id}-u${Date.now()}`,
+        id: `${item.id}-r${Date.now()}`,
         actor: demoPeople.engineer,
-        action: "updated",
+        action: accept ? "approved" : "rejected",
         entity: "checklistItem",
         entityId: item.id,
-        createdAt: new Date().toISOString(),
+        createdAt,
       });
-      return ChecklistItemResponse.parse(item);
+      return VerifiedChecklistItemResponse.parse(item);
     },
   },
 ];

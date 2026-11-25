@@ -1,8 +1,8 @@
 import type { ActivityResponse } from "@/shared/schemas/activity";
-import type { ChecklistsResponse } from "@/shared/schemas/checklist";
 import type { MaterialsResponse } from "@/shared/schemas/materials";
 import type { ProposalsResponse } from "@/shared/schemas/proposals";
 import type { StockMovementsResponse } from "@/shared/schemas/stock";
+import type { VerifiedChecklists as ChecklistsResponse } from "./checklist";
 import { formatQty } from "./format";
 
 export type Activity = ActivityResponse[number];
@@ -63,8 +63,16 @@ export function describeActivity(
     }
     case "checklistItem": {
       const item = look.checklists?.flatMap((c) => c.items).find((i) => i.id === a.entityId);
+      const words =
+        a.action === "approved"
+          ? "accepted"
+          : a.action === "rejected"
+            ? "sent back"
+            : item
+              ? statusWords[item.status]
+              : "";
       return {
-        title: item ? `${item.task} ${statusWords[item.status]}` : "Checklist updated",
+        title: item ? `${item.task} ${words}` : "Checklist updated",
         detail: who,
       };
     }

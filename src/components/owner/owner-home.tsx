@@ -25,6 +25,7 @@ import {
   useWorkers,
 } from "@/hooks/use-project-data";
 import { describeActivity } from "@/lib/activity";
+import { activeItems } from "@/lib/checklist";
 import { addDays, daysBetween, istDateOf, todayIst } from "@/lib/dates";
 import {
   formatIsoDate,
@@ -148,7 +149,7 @@ export function OwnerHome() {
   const usedPct = s.budgetPaise ? Math.round((s.spendPaise / s.budgetPaise) * 100) : 0;
   const split = "spendSplit" in s ? s.spendSplit : null;
   const week = Math.floor(daysBetween(project.startDate, today) / 7) + 1;
-  const underway = checklists.data?.flatMap((c) => c.items).find((i) => i.status === "inProgress");
+  const underway = activeItems(checklists.data).find((i) => i.verificationStatus === "doing");
   const chart = spentOverTime(s, project.startDate, today);
   const pending = proposals.data?.filter((p) => p.status === "pending") ?? [];
   const over = s.materialVariance.filter((v) => v.overTolerance);
@@ -286,7 +287,7 @@ export function OwnerHome() {
                   <span>
                     <span className="block font-semibold">{a.name} is low</span>
                     <span className="num block text-[15px] text-muted-foreground">
-                      {formatQty(a.balance)} {unit} left · reorder at {formatQty(a.lowStockQty)}
+                      {formatQty(a.balance)} {unit} left · reorder {formatQty(a.lowStockQty)}
                     </span>
                   </span>
                 </li>

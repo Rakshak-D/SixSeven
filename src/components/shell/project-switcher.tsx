@@ -1,11 +1,16 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui/button";
+import { signOut } from "@/lib/api/auth";
 import { formatPaiseShort } from "@/lib/format";
+import { mocksEnabled } from "@/mocks";
 import type { ProjectResponse } from "@/shared/schemas/projects";
 
 const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
@@ -19,6 +24,22 @@ export function ProjectSwitcher({
   projects: ProjectResponse[];
 }) {
   const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const router = useRouter();
+  const client = useQueryClient();
+
+  async function leave() {
+    setSigningOut(true);
+    try {
+      await signOut();
+      client.clear();
+      router.replace("/login");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not sign out. Try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
   return (
     <>
       <Button
@@ -73,6 +94,11 @@ export function ProjectSwitcher({
             </li>
           ))}
         </ul>
+        {mocksEnabled ? null : (
+          <Button variant="outline" className="mt-6 w-full" onClick={leave} disabled={signingOut}>
+            {signingOut ? "Signing out…" : "Sign out"}
+          </Button>
+        )}
       </Sheet>
     </>
   );

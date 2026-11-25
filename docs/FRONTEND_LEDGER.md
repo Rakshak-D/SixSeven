@@ -48,6 +48,69 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-26 IST · Sign-in, photo upload, task workflow, checklist edits
+
+- **Branch / commit:** `fe/contractor-screens` after PR #22 merged (follow-up PR; commits `a96565f`, `525689d`).
+- **Done:**
+  - **Multipart in `api()`:** a `FormData` body is sent as multipart (the browser sets the boundary).
+  - **Sign-in** (`/login`): email and password through the Better Auth bridge
+    (`POST /api/auth/sign-in/email`), then back to `/projects`. A 401 from any page links to it.
+    Sign out sits in the project switcher. On demo data (mocks on) the page says there is nothing to
+    sign in to and links to the demo projects. **IMPLEMENTED, not exercised**: no disposable database
+    was started, so the live sign-in has not been run.
+  - **Site photos** (contractor and engineer): Add photos on Site, and the Photo tile in the Log sheet.
+    A note and 1 to 10 JPEG, PNG or WebP photos of up to 5 MB each, checked before sending.
+    `POST /projects/:id/progress`.
+  - **Task workflow, contractor:** Start (`POST /checklist-items/:id/start`) and Send proof
+    (`POST /checklist-items/:id/completion`, note and photos). A sent-back task shows the engineer's
+    reason. The task then shows "Waiting for check" until the engineer decides.
+  - **Checklist edits, engineer:** add a task, rename it, remove it, each with a reason of at least
+    10 characters (`POST /projects/:id/checklist-items`, `PATCH` and `DELETE /checklist-items/:id`).
+    Tasks waiting for review cannot be edited.
+- **Mocks:** `src/mocks/checklist-routes.ts` answers all of the above and refuses what the API refuses
+  (409 for a task in the wrong state, 400 for a bad form, 403 for the wrong role). Demo uploads are not
+  stored, so their photo URLs show the "Demo photo" tile.
+- **Cleanup:** one `parseBody` and `mockId` for all mock routes, one `failIfInvalid` for all write hooks.
+- **Tests:** lint, typecheck pass. `vitest run src`: 65 pass (new: task workflow, photo limits and
+  roles, checklist add, rename and remove). Playwright at 390 px light and 1440 px dark: start a task,
+  send proof (empty note and no photo are refused in words, a real file goes through), Photo tile opens
+  the sheet, engineer adds a task (short reason refused). No overflow, no console errors.
+- **Still needs the backend or a decision:** the delivery challan photo (the contract has no field for
+  it); the anti-fraud and payments screens (requests 13 to 19, not authorised); team list and
+  invitations (requests 4 and 12).
+- **Review fixes (pr-review agent):** Accept is disabled until the proof photos can be shown, and a
+  failed proof load says so; a failed sign-out shows a message; the mock Start only accepts a task
+  that has not started, like the server; the hidden file input is out of the tab order; tests for the
+  multipart and JSON transport and for sign-in and sign-out (stubbed `fetch`). 71 tests pass.
+- **Next:** run the live sign-in and the screens against a disposable local database
+  (`./start.sh --live`, once Codex lands the launcher), then switch the mocks off route by route.
+
+### 2026-11-26 IST · Engineer side: Home, Review, verified checklist shape
+
+- **Branch / commit:** `fe/contractor-screens` after PR #22 merged (follow-up PR; commits `a96565f`, `525689d`).
+- **Found:** the live `GET /projects/:id/checklists` returns the M6 verified shape
+  (`verificationStatus`, `removedAt`, `history`). The shared `ChecklistsResponse` is strict and would
+  reject it, so the checklist reads now parse with `VerifiedChecklistsResponse`, and the demo mocks
+  produce that shape. The Site page shows the five states (not started, under way, waiting for check,
+  sent back, done) and hides soft-removed items. `src/lib/checklist.ts` derives the types because the
+  contract exports the schemas without types (request to Codex: export them).
+- **Done (MOCKED):**
+  - **Engineer Home:** plan progress, tasks waiting for the engineer, tasks sent back, materials
+    running low, recent activity. No money anywhere on it.
+  - **Review** (centre button, and from Home): each waiting task shows the contractor's note and
+    photos; Accept, or Send back with a reason of at least 10 characters. The mock refuses a send-back
+    without a reason, a proof that is not the latest submission (409), a repeat decision (409) and a
+    non-engineer (403), like the contract. Demo photos have no image files, so a tile says so.
+  - Activity lines for accepted and sent-back tasks.
+- **Tests:** lint, typecheck pass. `vitest run src`: 62 pass (new: accept, send-back refusals, role).
+  Playwright on the engineer demo project at 390 px light and 1440 px dark: Home, Site, Stock and Logs
+  have no overflow and no console errors; the review flow ran at 390 px (send back with a short reason
+  is refused in plain words, a valid send-back and an accept each remove the card).
+- **Not done:** the contractor side of M6 (start a task, submit completion with photos) needs multipart
+  in `api()`; checklist add, rename and remove (request 8 UI) are not built.
+- **Next:** multipart in `api()` (photo upload for deliveries, progress and task completion), then
+  login so the mocks can be switched off.
+
 ### 2026-11-26 IST · Contractor screens: Today, Stock, Wages
 
 - **Branch / commit:** `fe/contractor-screens`, with `main` merged in (M6: proposals, checklist

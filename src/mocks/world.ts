@@ -4,11 +4,11 @@
  * follow attendance, the summary adds up). Dates are relative to today, so the demo never goes stale.
  * Every route response built from this is parsed with the shared contract in ./routes.ts.
  */
+import type { VerifiedChecklist, VerifiedItem } from "@/lib/checklist";
 import { addDays, daysBetween, istTimestamp, mondayOf, todayIst, weekday } from "@/lib/dates";
 import type { ActivityResponse } from "@/shared/schemas/activity";
 import type { AdjustmentResponse } from "@/shared/schemas/adjustments";
 import type { AttendanceRecord } from "@/shared/schemas/attendance";
-import type { ChecklistResponse } from "@/shared/schemas/checklist";
 import type { MaterialResponse } from "@/shared/schemas/materials";
 import type { ProgressResponse } from "@/shared/schemas/progress";
 import type { ProposalResponse } from "@/shared/schemas/proposals";
@@ -38,7 +38,7 @@ export type DemoWorld = {
   payments: WagePaymentRecord[];
   adjustments: AdjustmentResponse[];
   proposals: ProposalResponse[];
-  checklists: ChecklistResponse[];
+  checklists: VerifiedChecklist[];
   progress: ProgressResponse[];
   /** Newest first. */
   activity: Activity[];
@@ -516,20 +516,31 @@ export function buildWorld(
   }
 
   const doneShare = Math.min(1, days / 140);
-  const items = checklistItems.map(([phase, task, used], i) => {
+  const items: VerifiedItem[] = checklistItems.map(([phase, task, used], i) => {
     const position = i / checklistItems.length;
     const status: "done" | "inProgress" | "pending" =
       position < doneShare * 0.55 ? "done" : position < doneShare * 0.7 ? "inProgress" : "pending";
     const materials: string[] = [...used];
-    return { id: `${projectId}-ci${i + 1}`, phase, task, materials, status };
+    const verificationStatus: VerifiedItem["verificationStatus"] =
+      status === "done" ? "done" : status === "inProgress" ? "doing" : "todo";
+    return {
+      id: `${projectId}-ci${i + 1}`,
+      phase,
+      task,
+      materials,
+      status,
+      verificationStatus,
+      removedAt: null,
+      history: [] as VerifiedItem["history"],
+    };
   });
-  const checklists: ChecklistResponse[] = [
+  const checklists: VerifiedChecklist[] = [
     {
       id: `${projectId}-cl1`,
       title: "Build plan",
       source: "template",
       createdAt: createdOn(addDays(start, 2), 11, 0),
-      items: items.map((it) => ({ ...it })),
+      items,
     },
   ];
   items
@@ -566,6 +577,38 @@ export function buildWorld(
       createdAt,
     });
     return { id, note, checklistItemId: i === 0 ? items[6].id : null, createdAt, photos };
+  });
+
+  // Tasks the contractor has finished and the engineer has not checked yet, plus one sent back.
+  const underway = items.filter((it) => it.verificationStatus === "doing");
+  underway.slice(0, 3).forEach((it, i) => {
+    const proof = progress[i + 1];
+    if (!proof) return;
+    proof.checklistItemId = it.id;
+    const sentBack = i === 2;
+    it.verificationStatus = sentBack ? "sent_back" : "waiting";
+    it.history.push({
+      id: `${it.id}-ev1`,
+      kind: "submitted",
+      actorId: contractor.id,
+      createdAt: proof.createdAt,
+      note: proof.note,
+      previous: null,
+      next: null,
+      progressId: proof.id,
+    });
+    if (sentBack) {
+      it.history.push({
+        id: `${it.id}-ev2`,
+        kind: "sent_back",
+        actorId: engineer.id,
+        createdAt: createdOn(addDays(today, -1), 11, 30),
+        note: "Photo does not show the full wall. Retake from the corner.",
+        previous: null,
+        next: null,
+        progressId: proof.id,
+      });
+    }
   });
 
   activity.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
