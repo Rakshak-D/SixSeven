@@ -75,6 +75,40 @@ export const projectMembers = pgTable(
   ],
 );
 
+export const projectInvitations = pgTable(
+  "project_invitations",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    email: text(),
+    phone: text(),
+    role: projectRole().notNull(),
+    invitedBy: text("invited_by")
+      .notNull()
+      .references(() => user.id),
+    acceptedBy: text("accepted_by").references(() => user.id),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("project_invitation_email_unique").on(t.projectId, t.email),
+    unique("project_invitation_phone_unique").on(t.projectId, t.phone),
+    index("project_invitation_recipient_idx").on(t.email, t.acceptedAt, t.createdAt),
+    check(
+      "project_invitation_recipient_canonical",
+      sql`(${t.email} is not null and ${t.phone} is null and ${t.email} = lower(btrim(${t.email})) and char_length(${t.email}) between 3 and 254)
+        or (${t.phone} is not null and ${t.email} is null and ${t.phone} ~ '^[+]91[6-9][0-9]{9}$')`,
+    ),
+    check("project_invitation_role", sql`${t.role} in ('owner', 'contractor')`),
+    check(
+      "project_invitation_acceptance",
+      sql`(${t.acceptedBy} is null) = (${t.acceptedAt} is null) and (${t.phone} is null or ${t.acceptedAt} is null)`,
+    ),
+  ],
+);
+
 export const materials = pgTable(
   "materials",
   {

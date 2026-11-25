@@ -4,7 +4,14 @@ import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 import { POST as authPost } from "@/app/api/auth/[...auth]/route";
 import { getDatabase } from "@/db/client";
-import { auditLog, checklistEvents, expenses, progressPhotos, progressUpdates } from "@/db/schema";
+import {
+  auditLog,
+  checklistEvents,
+  expenses,
+  progressPhotos,
+  progressUpdates,
+  projectMembers,
+} from "@/db/schema";
 import { app } from "@/server/app";
 import { createAuth } from "@/server/auth";
 import {
@@ -25,7 +32,11 @@ import {
 } from "@/shared/schemas/checklist";
 import { DeliveryResponse } from "@/shared/schemas/deliveries";
 import { ProgressResponse, TimelineResponse } from "@/shared/schemas/progress";
-import { ProjectMemberResponse, ProjectResponse } from "@/shared/schemas/projects";
+import {
+  ProjectInvitationResponse,
+  ProjectMemberResponse,
+  ProjectResponse,
+} from "@/shared/schemas/projects";
 import { ProposalResponse } from "@/shared/schemas/proposals";
 import { SummaryResponse } from "@/shared/schemas/summary";
 import { UsageResponse } from "@/shared/schemas/usages";
@@ -108,7 +119,7 @@ function monday(value: string) {
 }
 
 async function newProject(startDate: string, budgetPaise = 25_000_000) {
-  const response = await api("/projects", contractor, {
+  const response = await api("/projects", engineer, {
     name: "Synthetic M5 reporting project",
     location: "Demo site",
     startDate,
@@ -116,13 +127,16 @@ async function newProject(startDate: string, budgetPaise = 25_000_000) {
   });
   expect(response.status).toBe(201);
   const project = ProjectResponse.parse(await response.json());
-  for (const [email, role] of [
-    [DemoAccountEmail.owner, "owner"],
-    [DemoAccountEmail.engineer, "engineer"],
+  for (const [email, role, recipient] of [
+    [DemoAccountEmail.owner, "owner", owner],
+    [DemoAccountEmail.contractor, "contractor", contractor],
   ] as const) {
-    const member = await api(`/projects/${project.id}/members`, contractor, { email, role });
-    expect(member.status).toBe(201);
-    ProjectMemberResponse.parse(await member.json());
+    const invite = await api(`/projects/${project.id}/invitations`, engineer, { email, role });
+    expect(invite.status).toBe(201);
+    const { id } = ProjectInvitationResponse.parse(await invite.json());
+    const member = await api(`/invitations/${id}/accept`, recipient, {}, "POST");
+    expect(member.status).toBe(200);
+    expect(ProjectMemberResponse.parse(await member.json()).role).toBe(role);
   }
   return project.id;
 }
@@ -779,11 +793,9 @@ describe("M6 proposals and checklist verification", () => {
       body: { email, password, name: "Second test engineer" },
     });
     const secondEngineer = await signIn(email);
-    const secondary = await api(`/projects/${project}/members`, contractor, {
-      email,
-      role: "engineer",
-    });
-    expect(secondary.status).toBe(201);
+    await getDatabase()
+      .db.insert(projectMembers)
+      .values({ projectId: project, userId: secondEngineer.userId, role: "engineer" });
     await expectError(await api(`${draftPath}/records`, secondEngineer, payload), 404, "NOT_FOUND");
     const save = await api(`${draftPath}/records`, engineer, payload);
     expect(save.status).toBe(201);
