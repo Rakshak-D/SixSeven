@@ -95,8 +95,12 @@ export const ChecklistVerificationStatus = z.enum([
 ]);
 export const ChecklistChangeReason = z.string().trim().min(10).max(2000);
 export const ReviewChecklistItemInput = z.discriminatedUnion("decision", [
-  z.strictObject({ decision: z.literal("accept"), note: z.string().trim().max(2000).optional() }),
-  z.strictObject({ decision: z.literal("send_back"), note: ChecklistChangeReason }),
+  z.strictObject({
+    decision: z.literal("accept"),
+    progressId: Id,
+    note: z.string().trim().max(2000).optional(),
+  }),
+  z.strictObject({ decision: z.literal("send_back"), progressId: Id, note: ChecklistChangeReason }),
 ]);
 export const RenameChecklistItemInput = z.strictObject({
   task: ApprovedItem.shape.task,
@@ -123,3 +127,8 @@ export const VerifiedChecklistItemResponse = ChecklistItemResponse.extend({
   removedAt: Timestamp.nullable(),
   history: z.array(ChecklistEvent),
 });
+export const VerifiedChecklistResponse = ChecklistResponse.extend({
+  source: z.literal("template"),
+  items: z.array(VerifiedChecklistItemResponse).min(1).max(40),
+});
+export const VerifiedChecklistsResponse = z.array(VerifiedChecklistResponse);

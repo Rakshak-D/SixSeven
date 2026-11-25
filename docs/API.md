@@ -117,7 +117,7 @@ All routes require a session. Item IDs resolve to their project before checking 
 |---|---|---|---|
 | POST /checklist-items/:id/start | Contractor | No body | 200 VerifiedChecklistItemResponse |
 | POST /checklist-items/:id/completion | Contractor | Multipart note and 1–10 photos, using progress upload limits | 200 VerifiedChecklistItemResponse |
-| POST /checklist-items/:id/review | Engineer | ReviewChecklistItemInput | 200 VerifiedChecklistItemResponse |
+| POST /checklist-items/:id/review | Engineer | ReviewChecklistItemInput with the latest submitted progressId | 200 VerifiedChecklistItemResponse |
 | POST /projects/:id/checklist-items | Engineer | AddChecklistItemInput with the target checklist ID | 201 VerifiedChecklistItemResponse |
 | PATCH /checklist-items/:id | Engineer | RenameChecklistItemInput | 200 VerifiedChecklistItemResponse |
 | DELETE /checklist-items/:id | Engineer | RemoveChecklistItemInput | 200 VerifiedChecklistItemResponse |
