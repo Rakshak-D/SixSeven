@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M0 publication
+
+- Timestamp: 2026-11-25 14:56:50+05:30
+- Milestone/task ID: M0
+- Branch: chore/coordination
+- Scope and changes: pushed the reviewed M0 coordination foundation and opened PR #3 against main; updated the project status and publication references.
+- Files affected: docs/PROJECT_LEDGER.md and docs/BACKEND_LEDGER.md.
+- API or database changes: none.
+- Verification commands and outcomes: `git push --set-upstream origin chore/coordination` — PASS. GitHub PR #3 is open and mergeable with base main SHA 29b06094031f1fab470aa3c648c2ff2734af7e73. GitHub Actions CI run #6 for foundation commit 7941f25fe38365cb851732ffd1c0996d6c3f30ac — PASS.
+- Dependencies added: none.
+- Known limitations: PR is unmerged by instruction. CI run #6 covers foundation commit 7941f25; recheck the latest head after this ledger-only update. INTEGRATED status is not applicable until merge and integration testing; the PostgreSQL-dependent suite remains NOT_RUN as recorded below.
+- Frontend implications: none; no frontend implementation or Claude-owned ledger changed.
+- Commit or PR reference: foundation commit 7941f25fe38365cb851732ffd1c0996d6c3f30ac; [PR #3](https://github.com/Rakshak-D/SixSeven/pull/3).
+- Next action: await technical-lead review. Do not merge before explicit foundation approval. Do not begin business-feature implementation until the full specification and next milestone are authorized.
+
 ## Entry — M0 local verification
 
 - Timestamp: 2026-11-25 14:54:02+05:30
@@ -21,10 +36,10 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
   - `git diff --check` — PASS.
   - Full `corepack pnpm test` and `tests/api/health.test.ts` — NOT_RUN; health integration requires a reachable PostgreSQL database. No database or Docker service was started and no external database was accessed.
 - Dependencies added: none.
-- Known limitations: default Biome command is incompatible with the checked-out CRLF line endings on this Windows host; CRLF override passes. Full API/database suite is NOT_RUN. Remote CI remains to be observed after PR publication.
+- Known limitations: default Biome command is incompatible with the checked-out CRLF line endings on this Windows host; CRLF override passes. Full API/database suite is NOT_RUN. At this checkpoint PR publication and its CI run were still pending; see the newer publication entry.
 - Frontend implications: no frontend implementation files changed; ownership guidance and API contract documentation are Codex-owned. Claude's ledger remains unchanged.
-- Commit or PR reference: pending publication.
-- Next action: stage reviewed paths, commit and push only chore/coordination, then open an unmerged PR to main.
+- Commit or PR reference: foundation commit 7941f25fe38365cb851732ffd1c0996d6c3f30ac; PR #3 publication is recorded in the newer checkpoint above.
+- Next action: publication was completed in the newer checkpoint; await user review and approval without merging.
 
 ## Entry — M0 repository foundation
 
