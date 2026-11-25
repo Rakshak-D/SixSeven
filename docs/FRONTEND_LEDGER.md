@@ -9,6 +9,8 @@ checks pass) · **VERIFIED** (exercised in a browser at phone and desktop sizes)
 
 | Screen / feature | Route | API it needs | Status |
 |---|---|---|---|
+| App shell: floating top nav (desktop), bottom dock (phone), project switcher, role action sheets, project list and home | `/projects`, `/projects/[id]` and its `logs`, `site`, `money`, `stock`, `wages` placeholders | `GET /projects` (mocked: needs a session, login not built) | MOCKED, verified in a browser |
+| Design tokens, fonts, theme toggle, restyled ui primitives | `/styleguide` (development only, 404 in production) | none | VERIFIED |
 | All main screens, round 2 (prototype page, not app code) | n/a | demo data; needs requests 4–11 | MOCKED (prototype) |
 
 ## Backend requests
@@ -39,6 +41,78 @@ proposed method + path, fields, priority / blocking.
 | 19 | **Fraud flags** in the summary for owners: new supplier, bank change, a rate far above recent buys, a payment with no verified delivery, an entry with no engineer confirmation, repeated delays. Proposed `fraudFlags: [{kind, refType, refId, raisedOn}]` on `SummaryResponse` for owners only. | Owner dashboard | Medium | Open |
 
 ## Entries
+
+### 2026-11-25 20:12 IST · Stage 2: app shell
+
+- **Branch / commit:** `fe/design-tokens` (uncommitted, on top of stage 1).
+- **Decisions (frontend developer, today):** URLs are `/projects/[id]/…`, one set of pages that adapt to
+  the role, because roles are per project. The empty `(owner)`, `(contractor)` and `(engineer)` route
+  groups are removed. Tabs and centre actions: owner Home · Logs · Approvals · Site · Money; contractor
+  Today · Stock · + Log · Site · Wages; engineer Home · Logs · Review · Site · Stock. Team, invitations
+  and project settings sit behind the project switcher. The shell runs on mocks until login exists.
+- **Done:**
+  - `/` redirects to `/projects`, a project list with each project's role.
+  - `/projects/[id]` wraps every project page in the shell:
+    - desktop (1024 px and up): a floating top nav with a sliding tab indicator, the project switcher,
+      a "Demo data" badge, the role's action button and the theme toggle
+    - phone and tablet: a floating bottom dock with the action in the centre, and a top bar with the
+      switcher and the toggle
+  - A shared `Sheet` (bottom sheet on phone, right panel on desktop, Radix Dialog) is used by the
+    switcher and the action sheets. The action sheets state plainly that their lists and forms are not
+    connected yet; nothing reports fake success.
+  - Project home shows only contract fields: name, location, start date, budget.
+  - The other tabs are labelled "Not built yet".
+  - Unknown project and 401 states have honest messages.
+- **Files:**
+  - new: `src/components/shell/*`, `src/components/sheet.tsx`, `src/hooks/use-projects.ts`,
+    `src/lib/format.ts`, `src/mocks/projects.ts`, `src/mocks/types.ts`, `src/app/projects/**`
+  - changed: `src/mocks/index.ts`, `src/lib/api/client.ts` (one shared `mocksEnabled` flag),
+    `src/app/page.tsx`, `src/app/globals.css` (sheet, panel and dock animations)
+  - removed: the three role-group `.gitkeep` files
+- **API dependencies:** `GET /projects` is live but needs a session; mocked with three demo projects
+  (one per role) parsed through `ProjectsResponse`. Delete the mock when login lands.
+- **Tests:**
+  - `pnpm lint`, `pnpm typecheck`: pass.
+  - `vitest run src`: 37 pass, including new tests for the role tabs, href and active-tab matching, the
+    demo fixtures, and money and date formatting.
+  - Playwright at 390, 768 and 1440 px, light and dark, over the project list and one project per role:
+    no horizontal overflow, no console errors, top nav only at 1024 px and up, dock only below, nothing
+    tappable under 44 px.
+  - Playwright flows:
+    - a tab click moves the indicator and sets `aria-current`
+    - Approvals opens and Escape closes
+    - switching to the contractor project switches the tabs and the action to Log
+    - the phone dock navigates
+    - + Log opens the quick-log sheet
+    - content ends above the dock
+    - an unknown project shows "Project not found"
+- **Next:** stage 3, the overview blocks on contract-checked mocks (requests 6, 10, 12).
+
+### 2026-11-25 20:40 IST · Stage 1: design tokens
+
+- **Branch / commit:** `fe/design-tokens` from `main` at `3860e93`.
+- **Done:** replaced the shadcn neutral theme in `src/app/globals.css` with the Slate tokens: cream
+  light theme and warm near-black dark theme. Token names stay shadcn's, so the primitives keep their
+  APIs; Slate-only tokens added are band, ink-2, line-strong, success, warning, the category colours,
+  tile and scrim. One easing curve (`ease-slate`), three durations, rise, drop and fade animations, a
+  `num` utility for tabular figures, and a global reduced-motion rule. Fonts are Newsreader (headings,
+  italic, optical size) and Geist (body) through `next/font/google`, self-hosted at build. Restyled
+  button, card, input, select, dialog, tabs and badge to pills, larger radii and 44px touch targets. New
+  `ThemeToggle` (system default, remembered choice, one view-transition crossfade). New
+  development-only `/styleguide` page to review the tokens.
+- **Files changed:** `src/app/globals.css`, `src/app/layout.tsx`, `src/app/styleguide/page.tsx`,
+  `src/components/theme-toggle.tsx`, `src/components/ui/{badge,button,card,dialog,input,select,tabs}.tsx`,
+  this ledger.
+- **API dependencies:** none. **Mocked vs live:** the styleguide shows sample copy only.
+- **Tests:** `pnpm typecheck` pass; `pnpm lint` pass; `pnpm build` pass. A contrast script checked every
+  text and surface pair in both themes: all pass 4.5:1 after darkening the light-theme orange, green and
+  red. A Playwright script at 390, 768 and 1440 px, light and dark, found no horizontal overflow and no
+  console errors. It also confirmed the system theme applies, both fonts load, nothing tappable is under
+  44px, the toggle applies and persists across reload, tabs switch, and reduced motion stops
+  animations. A production start returns 404 for `/styleguide` and makes no Google Fonts requests.
+  `pnpm test` NOT_RUN: there are no frontend unit tests yet, and the backend suite needs the database,
+  which this change does not touch.
+- **Next:** stage 2, the floating top nav (desktop) and bottom dock (phone).
 
 ### 2026-11-25 19:42 IST · Anti-fraud plan into AGENTS.md, charts and type settled
 
