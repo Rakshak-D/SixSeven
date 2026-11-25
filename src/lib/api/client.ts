@@ -63,10 +63,17 @@ export async function api<T>(
     }
   }
 
+  // A FormData body is sent as multipart; the browser sets the content type and boundary itself.
+  const isForm = opts.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: opts.body === undefined ? undefined : { "content-type": "application/json" },
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    headers: opts.body === undefined || isForm ? undefined : { "content-type": "application/json" },
+    body:
+      opts.body === undefined
+        ? undefined
+        : isForm
+          ? (opts.body as FormData)
+          : JSON.stringify(opts.body),
     credentials: "include",
   });
   const data: unknown = res.headers.get("content-type")?.includes("json") ? await res.json() : null;

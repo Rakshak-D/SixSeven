@@ -3,34 +3,18 @@
  * what the real API refuses (docs/API.md): duplicate challans, usage over stock, attendance twice,
  * no-op corrections. Requests and responses go through the shared schemas.
  */
-import type { ZodType } from "zod";
 import { AdjustmentResponse, CreateAdjustmentInput } from "@/shared/schemas/adjustments";
 import { AttendanceResponse, CreateAttendanceInput } from "@/shared/schemas/attendance";
 import { CreateDeliveryInput, DeliveryResponse } from "@/shared/schemas/deliveries";
 import { CreateUsageInput, UsageResponse } from "@/shared/schemas/usages";
 import { CreateWagePaymentInput, WagePaymentResponse } from "@/shared/schemas/wages";
 import { allow, world } from "./routes";
-import { MockError, type MockRoute } from "./types";
+import { MockError, type MockRoute, mockId, parseBody } from "./types";
 import { balanceOf, type DemoWorld, demoPeople, qtyOf } from "./world";
 
-let counter = 0;
-const newId = (w: DemoWorld, prefix: string) =>
-  `${w.projectId}-${prefix}n${Date.now().toString(36)}${++counter}`;
+const newId = (w: DemoWorld, prefix: string) => mockId(w.projectId, prefix);
 const now = () => new Date().toISOString();
 const normalise = (s: string) => s.trim().toLowerCase();
-
-function parse<T>(schema: ZodType<T>, body: unknown): T {
-  const result = schema.safeParse(body);
-  if (!result.success) {
-    throw new MockError(
-      400,
-      "VALIDATION_ERROR",
-      result.error.issues[0]?.message ?? "Check the form",
-      result.error.issues,
-    );
-  }
-  return result.data;
-}
 
 function material(w: DemoWorld, materialId: string) {
   const m = w.materials.find((x) => x.id === materialId);
@@ -61,7 +45,7 @@ export const writeRoutes: MockRoute[] = [
     respond: ({ params, body }) => {
       allow(params.id, ["contractor"]);
       const w = world(params.id);
-      const input = parse(CreateDeliveryInput, body);
+      const input = parseBody(CreateDeliveryInput, body);
       material(w, input.materialId);
       const duplicate = w.movements.some(
         (m) =>
@@ -108,7 +92,7 @@ export const writeRoutes: MockRoute[] = [
     respond: ({ params, body }) => {
       allow(params.id, ["contractor"]);
       const w = world(params.id);
-      const input = parse(CreateUsageInput, body);
+      const input = parseBody(CreateUsageInput, body);
       const m = material(w, input.materialId);
       const balance = balanceOf(w, input.materialId);
       if (input.qty > balance) {
@@ -146,7 +130,7 @@ export const writeRoutes: MockRoute[] = [
     respond: ({ params, body }) => {
       allow(params.id, ["contractor"]);
       const w = world(params.id);
-      const input = parse(CreateAttendanceInput, body);
+      const input = parseBody(CreateAttendanceInput, body);
       for (const e of input.entries) {
         if (!w.workers.some((x) => x.id === e.workerId))
           throw new MockError(404, "NOT_FOUND", "Worker not found");
@@ -182,7 +166,7 @@ export const writeRoutes: MockRoute[] = [
     respond: ({ params, body }) => {
       allow(params.id, ["contractor"]);
       const w = world(params.id);
-      const input = parse(CreateWagePaymentInput, body);
+      const input = parseBody(CreateWagePaymentInput, body);
       if (!w.workers.some((x) => x.id === input.workerId))
         throw new MockError(404, "NOT_FOUND", "Worker not found");
       const id = newId(w, "pay");
@@ -198,7 +182,7 @@ export const writeRoutes: MockRoute[] = [
     respond: ({ params, body }) => {
       allow(params.id, ["contractor"]);
       const w = world(params.id);
-      const input = parse(CreateAdjustmentInput, body);
+      const input = parseBody(CreateAdjustmentInput, body);
       const base = {
         id: newId(w, "adj"),
         targetId: input.targetId,

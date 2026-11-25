@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ZodType } from "zod";
 import { ApiClientError, api } from "@/lib/api/client";
-import type { ReviewInput } from "@/lib/checklist";
+import type { AddItemInput, ReviewInput } from "@/lib/checklist";
 import { ActivityResponse } from "@/shared/schemas/activity";
 import {
   AdjustmentListResponse,
@@ -14,13 +14,16 @@ import {
   CreateAttendanceInput,
 } from "@/shared/schemas/attendance";
 import {
+  AddChecklistItemInput,
+  RemoveChecklistItemInput,
+  RenameChecklistItemInput,
   ReviewChecklistItemInput,
   VerifiedChecklistItemResponse,
   VerifiedChecklistsResponse,
 } from "@/shared/schemas/checklist";
 import { CreateDeliveryInput, DeliveryResponse } from "@/shared/schemas/deliveries";
 import { MaterialsResponse } from "@/shared/schemas/materials";
-import { TimelineResponse } from "@/shared/schemas/progress";
+import { CreateProgressInput, ProgressResponse, TimelineResponse } from "@/shared/schemas/progress";
 import { ProposalResponse, ProposalsResponse } from "@/shared/schemas/proposals";
 import { StockMovementsResponse, StockResponse } from "@/shared/schemas/stock";
 import { SummaryResponse } from "@/shared/schemas/summary";
@@ -151,6 +154,17 @@ export function useDecideProposal(projectId: string) {
   });
 }
 
+function failIfInvalid<T>(schema: ZodType<T>, value: unknown) {
+  const checked = schema.safeParse(value);
+  if (checked.success) return checked.data;
+  throw new ApiClientError(
+    400,
+    "VALIDATION_ERROR",
+    checked.error.issues[0]?.message ?? "Check the form",
+    checked.error.issues,
+  );
+}
+
 /**
  * A POST to a project route: validates the body with the shared input schema first (so the form can
  * show the contract's own message), parses the response, then refreshes everything for that project.
@@ -163,20 +177,11 @@ function useProjectPost<I, O>(
 ) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: I) => {
-      const checked = input.safeParse(body);
-      if (!checked.success) {
-        return Promise.reject(
-          new ApiClientError(
-            400,
-            "VALIDATION_ERROR",
-            checked.error.issues[0]?.message ?? "Check the form",
-            checked.error.issues,
-          ),
-        );
-      }
-      return api("POST", `${base(projectId)}${path}`, { body: checked.data, schema: output });
-    },
+    mutationFn: (body: I) =>
+      api("POST", `${base(projectId)}${path}`, {
+        body: failIfInvalid(input, body),
+        schema: output,
+      }),
     onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
   });
 }
@@ -196,23 +201,92 @@ export const useCreateAdjustment = (id: string) =>
 export function useReviewChecklistItem(projectId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, ...input }: ReviewInput & { itemId: string }) => {
-      const checked = ReviewChecklistItemInput.safeParse(input);
-      if (!checked.success) {
-        return Promise.reject(
-          new ApiClientError(
-            400,
-            "VALIDATION_ERROR",
-            checked.error.issues[0]?.message ?? "Check the form",
-            checked.error.issues,
-          ),
-        );
-      }
-      return api("POST", `/checklist-items/${encodeURIComponent(itemId)}/review`, {
-        body: checked.data,
+    mutationFn: ({ itemId, ...input }: ReviewInput & { itemId: string }) =>
+      api("POST", `/checklist-items/${encodeURIComponent(itemId)}/review`, {
+        body: failIfInvalid(ReviewChecklistItemInput, input),
+        schema: VerifiedChecklistItemResponse,
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
+  });
+}
+
+/** A note and photos as the multipart body the progress and completion routes take. */
+function proofForm(input: { note: string; photos: File[]; checklistItemId?: string }) {
+  const form = new FormData();
+  form.set("note", input.note);
+  if (input.checklistItemId) form.set("checklistItemId", input.checklistItemId);
+  for (const photo of input.photos) form.append("photos", photo);
+  return form;
+}
+
+/** Site photos with a note, optionally tied to a task. */
+export function useCreateProgress(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { note: string; photos: File[]; checklistItemId?: string }) => {
+      failIfInvalid(CreateProgressInput, input);
+      return api("POST", `${base(projectId)}/progress`, {
+        body: proofForm(input),
+        schema: ProgressResponse,
+      });
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
+  });
+}
+
+/** Contractor sends proof that a task is done; it then waits for the engineer. */
+export function useCompleteChecklistItem(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, ...input }: { itemId: string; note: string; photos: File[] }) => {
+      failIfInvalid(CreateProgressInput, input);
+      return api("POST", `/checklist-items/${encodeURIComponent(itemId)}/completion`, {
+        body: proofForm(input),
         schema: VerifiedChecklistItemResponse,
       });
     },
     onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
   });
+}
+
+export function useStartChecklistItem(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) =>
+      api("POST", `/checklist-items/${encodeURIComponent(itemId)}/start`, {
+        schema: VerifiedChecklistItemResponse,
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
+  });
+}
+
+/** Engineer edits the plan: add, rename or remove a task, always with a reason. */
+export function useEditChecklist(projectId: string) {
+  const client = useQueryClient();
+  const done = () => client.invalidateQueries({ queryKey: [projectId] });
+  const add = useMutation({
+    mutationFn: (input: AddItemInput) =>
+      api("POST", `${base(projectId)}/checklist-items`, {
+        body: failIfInvalid(AddChecklistItemInput, input),
+        schema: VerifiedChecklistItemResponse,
+      }),
+    onSuccess: done,
+  });
+  const rename = useMutation({
+    mutationFn: ({ itemId, ...input }: { itemId: string; task: string; reason: string }) =>
+      api("PATCH", `/checklist-items/${encodeURIComponent(itemId)}`, {
+        body: failIfInvalid(RenameChecklistItemInput, input),
+        schema: VerifiedChecklistItemResponse,
+      }),
+    onSuccess: done,
+  });
+  const remove = useMutation({
+    mutationFn: ({ itemId, ...input }: { itemId: string; reason: string }) =>
+      api("DELETE", `/checklist-items/${encodeURIComponent(itemId)}`, {
+        body: failIfInvalid(RemoveChecklistItemInput, input),
+        schema: VerifiedChecklistItemResponse,
+      }),
+    onSuccess: done,
+  });
+  return { add, rename, remove };
 }

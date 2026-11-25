@@ -20,7 +20,7 @@ import { StockMovementsResponse, StockResponse } from "@/shared/schemas/stock";
 import { SummaryResponse } from "@/shared/schemas/summary";
 import { WagePaymentListResponse, WageSheetResponse } from "@/shared/schemas/wages";
 import { WorkersResponse } from "@/shared/schemas/workers";
-import { MockError, type MockRoute } from "./types";
+import { MockError, type MockRoute, parseBody } from "./types";
 import {
   accruedOf,
   balanceOf,
@@ -97,10 +97,12 @@ function roleIn(projectId: string): Role {
   return config.role;
 }
 
-export function allow(projectId: string, roles: Role[]) {
-  if (!roles.includes(roleIn(projectId))) {
+export function allow<R extends Role>(projectId: string, roles: R[]): R {
+  const role = roleIn(projectId);
+  if (!(roles as Role[]).includes(role)) {
     throw new MockError(403, "FORBIDDEN", "Your role in this project can't see this");
   }
+  return role as R;
 }
 
 function project(projectId: string) {
@@ -247,7 +249,7 @@ function findProposal(proposalId: string) {
   throw new MockError(404, "NOT_FOUND", "Proposal not found");
 }
 
-function findChecklistItem(itemId: string) {
+export function findChecklistItem(itemId: string) {
   for (const c of demoProjectConfigs) {
     const w = world(c.id);
     for (const list of w.checklists) {
@@ -449,16 +451,7 @@ export const demoRoutes: MockRoute[] = [
     respond: ({ params, body }) => {
       const { w, item, projectId } = findChecklistItem(params.id);
       allow(projectId, ["engineer"]);
-      const parsed = ReviewChecklistItemInput.safeParse(body);
-      if (!parsed.success) {
-        throw new MockError(
-          400,
-          "VALIDATION_ERROR",
-          parsed.error.issues[0]?.message ?? "Check the form",
-          parsed.error.issues,
-        );
-      }
-      const input = parsed.data;
+      const input = parseBody(ReviewChecklistItemInput, body);
       if (item.verificationStatus !== "waiting") {
         throw new MockError(409, "CONFLICT", "This task is not waiting for review");
       }

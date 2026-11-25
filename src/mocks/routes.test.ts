@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addDays, todayIst } from "@/lib/dates";
+import { checklistRoutes } from "./checklist-routes";
 import { demoRoutes } from "./routes";
 import { MockError, type MockRoute } from "./types";
 import { writeRoutes } from "./write-routes";
@@ -7,7 +8,7 @@ import { writeRoutes } from "./write-routes";
 function call(method: MockRoute["method"], path: string, body?: unknown) {
   const [pathname, search = ""] = path.split("?");
   const parts = pathname.split("/");
-  for (const route of [...demoRoutes, ...writeRoutes]) {
+  for (const route of [...demoRoutes, ...writeRoutes, ...checklistRoutes]) {
     if (route.method !== method) continue;
     const pattern = route.path.split("/");
     if (pattern.length !== parts.length) continue;
@@ -300,5 +301,98 @@ describe("engineer review of checklist proof", () => {
         call("POST", `/checklist-items/${any.id}/review`, { decision: "accept", progressId: "x" }),
       ),
     ).toBe(403);
+  });
+});
+
+describe("photos and the task workflow", () => {
+  type Item = { id: string; task: string; verificationStatus: string; removedAt: string | null };
+  type List = { id: string; items: Item[] };
+  const lists = (id: string) => call("GET", `/projects/${id}/checklists`) as List[];
+  const photo = (name = "wall.jpg", bytes = 2000) =>
+    new File([new Uint8Array(bytes).fill(1)], name, { type: "image/jpeg" });
+  const form = (note: string, files: File[]) => {
+    const f = new FormData();
+    f.set("note", note);
+    for (const file of files) f.append("photos", file);
+    return f;
+  };
+
+  it("the contractor starts a task, then sends proof, then waits for the engineer", () => {
+    const item = lists("demo-lakeview")
+      .flatMap((l) => l.items)
+      .find((i) => i.verificationStatus === "todo") as Item;
+    expect(
+      status(() => call("POST", `/checklist-items/${item.id}/completion`, form("x", [photo()]))),
+    ).toBe(409);
+    expect((call("POST", `/checklist-items/${item.id}/start`) as Item).verificationStatus).toBe(
+      "doing",
+    );
+    expect(status(() => call("POST", `/checklist-items/${item.id}/start`))).toBe(409);
+    expect(
+      status(() => call("POST", `/checklist-items/${item.id}/completion`, form("Walls done", []))),
+    ).toBe(400);
+    const sent = call(
+      "POST",
+      `/checklist-items/${item.id}/completion`,
+      form("Walls done", [photo()]),
+    ) as Item;
+    expect(sent.verificationStatus).toBe("waiting");
+    const timeline = call("GET", "/projects/demo-lakeview/timeline") as {
+      updates: { note: string }[];
+    }[];
+    expect(timeline.flatMap((d) => d.updates).some((u) => u.note === "Walls done")).toBe(true);
+  });
+
+  it("an owner cannot add photos, and a photo over the limit or of the wrong type is refused", () => {
+    expect(
+      status(() => call("POST", "/projects/demo-greenfield/progress", form("x", [photo()]))),
+    ).toBe(403);
+    const bad = new File(["x"], "doc.pdf", { type: "application/pdf" });
+    expect(status(() => call("POST", "/projects/demo-lakeview/progress", form("x", [bad])))).toBe(
+      400,
+    );
+    expect(
+      call("POST", "/projects/demo-lakeview/progress", form("Slab shuttering", [photo()])),
+    ).toHaveProperty("id");
+  });
+
+  it("the engineer adds, renames and removes tasks with a reason", () => {
+    const [list] = lists("demo-hillside");
+    const added = call("POST", "/projects/demo-hillside/checklist-items", {
+      checklistId: list.id,
+      phase: "walls",
+      task: "Lintel at first floor",
+      reason: "Missing from the template",
+    }) as Item;
+    expect(added.verificationStatus).toBe("todo");
+    expect(
+      status(() =>
+        call("PATCH", `/checklist-items/${added.id}`, {
+          task: "Lintel at first floor",
+          reason: "Same name again",
+        }),
+      ),
+    ).toBe(409);
+    expect(
+      (
+        call("PATCH", `/checklist-items/${added.id}`, {
+          task: "Lintel, first floor",
+          reason: "Clearer name for the crew",
+        }) as Item
+      ).task,
+    ).toBe("Lintel, first floor");
+    expect(status(() => call("DELETE", `/checklist-items/${added.id}`, { reason: "short" }))).toBe(
+      400,
+    );
+    expect(
+      (
+        call("DELETE", `/checklist-items/${added.id}`, {
+          reason: "Duplicate of another task",
+        }) as Item
+      ).removedAt,
+    ).not.toBeNull();
+    expect(
+      status(() => call("DELETE", `/checklist-items/${added.id}`, { reason: "Removing it twice" })),
+    ).toBe(409);
   });
 });

@@ -1,8 +1,11 @@
 "use client";
 
-import { Camera } from "lucide-react";
+import { Camera, Plus } from "lucide-react";
+import { useState } from "react";
 import { ApprovalsList } from "@/components/owner/approvals-list";
+import { ProofSheet } from "@/components/photos/proof-sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChecklists, useProposals, useTimeline } from "@/hooks/use-project-data";
 import { activeItems } from "@/lib/checklist";
@@ -10,6 +13,7 @@ import { todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise, formatTimeIst } from "@/lib/format";
 import { mocksEnabled } from "@/mocks";
 import { ChecklistPhase } from "@/shared/schemas/checklist";
+import { AddTaskSheet, ItemActions } from "./item-actions";
 
 const phaseLabel: Record<(typeof ChecklistPhase.options)[number], string> = {
   foundation: "Foundation",
@@ -62,6 +66,8 @@ export function SitePage() {
   const proposals = useProposals(project.id);
   const items = activeItems(checklists.data);
   const done = items.filter((i) => i.verificationStatus === "done").length;
+  const [photos, setPhotos] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -69,7 +75,23 @@ export function SitePage() {
         <p className="font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]">
           {project.name}
         </p>
-        <h1 className="mt-2 text-5xl">Site</h1>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+          <h1 className="text-5xl">Site</h1>
+          {project.role !== "owner" ? (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setPhotos(true)}>
+                <Camera aria-hidden="true" />
+                Add photos
+              </Button>
+              {project.role === "engineer" && checklists.data?.length ? (
+                <Button onClick={() => setAdding(true)}>
+                  <Plus aria-hidden="true" />
+                  Add task
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         {items.length ? (
           <p className="num mt-2 text-ink-2">
             {done} of {items.length} tasks done · {Math.round((done / items.length) * 100)}%
@@ -113,7 +135,7 @@ export function SitePage() {
                         {list.map((item) => (
                           <li
                             key={item.id}
-                            className="flex min-h-11 items-center justify-between gap-3"
+                            className="flex min-h-11 flex-wrap items-center justify-between gap-x-3"
                           >
                             <span
                               className={
@@ -127,6 +149,7 @@ export function SitePage() {
                             >
                               {statusLabel[item.verificationStatus]}
                             </span>
+                            <ItemActions projectId={project.id} role={project.role} item={item} />
                           </li>
                         ))}
                       </ul>
@@ -226,6 +249,15 @@ export function SitePage() {
           </Section>
         </div>
       </div>
+      <ProofSheet projectId={project.id} open={photos} onOpenChange={setPhotos} />
+      {checklists.data ? (
+        <AddTaskSheet
+          projectId={project.id}
+          checklists={checklists.data}
+          open={adding}
+          onOpenChange={setAdding}
+        />
+      ) : null}
     </div>
   );
 }
