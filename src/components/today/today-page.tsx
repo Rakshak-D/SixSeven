@@ -3,6 +3,7 @@
 import { Pencil } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { ChangeList } from "@/components/approvals/change-list";
 import {
   Field,
   FormError,
@@ -58,6 +59,10 @@ export function TodayPage() {
         Log what happened on site. Made a mistake? Fix it with a reason; the original stays on
         record.
       </p>
+
+      <div className="mt-6 max-w-xl empty:hidden">
+        <ChangeList projectId={project.id} viewer={project.role} mine />
+      </div>
 
       <Tabs
         value={tab}

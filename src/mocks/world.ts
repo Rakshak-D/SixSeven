@@ -9,6 +9,7 @@ import { addDays, daysBetween, istTimestamp, mondayOf, todayIst, weekday } from 
 import type { ActivityResponse } from "@/shared/schemas/activity";
 import type { AdjustmentResponse } from "@/shared/schemas/adjustments";
 import type { AttendanceRecord } from "@/shared/schemas/attendance";
+import type { ChangeRequest } from "@/shared/schemas/change-requests";
 import type { MaterialResponse } from "@/shared/schemas/materials";
 import type { ProgressResponse } from "@/shared/schemas/progress";
 import type { ProposalResponse } from "@/shared/schemas/proposals";
@@ -39,6 +40,8 @@ export type DemoWorld = {
   adjustments: AdjustmentResponse[];
   proposals: ProposalResponse[];
   checklists: VerifiedChecklist[];
+  /** Newest first. */
+  changeRequests: ChangeRequest[];
   progress: ProgressResponse[];
   /** Newest first. */
   activity: Activity[];
@@ -626,6 +629,7 @@ export function buildWorld(
     adjustments,
     proposals,
     checklists,
+    changeRequests: [],
     progress,
     activity,
     effectiveQty,
@@ -657,7 +661,12 @@ export function spendTotals(world: DemoWorld, from?: string, to?: string) {
   const labourPaise = world.attendance
     .filter((a) => inRange(a.workDate))
     .reduce((sum, a) => sum + accruedOf(a), 0);
-  return { materialsPaise, labourPaise, otherPaise: 0 };
+  const otherPaise = world.changeRequests.reduce((sum, r) => {
+    if (r.kind !== "medical_expense" || r.payPaise === null) return sum;
+    const paidOn = r.events.at(-1)?.at.slice(0, 10) ?? r.payload.incidentOn;
+    return inRange(paidOn) ? sum + r.payPaise : sum;
+  }, 0);
+  return { materialsPaise, labourPaise, otherPaise };
 }
 
 /** Monday-start IST weeks from the project start to today. */

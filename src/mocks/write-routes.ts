@@ -222,17 +222,7 @@ export const writeRoutes: MockRoute[] = [
           newValue: input.newValue,
         };
       } else if (input.targetTable === "attendance") {
-        const a = w.attendance.find((x) => x.id === input.targetId);
-        if (!a) throw new MockError(404, "NOT_FOUND", "Attendance entry not found");
-        if (a.effectiveHalfDays === input.newValue)
-          throw new MockError(409, "CONFLICT", "That is already the value");
-        result = {
-          ...base,
-          targetTable: "attendance",
-          oldValue: a.effectiveHalfDays,
-          newValue: input.newValue,
-        };
-        a.effectiveHalfDays = input.newValue;
+        throw new MockError(409, "CONFLICT", "An attendance fix needs the owner's approval");
       } else {
         const p = w.payments.find((x) => x.id === input.targetId);
         if (!p) throw new MockError(404, "NOT_FOUND", "Payment not found");

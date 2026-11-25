@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ZodType } from "zod";
 import { ApiClientError, api } from "@/lib/api/client";
-import type { AddItemInput, ReviewInput } from "@/lib/checklist";
+import type { ReviewInput } from "@/lib/checklist";
 import { ActivityResponse } from "@/shared/schemas/activity";
 import {
   AdjustmentListResponse,
@@ -11,12 +11,19 @@ import {
 import {
   AttendanceListResponse,
   AttendanceResponse,
+  AttendanceRosterResponse,
   CreateAttendanceInput,
 } from "@/shared/schemas/attendance";
 import {
-  AddChecklistItemInput,
-  RemoveChecklistItemInput,
-  RenameChecklistItemInput,
+  ChangeRequestResponse,
+  ChangeRequestsResponse,
+  CreateChangeRequestInput,
+  DecideChangeRequestInput,
+  MedicalExpenseFields,
+  ReopenChangeRequestInput,
+  VoteChangeRequestInput,
+} from "@/shared/schemas/change-requests";
+import {
   ReviewChecklistItemInput,
   VerifiedChecklistItemResponse,
   VerifiedChecklistsResponse,
@@ -260,33 +267,60 @@ export function useStartChecklistItem(projectId: string) {
   });
 }
 
-/** Engineer edits the plan: add, rename or remove a task, always with a reason. */
-export function useEditChecklist(projectId: string) {
+/** Who came on each day, without pay. Every project member may read it. */
+export const useRoster = (id: string, enabled = true) =>
+  useQuery({
+    queryKey: [id, "roster"],
+    enabled,
+    queryFn: () =>
+      api("GET", `${base(id)}/attendance/roster`, { schema: AttendanceRosterResponse }),
+  });
+
+export const useChangeRequests = (id: string) =>
+  useQuery({
+    queryKey: [id, "change-requests"],
+    queryFn: () => api("GET", `${base(id)}/change-requests`, { schema: ChangeRequestsResponse }),
+  });
+
+/** Ask for a change. Nothing changes until the owner accepts it. */
+export const useCreateChange = (id: string) =>
+  useProjectPost(id, "/change-requests", CreateChangeRequestInput, ChangeRequestResponse);
+
+function useChangeStep<I>(projectId: string, step: string, input: ZodType<I>) {
   const client = useQueryClient();
-  const done = () => client.invalidateQueries({ queryKey: [projectId] });
-  const add = useMutation({
-    mutationFn: (input: AddItemInput) =>
-      api("POST", `${base(projectId)}/checklist-items`, {
-        body: failIfInvalid(AddChecklistItemInput, input),
-        schema: VerifiedChecklistItemResponse,
+  return useMutation({
+    mutationFn: ({ requestId, body }: { requestId: string; body: I }) =>
+      api("POST", `/change-requests/${encodeURIComponent(requestId)}/${step}`, {
+        body: failIfInvalid(input, body),
+        schema: ChangeRequestResponse,
       }),
-    onSuccess: done,
+    // An accepted change touches checklists, attendance and money, so refresh the whole project.
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
   });
-  const rename = useMutation({
-    mutationFn: ({ itemId, ...input }: { itemId: string; task: string; reason: string }) =>
-      api("PATCH", `/checklist-items/${encodeURIComponent(itemId)}`, {
-        body: failIfInvalid(RenameChecklistItemInput, input),
-        schema: VerifiedChecklistItemResponse,
-      }),
-    onSuccess: done,
+}
+export const useVoteChange = (id: string) => useChangeStep(id, "vote", VoteChangeRequestInput);
+export const useReopenChange = (id: string) =>
+  useChangeStep(id, "reopen", ReopenChangeRequestInput);
+export const useDecideChange = (id: string) =>
+  useChangeStep(id, "decision", DecideChangeRequestInput);
+
+/** An onsite accident's bill with photos taken now. `capturedAt` pairs with `billPhotos` by order. */
+export function useCreateMedicalExpense(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ billPhotos, ...fields }: MedicalExpenseFields & { billPhotos: File[] }) => {
+      const checked = failIfInvalid(MedicalExpenseFields, fields);
+      const form = new FormData();
+      for (const [key, value] of Object.entries(checked)) form.set(key, String(value));
+      for (const photo of billPhotos) {
+        form.append("billPhotos", photo);
+        form.append("capturedAt", new Date(photo.lastModified).toISOString());
+      }
+      return api("POST", `${base(projectId)}/medical-expenses`, {
+        body: form,
+        schema: ChangeRequestResponse,
+      });
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
   });
-  const remove = useMutation({
-    mutationFn: ({ itemId, ...input }: { itemId: string; reason: string }) =>
-      api("DELETE", `/checklist-items/${encodeURIComponent(itemId)}`, {
-        body: failIfInvalid(RemoveChecklistItemInput, input),
-        schema: VerifiedChecklistItemResponse,
-      }),
-    onSuccess: done,
-  });
-  return { add, rename, remove };
 }

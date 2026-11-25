@@ -53,8 +53,33 @@ proposed method + path, fields, priority / blocking.
 | 25 | **Supplier payments are owner-only, with autopay.** Extends requests 16–18; the spec change is approved (see the 2026-11-26 entry).<br>• **Contractors:** they cannot create, approve or read supplier payments or bank details.<br>• **Mandates:** each approved supplier can have `autopay {enabled, perBillCapPaise, perWeekCapPaise, paused}` (`PUT /suppliers/:id/autopay`, owner).<br>• **Release:** a mock payment releases only after the engineer verifies the delivery (request 13), for a server-calculated amount capped at the owner-approved order and the mandate caps. Everything else goes to the owner's pending list (request 18). | Owner → Money → Suppliers | High; changes a P0 rule | Open |
 | 26 | **Keep the fix reason on the stock line.** Today `src/server/services/adjustments.ts` writes the compensating movement with the fixed note "Compensating stock correction", so the reason the user typed is lost in stock history. Write the adjustment's reason (or `Fix: <reason>`) as the movement note, or return `adjustmentId` on the movement so the client can show the reason. | Logs → stock, Spends | Medium; reported bug | Open |
 | 27 | **Camera photos carry a capture time.** The app will take photos only from the live in-app camera, never the gallery. Each photo upload gains `capturedAt` (client time, stored and shown). The server refuses a `capturedAt` more than 10 minutes before the upload. This is not tamper-proof; it only makes old gallery photos harder to pass off. | Every photo upload | Low | Open |
+| 28 | **Name the capture-time field** for medical bill photos (PR #34 mentions capture timestamps without a field name). The UI sends `capturedAt` per `billPhotos` part, in order. | Medical expense | Medium; needed with the routes | Open |
 
 ## Entries
+
+### 2026-11-26 IST · Approval chain and medical entries (MOCKED)
+
+- **Branch:** `fe/approval-chain`, built on the contract from PR #34
+  (`shared/schemas/change-requests.ts`). No frontend-only request or response types.
+- **Status: MOCKED.** The change-request and medical routes are not built on the server. On live data
+  (mocks off) these screens show the API's error, and engineer plan edits and attendance fixes cannot
+  be saved until the routes land. The direct `PATCH`/`DELETE`/`POST checklist-items` calls and the
+  direct attendance adjustment are no longer used by the UI.
+- **Screens:** engineer Site edits ask for a change (the task keeps its value until accepted);
+  engineer Logs has an Attendance tab from `/attendance/roster` with Fix; contractor votes on Today
+  and Site; the contractor's own attendance fix goes to the owner; the owner decides in Approvals,
+  with full or part payment for medical bills (labelled mock). Every step needs a note and shows in
+  a trail. Medical expense is on Site and in the contractor's Log sheet.
+- **Mocks:** `mocks/change-routes.ts` and `change-seed.ts`. Each demo project is one role, so the
+  seeds give every role something to act on.
+- **Question for backend (request 28):** the contract says bill photos come "with capture
+  timestamps" but names no field. The UI sends one `capturedAt` (ISO) per `billPhotos` part, in the
+  same order. Please confirm or name the field.
+- **Not covered:** owner proposals still take no decision note (`DecideProposalInput`, request 21).
+- **Checks:** Biome, typecheck, `vitest run src` (84 pass, including the chain's states, roles and
+  pay limits). Playwright on mocks: reopen, rename request, attendance medical fix, contractor vote,
+  medical bill with a stand-in camera stream, owner accept and part payment; 390, 768 and 1440,
+  light and dark, no sideways scroll.
 
 ### 2026-11-26 IST · Fix reasons, required notes, payment proof, live camera
 
