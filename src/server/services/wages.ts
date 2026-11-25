@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import type { Db } from "@/db/client";
-import { adjustments, attendance, projects, wagePayments, workers } from "@/db/schema";
+import { adjustments, projects, wagePayments, workers } from "@/db/schema";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
@@ -17,6 +17,7 @@ import type {
 import { WageSheetResponse as WageSheetSchema } from "@/shared/schemas/wages";
 import { recordAudit } from "./audit";
 import { requireProjectAccess } from "./projects";
+import { accruedPaise, loadEffectiveAttendance } from "./wage-calculations";
 
 export async function recordWagePayment(
   db: Db,
@@ -149,25 +150,7 @@ export async function buildWageSheet(
       .from(workers)
       .where(eq(workers.projectId, projectId))
       .orderBy(asc(workers.name), asc(workers.id));
-    const attendanceRows = await tx
-      .select({
-        workerId: attendance.workerId,
-        effectiveHalfDays: sql<string>`coalesce((
-          select new_value::integer from adjustments
-          where project_id = ${attendance.projectId} and target_table = 'attendance'
-            and target_id = ${attendance.id}
-          order by sequence_no desc limit 1
-        ), ${attendance.halfDays})::text`,
-        ratePaise: sql<string>`${attendance.ratePaise}::text`,
-      })
-      .from(attendance)
-      .where(
-        and(
-          eq(attendance.projectId, projectId),
-          sql`${attendance.workDate} >= ${query.from}::date`,
-          sql`${attendance.workDate} <= ${query.to}::date`,
-        ),
-      );
+    const attendanceRows = await loadEffectiveAttendance(tx, projectId, query.from, query.to);
     const paymentRows = await tx
       .select({
         workerId: wagePayments.workerId,
@@ -203,10 +186,10 @@ export async function buildWageSheet(
     for (const row of attendanceRows) {
       const current = totals.get(row.workerId);
       if (!current) throw new Error("Attendance references a worker outside its project");
-      const halfDays = parseInteger(row.effectiveHalfDays, "attendance units");
+      const halfDays = parseInteger(row.halfDays, "attendance units");
       const rate = parseInteger(row.ratePaise, "attendance rate");
       current.halfDays += halfDays;
-      current.accrued += halfDays * (rate / BigInt(2));
+      current.accrued += accruedPaise(halfDays, rate);
     }
     for (const row of paymentRows) {
       const current = totals.get(row.workerId);

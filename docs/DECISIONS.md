@@ -64,3 +64,21 @@ Maintained by Codex. Amend decisions only when new evidence or an approved speci
 - Rejected alternatives: floating-point totals, export-specific calculations, or adding an external PDF dependency.
 - Trade-off: a report whose exact totals exceed the published JSON integer range returns a conflict instead of truncating.
 - Impact on Claude: all report formats derive from the same worker and project totals; PDF uses an ASCII currency label for reliable rendering.
+
+## D-008 — Bound project summaries to IST site dates and round material lines
+
+- Context: summaries combine date-only stock, attendance and expense records, while fractional material quantities can produce fractions of a paise.
+- Decision: include records from the inclusive project start date through the current IST date, bucket weekly totals by Monday in IST, and exclude future-dated records. Compute each effective original delivery's `quantity × unit price` in PostgreSQL numeric and round that line to a whole paise using PostgreSQL `round(numeric, 0)` before summing. Divide total expenditure by inclusive elapsed site days with a one-day minimum and floor the result to paise.
+- Reason: retain original site dates for weekly reports and give each fractional purchase a deterministic, reconcilable monetary value.
+- Rejected alternatives: JavaScript floating-point multiplication, rounding only the final aggregate, or applying corrections on their submission date.
+- Trade-off: ties round away from zero per delivery line; the result can differ from rounding one aggregate.
+- Impact on Claude: the additive weekly response reconciles with the project total; M5 does not expose labour breakdown to engineers.
+
+## D-009 — Keep progress photos private with compensating filesystem cleanup
+
+- Context: project photos must be retrievable only after membership authorization, while filesystem writes cannot join a PostgreSQL transaction.
+- Decision: store validated, generated-key files under an ignored project-local directory; validate and stage images before database writes, then remove files created by a failed transaction. Return only metadata and authenticated project-scoped URLs. Document the crash window between file promotion and database commit as a possible orphan-file condition.
+- Reason: avoid public/static exposure and prevent failed requests from leaving database metadata or ordinary filesystem leftovers.
+- Rejected alternatives: public assets, user-controlled filenames, or claiming distributed atomicity across PostgreSQL and disk.
+- Trade-off: process termination in the documented gap can leave an unreferenced file; M5 does not add automatic orphan purging.
+- Impact on Claude: photo URLs require authenticated same-origin fetch; response schemas expose neither filesystem paths nor storage keys.

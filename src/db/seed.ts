@@ -1,6 +1,12 @@
 import { and, eq, sql as expression } from "drizzle-orm";
+import sharp from "sharp";
 import { createAuth } from "@/server/auth";
 import { recordAudit } from "@/server/services/audit";
+import {
+  persistValidatedPhotos,
+  readStoredPhoto,
+  validateImageUpload,
+} from "@/server/services/photo-storage";
 import { appendStockMovement } from "@/server/services/stock-ledger";
 import { CreateAdjustmentInput } from "@/shared/schemas/adjustments";
 import { CreateAttendanceInput } from "@/shared/schemas/attendance";
@@ -14,7 +20,10 @@ import { disposableDatabase } from "./config";
 import {
   adjustments,
   attendance,
+  expenses,
   materials,
+  progressPhotos,
+  progressUpdates,
   projectMembers,
   projects,
   stockMovements,
@@ -105,6 +114,7 @@ async function seed() {
   const demoPassword: string = password;
 
   const { db, sql } = getDatabase();
+  let cleanupDemoPhoto: (() => Promise<void>) | undefined;
   try {
     await db.transaction(async (tx) => {
       // Serialize repeat seeds without touching unrelated records.
@@ -521,8 +531,123 @@ async function seed() {
       ) {
         throw new Error("Reserved demo stock correction ID is already in use");
       }
+
+      const demoExpenses = [
+        {
+          id: "demo-expense-site-water",
+          amountPaise: 85_000,
+          occurredOn: "2026-11-19",
+          description: "Temporary site water and sanitation",
+        },
+        {
+          id: "demo-expense-material-handling",
+          amountPaise: 125_000,
+          occurredOn: "2026-11-24",
+          description: "Material handling and site transport",
+        },
+      ] as const;
+      for (const fixture of demoExpenses) {
+        const [existing] = await tx.select().from(expenses).where(eq(expenses.id, fixture.id));
+        if (existing) {
+          if (
+            existing.projectId !== projectId ||
+            existing.amountPaise !== fixture.amountPaise ||
+            existing.occurredOn !== fixture.occurredOn ||
+            existing.description !== fixture.description ||
+            existing.createdBy !== contractor
+          )
+            throw new Error("A reserved demo expense ID is already in use");
+          continue;
+        }
+        await tx.insert(expenses).values({
+          ...fixture,
+          projectId,
+          createdBy: contractor,
+        });
+      }
+
+      const demoProgressId = "demo-progress-foundation";
+      const [existingProgress] = await tx
+        .select()
+        .from(progressUpdates)
+        .where(eq(progressUpdates.id, demoProgressId));
+      const progressNote = "Foundation reinforcement inspected before the next concrete pour.";
+      const demoSvg = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" fill="#dceaf2"/><circle cx="520" cy="78" r="34" fill="#f2bf62"/><rect y="278" width="640" height="122" fill="#caa878"/><path d="M0 280h640" stroke="#806546" stroke-width="8"/><path d="M148 278V154h352v124M148 154l176-92 176 92M214 278V188h94v90m54 0V188h94v90" fill="none" stroke="#4d6470" stroke-width="14"/><path d="M148 154h352M324 62v216M148 154l176 124 176-124" fill="none" stroke="#b04e3a" stroke-width="7"/><text x="24" y="368" font-family="Arial" font-size="20" fill="#3e433d">Synthetic Slate demo illustration</text></svg>',
+      );
+      const demoPng = await sharp(demoSvg).png().toBuffer();
+      const validatedDemoPhoto = await validateImageUpload(
+        new File([new Uint8Array(demoPng)], "synthetic-foundation.png", {
+          type: "image/png",
+        }),
+      );
+      if (existingProgress) {
+        if (
+          existingProgress.projectId !== projectId ||
+          existingProgress.note !== progressNote ||
+          existingProgress.checklistItemId !== null ||
+          existingProgress.createdBy !== contractor
+        )
+          throw new Error("Reserved demo progress ID is already in use");
+        const existingPhotos = await tx
+          .select()
+          .from(progressPhotos)
+          .where(
+            and(
+              eq(progressPhotos.projectId, projectId),
+              eq(progressPhotos.progressId, demoProgressId),
+            ),
+          );
+        const existingPhoto = existingPhotos[0];
+        if (
+          existingPhotos.length !== 1 ||
+          !existingPhoto ||
+          existingPhoto.id !== "demo-progress-photo-foundation" ||
+          existingPhoto.mime !== "image/png" ||
+          existingPhoto.sizeBytes !== demoPng.byteLength ||
+          existingPhoto.takenOn !== "2026-11-25"
+        )
+          throw new Error("Reserved demo progress photo metadata is missing or changed");
+        const existingBytes = await readStoredPhoto(existingPhoto.storageKey);
+        if (!existingBytes || !existingBytes.equals(demoPng))
+          throw new Error("Reserved demo progress photo file is missing or changed");
+      } else {
+        const stored = await persistValidatedPhotos([validatedDemoPhoto]);
+        cleanupDemoPhoto = stored.cleanup;
+        await tx.insert(progressUpdates).values({
+          id: demoProgressId,
+          projectId,
+          note: progressNote,
+          checklistItemId: null,
+          createdBy: contractor,
+        });
+        await tx.insert(progressPhotos).values({
+          id: "demo-progress-photo-foundation",
+          projectId,
+          progressId: demoProgressId,
+          mime: validatedDemoPhoto.mime,
+          sizeBytes: validatedDemoPhoto.sizeBytes,
+          takenOn: "2026-11-25",
+          storageKey: stored.photos[0].storageKey,
+        });
+        await recordAudit(tx, {
+          projectId,
+          actorId: contractor,
+          action: "created",
+          entity: "progress",
+          entityId: demoProgressId,
+        });
+      }
     });
+    cleanupDemoPhoto = undefined;
     console.log("Demo records are ready");
+  } catch (error) {
+    if (cleanupDemoPhoto) {
+      await cleanupDemoPhoto().catch(() => {
+        console.error("[seed] unable to clean a staged demo photo after a failed seed");
+      });
+    }
+    throw error;
   } finally {
     await sql.end();
   }
