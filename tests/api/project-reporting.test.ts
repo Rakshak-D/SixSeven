@@ -158,6 +158,85 @@ async function imageFile(type: "png" | "jpeg" | "webp" = "png") {
   };
 }
 
+describe("medical reimbursements", () => {
+  it("keeps bills private and reconciles one partial mock reimbursement", async () => {
+    const today = dateString(new Date());
+    const id = await newProject(today);
+    const worker = await api(`/projects/${id}/workers`, contractor, {
+      name: "Synthetic bill worker",
+      category: "mason",
+      dailyRatePaise: 80_000,
+    });
+    expect(worker.status).toBe(201);
+    const { id: workerId } = await worker.json();
+    const image = await imageFile();
+    const form = (capturedAt: string) => {
+      const data = new FormData();
+      data.set("workerId", workerId);
+      data.set("billPaise", "24000");
+      data.set("incidentOn", today);
+      data.set("note", "Synthetic medical evidence");
+      data.append("billPhotos", image.file);
+      data.append("capturedAt", capturedAt);
+      return data;
+    };
+    const path = `/projects/${id}/medical-expenses`;
+    await expectError(
+      await api(path, contractor, form(new Date(Date.now() - 601_000).toISOString())),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const capture = new Date().toISOString();
+    await expectError(await api(path, outsider, form(capture)), 404, "NOT_FOUND");
+    const submitted = await api(path, contractor, form(capture));
+    expect(submitted.status).toBe(201);
+    const claim = await submitted.json();
+    expect(claim).toMatchObject({
+      kind: "medical_expense",
+      status: "pending_owner",
+      reimbursementProvider: "mock",
+      payPaise: null,
+    });
+    const [photo] = claim.payload.billPhotos;
+    expect(photo).toMatchObject({ capturedAt: capture, receivedAt: expect.any(String) });
+    const imagePath = photo.url.slice("/api/v1".length);
+    await expectError(await api(imagePath, engineer), 404, "NOT_FOUND");
+    const fromOwner = await api(imagePath, owner);
+    expect(fromOwner.status).toBe(200);
+    expect(fromOwner.headers.get("cache-control")).toBe("private, no-store");
+    expect(Buffer.from(await fromOwner.arrayBuffer())).toEqual(image.bytes);
+    const decision = `/change-requests/${claim.id}/decision`;
+    await expectError(
+      await api(decision, owner, { accept: true, payPaise: 24_001, note: "Above the bill" }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const approve = () =>
+      api(decision, owner, { accept: true, payPaise: 12_345, note: "Partial reimbursement" });
+    const outcomes = await Promise.all([approve(), approve()]);
+    expect(outcomes.map((response) => response.status).sort()).toEqual([200, 409]);
+    const accepted = outcomes.find((response) => response.ok);
+    expect(await accepted?.json()).toMatchObject({ status: "accepted", payPaise: 12_345 });
+    const rejection = await api(path, contractor, form(new Date().toISOString()));
+    const rejectedClaim = await rejection.json();
+    expect(
+      (
+        await api(`/change-requests/${rejectedClaim.id}/decision`, owner, {
+          accept: false,
+          note: "Invalid duplicate claim",
+        })
+      ).status,
+    ).toBe(200);
+    const summary = SummaryResponse.parse(
+      await (await api(`/projects/${id}/summary`, owner)).json(),
+    );
+    expect(summary).toMatchObject({
+      spendSplit: { otherPaise: 12_345 },
+      spendByWeek: [{ weekStart: monday(today), otherPaise: 12_345 }],
+    });
+  });
+});
+
 describe("project financial summary", () => {
   it("uses effective records, exact material cost rounding, IST weeks and role-safe responses", async () => {
     const today = dateString(new Date());
