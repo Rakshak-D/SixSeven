@@ -126,3 +126,21 @@ All routes require a session. Item IDs resolve to their project before checking 
 Checklist reads and saves retain the legacy display status and add verificationStatus, removedAt and history to items. Clients use verificationStatus for todo, doing, waiting, done and sent_back. Filter removed items using removedAt. History links submission evidence to progress IDs in the project timeline. The live PATCH accepts rename input only. The legacy status-write schema remains exported for existing development fixtures.
 
 Checklist drafts return source template. An AI request satisfying the existing input contract receives the deterministic template with fallbackReason unavailable. This milestone selects no provider and requires no AI credentials. Proposal and checklist handlers are implemented in M6. A checklist can hold forty historical items, including soft removals. Drafts can be saved once, by their creating engineer. Proposals record one owner decision without changing budget or creating a payment.
+## Change requests (contract only)
+
+The shared schemas and inferred types are available in `src/shared/schemas/change-requests.ts`. These routes are pending backend implementation and frontend integration.
+
+| Method and path | Caller | Input | Success |
+| --- | --- | --- | --- |
+| POST /projects/:id/change-requests | Engineer for checklist edits and attendance fixes, contractor for attendance fixes | `CreateChangeRequestInput` | 201 `ChangeRequestResponse` |
+| GET /projects/:id/change-requests | Project members, subject to sensitive-record visibility | `ChangeRequestsQuery` with optional `status` | 200 `ChangeRequestsResponse` |
+| POST /change-requests/:id/vote | Contractor in the project | `VoteChangeRequestInput` | 200 `ChangeRequestResponse` |
+| POST /change-requests/:id/reopen | Original author | `ReopenChangeRequestInput` | 200 `ChangeRequestResponse` |
+| POST /change-requests/:id/decision | Owner in the project | `DecideChangeRequestInput` | 200 `ChangeRequestResponse` |
+| POST /projects/:id/medical-expenses | Engineer or contractor in the project | Multipart `MedicalExpenseFields` plus 1–3 `billPhotos` with capture timestamps | 201 `ChangeRequestResponse` |
+
+All writes require a nonblank `note`. The server derives the actor and role from the session and membership. Errors use the existing envelope: 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, and 409 `CONFLICT` for invalid state, stale targets or duplicate decisions. Medical uploads also support 413 for oversized requests.
+
+Engineer requests start at `pending_contractor`. The contractor advances them to `pending_owner` or marks them `rejected_contractor`. Only the author can reopen a contractor-rejected request. Contractor-authored requests start at `pending_owner`. The owner accepts and applies the change in the same transaction or marks it `rejected_owner`. Owner outcomes are final. Rejected requests are excluded from the pending owner queue. Task proof and its engineer review remain separate.
+
+An attendance target ID references the attendance row. Actual half-days and paid entitlement are separate, and only a medical emergency allows a full-day pay override. Medical approval requires `payPaise` between 1 and the bill amount. Other decisions reject that field. Reimbursement uses the mock provider. Medical records and receipts are restricted to the author and the authorized contractor and owner reviewers.
