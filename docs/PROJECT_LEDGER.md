@@ -23,7 +23,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 | M2 — auth and project access | INTEGRATED | PR #7 merged and main CI #18 passed all 45 tests. |
 | M3 — material, worker and stock operations | VERIFIED | PR #8 PostgreSQL CI passed all 64 tests, including concurrent ledger writes and repeated demo seeding. |
 | M4 — attendance, wage accounting and corrections | INTEGRATED | PR #11 merged as `c34eb6e`; PR CI #29 passed all 81 tests and main CI #30 passed on the merge commit. |
-| M5 — financial summary, progress evidence and activity | IN_PROGRESS | Weekly contract is merged in PR #13; persistence and handlers are being implemented on `be/project-reporting`. PostgreSQL verification, publication and merge remain. |
+| M5 — financial summary, progress evidence and activity | VERIFIED | PR #14 head `53f4720` passed PostgreSQL CI #48: migration, seed twice, Biome, typecheck and 102 tests. Merge and post-merge main CI remain. |
 | Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities
@@ -34,7 +34,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 ## Status snapshot
 
-- Overall: M4 is integrated and verified. M5 adds append-only expense/progress/photo persistence and implements summary, weekly spend, progress upload, timeline, protected photo retrieval and activity endpoints; M5 remains in progress pending PostgreSQL verification and integration.
+- Overall: M4 is integrated and verified. M5 adds append-only expense/progress/photo persistence and implements summary, weekly spend, progress upload, timeline, protected photo retrieval and activity endpoints. M5 is verified on PR #14 head `53f4720`; integration into main and main CI remain.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
 
 ## Integration checkpoints
@@ -68,8 +68,8 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 - Ledger publication commit: 7306ca846a2390a976cdd5574259ab9758b1ae05; CI run #7 passed for this head.
 - [PR #3 — coordination foundation](https://github.com/Rakshak-D/SixSeven/pull/3) was merged with a merge commit after [CI run #8](https://github.com/Rakshak-D/SixSeven/actions/runs/45586356601) passed on reviewed head aa1b3c6d97b8c7bb225998adf8247b599b982ea0. Local main was synchronized by fast-forward. See the backend ledger for verification.
 - Latest synchronized main for M4: `c34eb6e4077f1eeb38ef3312b55df3011007d416`, merge commit for PR #11. PR CI run #29 passed migration, upgrade, repeatable seed and all 81 PostgreSQL-backed tests at head `a0d7584fa479657af0af90b7d350dc474572214f`; main CI run #30 passed on the merge commit.
-- M5 baseline: local main was synchronized through merged [PR #13](https://github.com/Rakshak-D/SixSeven/pull/13) at `c56504f7004a256c7704a51e89c6b4b7402f083b`; [main CI #33](https://github.com/Rakshak-D/SixSeven/actions/runs/45616548190) passed. Active work is on `be/project-reporting`.
+- M5 baseline: local main was synchronized through merged [PR #13](https://github.com/Rakshak-D/SixSeven/pull/13) at `c56504f7004a256c7704a51e89c6b4b7402f083b`; [main CI #33](https://github.com/Rakshak-D/SixSeven/actions/runs/45616548190) passed. PR #14 is verified at head `53f4720e1332a67a7faee3b6bbac754d4be46bbd` by [PostgreSQL CI #48](https://github.com/Rakshak-D/SixSeven/actions/runs/45639908173); current main baseline is `9a92f9ec6f1de1e8b9ef7e867dff831efef3f99e`.
 
 ## Next authorized milestone
 
-Complete M5 end-to-end on `be/project-reporting`. Keep frontend request items #4–9 and #11 open for separate product review; this milestone does not change the project creator role, add invitation workflows, or replace checklist state transitions. No local PostgreSQL database or Docker service is authorized; use hosted disposable PostgreSQL CI.
+After PR #14 is merged and main CI passes, await the next specification-authorized milestone. Keep frontend request items #4–9 and #11 open for separate product review; M5 does not change the project creator role, add invitation workflows, or replace checklist state transitions.
