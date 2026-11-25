@@ -39,6 +39,13 @@ Codex maintains all AGENTS.md files, including nested guidance located inside Cl
 
 Codex must not edit frontend-owned implementation files without an explicitly coordinated handoff. Claude must not implement API routes, database access, authentication or authorization logic, or competing request/response schemas.
 
+### Frontend is closed to Codex (set by Max, 2026-11-26)
+
+- Codex does not edit any frontend file: `src/app/**` except `src/app/api/**`, `src/components/**`, `src/hooks/**`, `src/lib/api/**`, `src/mocks/**`, frontend tests, `tests/e2e/**`. This overrides every earlier line, ledger entry or handoff that says otherwise.
+- When Codex needs a frontend change, it writes the request in BACKEND_LEDGER.md (files, reason, expected change). Claude reads it and decides. Codex does not make the change itself, even a small one.
+- Every agent reads PROJECT_LEDGER.md, BACKEND_LEDGER.md and docs/FRONTEND_LEDGER.md at the start of every task and again before each commit, push or merge. Do not rely on memory of earlier sessions.
+- When main is merged into a frontend branch, Claude does not take frontend changes it did not make if they would change a feature Claude built. Small fixes (typos, lint, type errors) may stay, and Claude lists what changed and what it did in docs/FRONTEND_LEDGER.md and tells Max.
+
 ### Mixed concerns and handoffs
 
 - src/app/api/[[...route]]/route.ts is the Next.js-to-Hono server bridge and is owned by Codex. src/server/app.ts and route modules are also Codex-owned.
