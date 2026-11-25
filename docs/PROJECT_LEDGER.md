@@ -19,7 +19,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 | Milestone | State | Dependency / exit condition |
 |---|---|---|
-| M0 — repository foundation and ownership | VERIFIED — branch and reviewable PR are published; local checks and CI run #6 passed for foundation commit 7941f25. PR remains unmerged pending technical-lead approval. | Complete when the branch and reviewable PR are published. Do not merge without user approval. |
+| M0 — repository foundation and ownership | VERIFIED — branch and reviewable PR are published; local checks and CI runs #6 and #7 passed for the foundation and ledger publication commits. PR remains unmerged pending technical-lead approval. | Complete when the branch and reviewable PR are published. Do not merge without user approval. |
 | M1 — specification intake | PLANNED | Requires the full official problem statement, architecture, dependencies, features, event deadline, and acceptance criteria. |
 | M2 — API and data contract | PLANNED | Requires M1; define and review the shared contract before dependent frontend/backend work. |
 | M3 — authorized vertical slice | PLANNED | Requires M2 and a technical-lead-approved milestone. Scope comes only from the supplied specification. |
@@ -38,7 +38,7 @@ Feature-level priority is not assigned until the official brief is available.
 ## Status snapshot
 
 - Overall: IN_PROGRESS — M0 is verified on PR #3; it is unmerged and not integration-tested.
-- M0 changes: VERIFIED — foundation commit 7941f25 is pushed and PR #3 is open; local checks and PR CI run #6 passed for that commit.
+- M0 changes: VERIFIED — PR #3 is open; local checks passed, and PR CI runs #6 and #7 passed for commits 7941f25 and 7306ca8 respectively.
 - Existing scaffold: one health handler and OpenAPI document generator; all other route modules are empty routers. Database schemas are empty, initial migration is SELECT 1, seed is a no-op, and current tests cover health plus the shared money helper.
 - No business feature is recorded as implemented or integrated.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
@@ -73,6 +73,7 @@ Feature-level priority is not assigned until the official brief is available.
 - Last verified main: 29b06094031f1fab470aa3c648c2ff2734af7e73.
 - M0 branch: chore/coordination, created from the verified main above.
 - M0 foundation commit: 7941f25fe38365cb851732ffd1c0996d6c3f30ac.
+- Ledger publication commit: 7306ca846a2390a976cdd5574259ab9758b1ae05; CI run #7 passed for this head.
 - Pull request: [#3 — coordination foundation](https://github.com/Rakshak-D/SixSeven/pull/3), open against main; GitHub reports mergeable. Do not merge before technical-lead approval.
 - Merge status: not merged. INTEGRATED is prohibited until merge and integration testing.
 

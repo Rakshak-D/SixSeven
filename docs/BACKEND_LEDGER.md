@@ -4,17 +4,17 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
 ## Entry — M0 publication
 
-- Timestamp: 2026-11-25 14:56:50+05:30
+- Timestamp: 2026-11-25 15:01:20+05:30
 - Milestone/task ID: M0
 - Branch: chore/coordination
 - Scope and changes: pushed the reviewed M0 coordination foundation and opened PR #3 against main; updated the project status and publication references.
 - Files affected: docs/PROJECT_LEDGER.md and docs/BACKEND_LEDGER.md.
 - API or database changes: none.
-- Verification commands and outcomes: `git push --set-upstream origin chore/coordination` — PASS. GitHub PR #3 is open and mergeable with base main SHA 29b06094031f1fab470aa3c648c2ff2734af7e73. GitHub Actions CI run #6 for foundation commit 7941f25fe38365cb851732ffd1c0996d6c3f30ac — PASS.
+- Verification commands and outcomes: `git push --set-upstream origin chore/coordination` — PASS. GitHub PR #3 is open and mergeable with base main SHA 29b06094031f1fab470aa3c648c2ff2734af7e73. GitHub Actions CI run #6 for foundation commit 7941f25fe38365cb851732ffd1c0996d6c3f30ac — PASS; run #7 for the ledger publication commit 7306ca846a2390a976cdd5574259ab9758b1ae05 — PASS.
 - Dependencies added: none.
-- Known limitations: PR is unmerged by instruction. CI run #6 covers foundation commit 7941f25; recheck the latest head after this ledger-only update. INTEGRATED status is not applicable until merge and integration testing; the PostgreSQL-dependent suite remains NOT_RUN as recorded below.
+- Known limitations: PR is unmerged by instruction. INTEGRATED status is not applicable until merge and integration testing; the PostgreSQL-dependent suite remains NOT_RUN as recorded below.
 - Frontend implications: none; no frontend implementation or Claude-owned ledger changed.
-- Commit or PR reference: foundation commit 7941f25fe38365cb851732ffd1c0996d6c3f30ac; [PR #3](https://github.com/Rakshak-D/SixSeven/pull/3).
+- Commit or PR reference: foundation commit 7941f25fe38365cb851732ffd1c0996d6c3f30ac; ledger publication commit 7306ca846a2390a976cdd5574259ab9758b1ae05; [PR #3](https://github.com/Rakshak-D/SixSeven/pull/3).
 - Next action: await technical-lead review. Do not merge before explicit foundation approval. Do not begin business-feature implementation until the full specification and next milestone are authorized.
 
 ## Entry — M0 local verification
