@@ -287,7 +287,7 @@ export function OwnerHome() {
                   <span>
                     <span className="block font-semibold">{a.name} is low</span>
                     <span className="num block text-[15px] text-muted-foreground">
-                      {formatQty(a.balance)} {unit} left · reorder at {formatQty(a.lowStockQty)}
+                      {formatQty(a.balance)} {unit} left · reorder {formatQty(a.lowStockQty)}
                     </span>
                   </span>
                 </li>

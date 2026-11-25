@@ -94,7 +94,7 @@ export const checklistRoutes: MockRoute[] = [
     respond: ({ params }) => {
       const { w, item, projectId } = findChecklistItem(params.id);
       allow(projectId, ["contractor"]);
-      if (item.removedAt || !["todo", "sent_back"].includes(item.verificationStatus)) {
+      if (item.removedAt || item.verificationStatus !== "todo") {
         throw new MockError(409, "CONFLICT", "This task can't be started now");
       }
       item.verificationStatus = "doing";

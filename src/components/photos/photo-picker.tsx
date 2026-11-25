@@ -36,6 +36,8 @@ export function PhotoPicker({
         multiple
         className="sr-only"
         aria-label="Choose photos"
+        aria-hidden="true"
+        tabIndex={-1}
         onChange={(event) => {
           onChange([...files, ...Array.from(event.target.files ?? [])]);
           event.target.value = "";

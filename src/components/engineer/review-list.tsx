@@ -10,6 +10,7 @@ import { useChecklists, useReviewChecklistItem, useTimeline } from "@/hooks/use-
 import { activeItems, latestSubmission, type VerifiedItem } from "@/lib/checklist";
 import { istDateOf } from "@/lib/dates";
 import { formatShortDate, formatTimeIst } from "@/lib/format";
+import { mocksEnabled } from "@/mocks";
 import type { ProgressResponse } from "@/shared/schemas/progress";
 
 /** A proof photo. If it cannot load (demo data has no image files), say so instead of a broken icon. */
@@ -18,7 +19,11 @@ function Proof({ url }: { url: string }) {
   return (
     <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-secondary">
       {failed ? (
-        <ImageOff aria-label="Photo not available" className="size-6 text-muted-foreground" />
+        <ImageOff
+          role="img"
+          aria-label={mocksEnabled ? "Demo photo, no image file" : "Photo not available"}
+          className="size-6 text-muted-foreground"
+        />
       ) : (
         // biome-ignore lint/performance/noImgElement: protected same-origin photo, sized by the box
         <img
@@ -66,7 +71,9 @@ function ReviewCard({
           </div>
         </>
       ) : (
-        <p className="mt-3 text-[15px] text-muted-foreground">The proof is still loading.</p>
+        <p className="mt-3 text-[15px] text-muted-foreground">
+          Accept needs the proof on screen. It could not be shown yet.
+        </p>
       )}
 
       {sending ? (
@@ -108,7 +115,7 @@ function ReviewCard({
               Send back
             </Button>
             <Button
-              disabled={review.isPending}
+              disabled={review.isPending || !proof}
               onClick={() =>
                 review.mutate(
                   { itemId: item.id, decision: "accept", progressId },
@@ -132,6 +139,17 @@ export function ReviewList({ projectId }: { projectId: string }) {
   if (checklists.isPending) return <Skeleton className="mt-4 h-40 rounded-3xl" />;
   const waiting = activeItems(checklists.data).filter((i) => i.verificationStatus === "waiting");
   const proofs = new Map((timeline.data ?? []).flatMap((d) => d.updates).map((u) => [u.id, u]));
+  if (timeline.isError) {
+    return (
+      <p
+        role="alert"
+        className="mt-4 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-[15px]"
+      >
+        Could not load the proof photos, so nothing can be accepted right now. Try again in a
+        moment.
+      </p>
+    );
+  }
   if (waiting.length === 0) {
     return <p className="mt-4 text-muted-foreground">Nothing is waiting for your check.</p>;
   }

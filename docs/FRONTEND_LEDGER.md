@@ -50,7 +50,7 @@ proposed method + path, fields, priority / blocking.
 
 ### 2026-11-26 IST · Sign-in, photo upload, task workflow, checklist edits
 
-- **Branch / commit:** `fe/contractor-screens` (PR #22).
+- **Branch / commit:** `fe/contractor-screens` after PR #22 merged (follow-up PR; commits `a96565f`, `525689d`).
 - **Done:**
   - **Multipart in `api()`:** a `FormData` body is sent as multipart (the browser sets the boundary).
   - **Sign-in** (`/login`): email and password through the Better Auth bridge
@@ -78,12 +78,16 @@ proposed method + path, fields, priority / blocking.
 - **Still needs the backend or a decision:** the delivery challan photo (the contract has no field for
   it); the anti-fraud and payments screens (requests 13 to 19, not authorised); team list and
   invitations (requests 4 and 12).
+- **Review fixes (pr-review agent):** Accept is disabled until the proof photos can be shown, and a
+  failed proof load says so; a failed sign-out shows a message; the mock Start only accepts a task
+  that has not started, like the server; the hidden file input is out of the tab order; tests for the
+  multipart and JSON transport and for sign-in and sign-out (stubbed `fetch`). 71 tests pass.
 - **Next:** run the live sign-in and the screens against a disposable local database
   (`./start.sh --live`, once Codex lands the launcher), then switch the mocks off route by route.
 
 ### 2026-11-26 IST · Engineer side: Home, Review, verified checklist shape
 
-- **Branch / commit:** `fe/contractor-screens` (PR #22).
+- **Branch / commit:** `fe/contractor-screens` after PR #22 merged (follow-up PR; commits `a96565f`, `525689d`).
 - **Found:** the live `GET /projects/:id/checklists` returns the M6 verified shape
   (`verificationStatus`, `removedAt`, `history`). The shared `ChecklistsResponse` is strict and would
   reject it, so the checklist reads now parse with `VerifiedChecklistsResponse`, and the demo mocks

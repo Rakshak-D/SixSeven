@@ -5,6 +5,7 @@ import { Check, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/api/auth";
@@ -33,6 +34,8 @@ export function ProjectSwitcher({
       await signOut();
       client.clear();
       router.replace("/login");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not sign out. Try again.");
     } finally {
       setSigningOut(false);
     }
