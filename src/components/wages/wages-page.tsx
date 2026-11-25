@@ -25,6 +25,7 @@ import {
 } from "@/hooks/use-project-data";
 import { addDays, mondayOf, todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise } from "@/lib/format";
+import { referenceProblem, referenceRules } from "@/lib/payment-reference";
 
 const eyebrow = "font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]";
 const days = (halfDays: number) => `${halfDays / 2} ${halfDays === 2 ? "day" : "days"}`;
@@ -263,7 +264,9 @@ function PayForm({
   const [kind, setKind] = useState<"wage" | "advance">("wage");
   const [mode, setMode] = useState<"cash" | "upi" | "bank">("cash");
   const [date, setDate] = useState(today);
+  // Kept apart so switching "Paid by" never carries a UPI ID into the cash note or back.
   const [reference, setReference] = useState("");
+  const [cashNote, setCashNote] = useState("");
   const [problem, setProblem] = useState<string>();
 
   function submit(event: React.FormEvent) {
@@ -271,6 +274,10 @@ function PayForm({
     const found = firstProblem([
       [!workerId, "Pick a worker."],
       [!rupeesToPaise(amount), "Enter the amount in rupees."],
+      [
+        referenceProblem(mode, reference, cashNote) !== undefined,
+        referenceProblem(mode, reference, cashNote) ?? "",
+      ],
     ]);
     setProblem(found);
     if (found) return;
@@ -280,7 +287,8 @@ function PayForm({
       kind,
       mode,
       paidOn: date,
-      ...(reference.trim() ? { reference } : {}),
+      // The contract has no payment note yet (request 22), so the cash note travels as the reference.
+      reference: mode === "cash" ? cashNote.trim() : reference.trim(),
     });
   }
 
@@ -331,7 +339,15 @@ function PayForm({
         </Field>
         <Field label="Paid by">
           {(id) => (
-            <NativeSelect id={id} value={mode} onChange={(v) => setMode(v as typeof mode)}>
+            <NativeSelect
+              id={id}
+              value={mode}
+              onChange={(v) => {
+                setMode(v as typeof mode);
+                setReference("");
+                setProblem(undefined);
+              }}
+            >
               <option value="cash">Cash</option>
               <option value="upi">UPI</option>
               <option value="bank">Bank</option>
@@ -339,9 +355,29 @@ function PayForm({
           )}
         </Field>
       </div>
-      <Field label="Reference (optional)" hint="UPI transaction ID or bank reference.">
-        {(id) => <Input id={id} value={reference} onChange={(e) => setReference(e.target.value)} />}
-      </Field>
+      {mode === "cash" ? (
+        <Field label="Note" hint="Who received the cash, and where.">
+          {(id) => (
+            <Input
+              id={id}
+              maxLength={160}
+              value={cashNote}
+              onChange={(e) => setCashNote(e.target.value)}
+            />
+          )}
+        </Field>
+      ) : (
+        <Field label={referenceRules[mode].label} hint={referenceRules[mode].hint}>
+          {(id) => (
+            <Input
+              id={id}
+              inputMode={mode === "upi" ? "numeric" : "text"}
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+            />
+          )}
+        </Field>
+      )}
       <FormError error={problem ?? save.error} />
       {save.isSuccess && !save.isPending ? <SavedNotice>Payment recorded.</SavedNotice> : null}
       <Button type="submit" size="lg" className="w-full" disabled={save.isPending}>

@@ -1,9 +1,10 @@
 "use client";
 
 import { Camera, X } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MaxPhotoBytes, PhotoMime } from "@/shared/schemas/progress";
+import { CameraView } from "./camera-view";
 
 const MAX_PHOTOS = 10;
 
@@ -18,7 +19,21 @@ export function photoProblem(files: File[]): string | undefined {
   return undefined;
 }
 
-/** Choose photos from the camera or gallery, see what is chosen, remove one. Parent owns the list. */
+/** A small preview of a captured photo, so a blurred one can be removed and retaken. */
+function Thumbnail({ file }: { file: File }) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    const made = URL.createObjectURL(file);
+    setUrl(made);
+    return () => URL.revokeObjectURL(made);
+  }, [file]);
+  return url ? (
+    // biome-ignore lint/performance/noImgElement: a local blob, sized by the box
+    <img src={url} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+  ) : null;
+}
+
+/** Take photos with the live camera, see them, remove one. Parent owns the list. */
 export function PhotoPicker({
   files,
   onChange,
@@ -26,42 +41,41 @@ export function PhotoPicker({
   files: File[];
   onChange: (files: File[]) => void;
 }) {
-  const input = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const full = files.length >= MAX_PHOTOS;
   return (
     <div>
-      <input
-        ref={input}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        multiple
-        className="sr-only"
-        aria-label="Choose photos"
-        aria-hidden="true"
-        tabIndex={-1}
-        onChange={(event) => {
-          onChange([...files, ...Array.from(event.target.files ?? [])]);
-          event.target.value = "";
-        }}
-      />
-      <Button type="button" variant="outline" onClick={() => input.current?.click()}>
-        <Camera aria-hidden="true" />
-        {files.length ? "Add more photos" : "Take or choose photos"}
-      </Button>
+      {open ? (
+        <CameraView
+          full={full}
+          onCapture={(photo) => onChange([...files, photo])}
+          onClose={() => setOpen(false)}
+        />
+      ) : (
+        <Button type="button" variant="outline" disabled={full} onClick={() => setOpen(true)}>
+          <Camera aria-hidden="true" />
+          {files.length ? "Take another photo" : "Take photo"}
+        </Button>
+      )}
+      <p className="mt-2 text-[14px] text-muted-foreground">
+        Photos are taken now, with the camera. The gallery cannot be used.
+      </p>
       {files.length > 0 ? (
         <ul className="mt-3 space-y-1.5">
           {files.map((file, i) => (
             <li
-              key={`${file.name}-${file.size}-${file.lastModified}-${i}`}
-              className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-secondary px-3"
+              key={`${file.name}-${file.size}-${i}`}
+              className="flex min-h-14 items-center gap-3 rounded-xl bg-secondary px-3"
             >
-              <span className="min-w-0 truncate text-[15px]">
-                {file.name} · {(file.size / 1_000_000).toFixed(1)} MB
+              <Thumbnail file={file} />
+              <span className="min-w-0 flex-1 truncate text-[15px]">
+                Photo {i + 1} · {(file.size / 1_000_000).toFixed(1)} MB
               </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Remove ${file.name}`}
+                aria-label={`Remove photo ${i + 1}`}
                 onClick={() => onChange(files.filter((_, j) => j !== i))}
               >
                 <X aria-hidden="true" />
