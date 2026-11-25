@@ -17,6 +17,7 @@ import {
   type ChangeRequestsQuery,
   CreateChangeRequestInput,
   type DecideChangeRequestInput,
+  type MedicalExpenseFields,
   type ReopenChangeRequestInput,
   type VoteChangeRequestInput,
 } from "@/shared/schemas/change-requests";
@@ -26,7 +27,15 @@ import type { Actor } from "../middleware/auth";
 import { ApiError } from "../middleware/errors";
 import { applyAdjustment } from "./adjustments";
 import { recordAudit } from "./audit";
+import { captureTimes } from "./capture-times";
 import { applyChecklistAdd, applyChecklistEdit } from "./checklists";
+import {
+  insertMedicalClaim,
+  medicalClaimView,
+  reimburseMedicalClaim,
+  requireClaimWorker,
+} from "./medical-claims";
+import { persistValidatedPhotos, validateImageUpload } from "./photo-storage";
 import { requireProjectAccess } from "./projects";
 
 type Row = typeof changeRequests.$inferSelect;
@@ -37,13 +46,16 @@ const forbidden = () =>
 const notFound = () => new ApiError(404, ErrorCode.NOT_FOUND, "Change request or target not found");
 const sensitiveKinds = ["attendance_fix", "medical_expense"];
 
-function present(row: Row, events: Event[]) {
+async function present(tx: Transaction, row: Row, events: Event[]) {
+  const medical =
+    row.kind === "medical_expense" ? await medicalClaimView(tx, row.projectId, row.id) : null;
   return ChangeRequest.parse({
     id: row.id,
     projectId: row.projectId,
     kind: row.kind,
     ...(row.targetId !== null && { targetId: row.targetId }),
     payload: row.payload,
+    ...medical,
     authorId: row.authorId,
     authorRole: row.authorRole,
     status: row.status,
@@ -101,7 +113,46 @@ async function append(
     entity: "changeRequest",
     entityId: row.id,
   });
-  return present(row, (await history(tx, row.projectId, [row.id])).get(row.id) ?? []);
+  return present(tx, row, (await history(tx, row.projectId, [row.id])).get(row.id) ?? []);
+}
+
+export async function createMedicalExpense(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+  input: MedicalExpenseFields,
+  files: File[],
+  captures: string[],
+  receivedAt: Date,
+) {
+  await requireProjectAccess(db, actor, projectId, ["engineer", "contractor"]);
+  const taken = captureTimes(captures, files.length, receivedAt);
+  const validated = [];
+  for (const file of files) validated.push(await validateImageUpload(file));
+  const stored = await persistValidatedPhotos(validated);
+  try {
+    return await db.transaction(async (tx) => {
+      const { role } = await requireProjectAccess(tx, actor, projectId, ["engineer", "contractor"]);
+      await requireClaimWorker(tx, projectId, input.workerId);
+      const [row] = await tx
+        .insert(changeRequests)
+        .values({
+          id: crypto.randomUUID(),
+          projectId,
+          kind: "medical_expense",
+          payload: {},
+          authorId: actor.userId,
+          authorRole: role,
+          status: role === "engineer" ? "pending_contractor" : "pending_owner",
+        })
+        .returning();
+      await insertMedicalClaim(tx, projectId, row.id, input, stored.photos, taken, receivedAt);
+      return append(tx, row, actor, role, "created", input.note);
+    });
+  } catch (error) {
+    await stored.cleanup();
+    throw error;
+  }
 }
 
 export async function attendanceChangeState(tx: Transaction, projectId: string, id: string) {
@@ -264,7 +315,7 @@ export async function listChangeRequests(
         projectId,
         rows.map(({ id }) => id),
       );
-      return rows.map((row) => present(row, grouped.get(row.id) ?? []));
+      return Promise.all(rows.map((row) => present(tx, row, grouped.get(row.id) ?? [])));
     },
     { isolationLevel: "repeatable read", accessMode: "read only" },
   );
@@ -350,6 +401,10 @@ export async function decideChangeRequest(
     if (row.status !== "pending_owner") throw conflict("An owner decision is not pending");
     if (!decision.accept)
       return transition(tx, row, actor, role, "rejected_owner", "owner_rejected", decision.note);
+    if (row.kind === "medical_expense") {
+      await reimburseMedicalClaim(tx, actor, row.projectId, row.id, decision.payPaise);
+      return transition(tx, row, actor, role, "accepted", "owner_accepted", decision.note);
+    }
     if (decision.payPaise !== undefined)
       throw new ApiError(
         400,

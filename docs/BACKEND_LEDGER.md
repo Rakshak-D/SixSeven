@@ -7,6 +7,12 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Branch `be/required-operation-notes`. New delivery and usage writes, checklist acceptance and proposal decisions require `Note`. Proposal decisions store the note in their audit event. Historical responses remain readable. Change-request actions already require notes and wage payment notes are in #29.
 - Frontend handoff: add a nonblank decision note to the proposal flow in `src/components/owner/approvals-list.tsx` and submit it through `src/hooks/use-project-data.ts`. Verify that all delivery, usage and checklist review submissions and fixtures send notes. Keep the rollout in draft until the proposal consumer is ready.
 
+## Entry — Medical claims and bill photo contract
+
+- Branch `be/medical-evidence`, requests #23 and #27. Medical bill submissions use one `capturedAt` part per `billPhotos` part in matching order. This confirms the frontend ledger's multipart convention. The author and authorized reviewers can fetch private bill images.
+- Migration `0012_medical_evidence` stores the claim and capture/receipt metadata. Approval inserts one mock expense in the owner decision transaction. Rejection and duplicate acceptance do not create another expense.
+- Local verification passed fresh migration, demo seed, and 13 PostgreSQL reporting and database tests. The medical test covers stale captures, cross-project access, private image bytes, amount bounds, concurrent approval and weekly reconciliation. This entry covers medical photos. Other upload routes have a separate rollout.
+
 ## Entry — Request #4 engineer-led project setup
 
 - Timestamp: 2026-11-26 IST. Branch: `be/project-invitations`.
