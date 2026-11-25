@@ -12,6 +12,7 @@ import {
   AttendanceRosterResponse,
 } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
+import { ChangeRequest } from "@/shared/schemas/change-requests";
 import { DeliveryResponse } from "@/shared/schemas/deliveries";
 import {
   WagePaymentListResponse,
@@ -84,6 +85,29 @@ function call(
 async function failure(response: Response, status: number, code: string) {
   expect(response.status).toBe(status);
   expect(ErrorResponse.parse(await response.json()).error.code).toBe(code);
+}
+
+async function approveAttendance(
+  targetId: string,
+  newValue: number,
+  note: string,
+  payFullDay = false,
+) {
+  const created = await call(projectId, "change-requests", contractor, {
+    kind: "attendance_fix",
+    targetId,
+    note,
+    payload: { newValue, reasonKind: payFullDay ? "medical_emergency" : "other", payFullDay },
+  });
+  expect(created.status).toBe(201);
+  const request = ChangeRequest.parse(await created.json());
+  const decided = await app.request(`/api/v1/change-requests/${request.id}/decision`, {
+    method: "POST",
+    headers: { cookie: owner.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ accept: true, note: "Reviewed the site register" }),
+  });
+  expect(decided.status).toBe(200);
+  expect(ChangeRequest.parse(await decided.json()).status).toBe("accepted");
 }
 
 async function newWorker(actor = contractor, name = "Synthetic Labour", dailyRatePaise = 90_000) {
@@ -173,13 +197,17 @@ describe("attendance and wage accounting", () => {
     const {
       entries: [entry],
     } = AttendanceResponse.parse(await result.json());
-    const corrected = await call(projectId, "adjustments", contractor, {
-      targetTable: "attendance",
-      targetId: entry.id,
-      newValue: 0,
-      reason: "Correct the site attendance register",
-    });
-    expect(corrected.status).toBe(201);
+    await failure(
+      await call(projectId, "adjustments", contractor, {
+        targetTable: "attendance",
+        targetId: entry.id,
+        newValue: 0,
+        reason: "Correct the site attendance register",
+      }),
+      403,
+      "FORBIDDEN",
+    );
+    await approveAttendance(entry.id, 0, "Correct the site attendance register");
     const path = `attendance/roster?workerId=${worker.id}&from=${workDate}&to=${workDate}`;
     await failure(await call(projectId, path), 401, "UNAUTHENTICATED");
     await failure(await call(projectId, path, outsider), 404, "NOT_FOUND");
@@ -460,6 +488,16 @@ describe("attendance and wage accounting", () => {
     ] as const;
     const responses = [];
     for (const correction of corrections) {
+      if (correction.targetTable === "attendance") {
+        await approveAttendance(correction.targetId, correction.newValue, correction.reason);
+        const response = await call(
+          projectId,
+          `adjustments?targetTable=attendance&targetId=${correction.targetId}`,
+          owner,
+        );
+        responses.push(AdjustmentListResponse.parse(await response.json())[0]);
+        continue;
+      }
       const response = await call(projectId, "adjustments", contractor, correction);
       expect(response.status).toBe(201);
       responses.push(AdjustmentResponse.parse(await response.json()));
@@ -517,6 +555,25 @@ describe("attendance and wage accounting", () => {
     expect(
       await db.select().from(adjustments).where(eq(adjustments.targetId, delivery.id)),
     ).toHaveLength(2);
+  });
+
+  it("pays an approved medical full day while retaining actual attendance", async () => {
+    const worker = await newWorker(contractor, "Medical entitlement fixture", 90_000);
+    const date = "2026-11-24";
+    const response = await call(projectId, "attendance", contractor, {
+      workDate: date,
+      entries: [{ workerId: worker.id, halfDays: 1 }],
+    });
+    const target = AttendanceResponse.parse(await response.json()).entries[0];
+    await approveAttendance(target.id, 1, "Worker left after an onsite emergency", true);
+    const actual = await call(projectId, `attendance?workerId=${worker.id}`, owner);
+    expect(AttendanceListResponse.parse(await actual.json())[0].effectiveHalfDays).toBe(1);
+    const wages = await call(projectId, `wage-sheet?from=${date}&to=${date}`, owner);
+    expect(
+      WageSheetResponse.parse(await wages.json()).workers.find(
+        ({ workerId }) => workerId === worker.id,
+      ),
+    ).toMatchObject({ halfDays: 1, accruedPaise: 90_000 });
   });
 
   it("rejects no-op, cross-project, unauthorized and concurrent stale corrections", async () => {

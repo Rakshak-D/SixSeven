@@ -327,70 +327,71 @@ export function reviewItem(
   });
 }
 
-export function addItem(
-  db: Db,
+export async function applyChecklistAdd(
+  tx: Transaction,
   actor: Actor,
   projectId: string,
   input: z.infer<typeof AddChecklistItemInput>,
 ) {
-  return db.transaction(async (tx) => {
-    await requireProjectAccess(tx, actor, projectId, ["engineer"]);
-    const [record] = await tx
-      .select({ id: checklistRecords.id })
-      .from(checklistRecords)
-      .where(
-        and(eq(checklistRecords.projectId, projectId), eq(checklistRecords.id, input.checklistId)),
-      )
-      .for("update");
-    if (!record) throw notFound();
-    const [last] = await tx
-      .select({ position: checklistItems.position })
-      .from(checklistItems)
-      .where(eq(checklistItems.checklistId, record.id))
-      .orderBy(desc(checklistItems.position))
-      .limit(1);
-    const position = (last?.position ?? -1) + 1;
-    if (position >= 40) throw conflict("Checklist already has forty historical items");
-    const { phase, task, materials, reason } = input;
-    const [item] = await tx
-      .insert(checklistItems)
-      .values({
-        id: crypto.randomUUID(),
-        projectId,
-        checklistId: record.id,
-        position,
-        phase,
-        task,
-        materials,
-      })
-      .returning();
-    if (!item) throw new Error("Checklist item insert did not return a row");
-    return appendEvent(tx, actor, item, { kind: "added", note: reason, next: task });
-  });
+  const [record] = await tx
+    .select({ id: checklistRecords.id })
+    .from(checklistRecords)
+    .where(
+      and(eq(checklistRecords.projectId, projectId), eq(checklistRecords.id, input.checklistId)),
+    )
+    .for("update");
+  if (!record) throw notFound();
+  const [last] = await tx
+    .select({ position: checklistItems.position })
+    .from(checklistItems)
+    .where(eq(checklistItems.checklistId, record.id))
+    .orderBy(desc(checklistItems.position))
+    .limit(1);
+  const position = (last?.position ?? -1) + 1;
+  if (position >= 40) throw conflict("Checklist already has forty historical items");
+  const { phase, task, materials, reason } = input;
+  const [item] = await tx
+    .insert(checklistItems)
+    .values({
+      id: crypto.randomUUID(),
+      projectId,
+      checklistId: record.id,
+      position,
+      phase,
+      task,
+      materials,
+    })
+    .returning();
+  if (!item) throw new Error("Checklist item insert did not return a row");
+  return appendEvent(tx, actor, item, { kind: "added", note: reason, next: task });
 }
 
-export function editItem(db: Db, actor: Actor, id: string, reason: string, task?: string) {
-  return db.transaction(async (tx) => {
-    const item = await accessItem(tx, actor, id, "engineer");
-    const [current] = await tx
-      .select()
-      .from(checklistItems)
-      .where(eq(checklistItems.id, item.id))
-      .for("update");
-    if (!current || current.removedAt || current.state === "waiting")
-      throw conflict("Checklist item is removed or awaiting review");
-    if (task === current.task) throw conflict("Checklist item already has that name");
-    const [updated] = await tx
-      .update(checklistItems)
-      .set(task === undefined ? { removedAt: new Date() } : { task })
-      .where(eq(checklistItems.id, item.id))
-      .returning();
-    if (!updated) throw notFound();
-    return appendEvent(tx, actor, updated, {
-      kind: task === undefined ? "removed" : "renamed",
-      note: reason,
-      previous: current.task,
-      next: task,
-    });
+export async function applyChecklistEdit(
+  tx: Transaction,
+  actor: Actor,
+  projectId: string,
+  id: string,
+  reason: string,
+  task?: string,
+) {
+  const [current] = await tx
+    .select()
+    .from(checklistItems)
+    .where(and(eq(checklistItems.id, id), eq(checklistItems.projectId, projectId)))
+    .for("update");
+  if (!current || current.removedAt || current.state === "waiting")
+    throw conflict("Checklist item is removed or awaiting review");
+  if (task === current.task) throw conflict("Checklist item already has that name");
+  const [updated] = await tx
+    .update(checklistItems)
+    .set(task === undefined ? { removedAt: new Date() } : { task })
+    .where(and(eq(checklistItems.id, id), eq(checklistItems.projectId, projectId)))
+    .returning();
+  if (!updated) throw notFound();
+  return appendEvent(tx, actor, updated, {
+    kind: task === undefined ? "removed" : "renamed",
+    note: reason,
+    previous: current.task,
+    next: task,
   });
 }
