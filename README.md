@@ -20,7 +20,7 @@ corepack pnpm db:migrate
 corepack pnpm dev
 ~~~
 
-The current seed script is a no-op. No demo accounts or demo records exist. GET /api/v1/health and GET /api/v1/doc have handlers in the scaffold, but M0 has not run them against a database. Other listed API route modules are empty routers.
+Follow [development setup](docs/devops.md) to confirm the migration target and seed demo accounts. Better Auth and the project APIs use the configured PostgreSQL database. [API.md](docs/API.md) lists the implemented operations and planned features.
 
 ## Checks
 

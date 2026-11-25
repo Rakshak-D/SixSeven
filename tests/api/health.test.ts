@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { app } from "@/server/app";
 import { ErrorResponse } from "@/shared/errors";
+import { testDatabase } from "./database-fixture";
+
+beforeAll(() => {
+  testDatabase();
+});
 
 describe("meta routes", () => {
   it("GET /health reports the app and the DB as up", async () => {

@@ -42,6 +42,7 @@ Codex must not edit frontend-owned implementation files without an explicitly co
 ### Mixed concerns and handoffs
 
 - src/app/api/[[...route]]/route.ts is the Next.js-to-Hono server bridge and is owned by Codex. src/server/app.ts and route modules are also Codex-owned.
+- src/app/api/auth/[...auth]/route.ts is the Better Auth server bridge and is owned by Codex.
 - src/app/layout.tsx, page files, client providers, and visual components are Claude-owned. A change there that alters server wiring or an API assumption needs a handoff before editing.
 - Root manifests, lockfiles, .env.example, GitHub workflows, Docker files, and shared build/lint configuration are Codex-owned. Claude records dependency or config requests in FRONTEND_LEDGER.md; Codex reviews and implements them.
 - src/shared/** and docs/API.md are Codex-owned contract sources. Claude requests changes in FRONTEND_LEDGER.md or a GitHub issue; Codex evaluates and updates the canonical contract.

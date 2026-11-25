@@ -34,15 +34,16 @@ export const errorHandler: ErrorHandler = (err, c) => {
   }
   if (err instanceof HTTPException && err.status < 500) {
     const code =
-      err.status === 401
-        ? ErrorCode.UNAUTHENTICATED
-        : err.status === 403
-          ? ErrorCode.FORBIDDEN
-          : ErrorCode.CONFLICT;
+      {
+        401: ErrorCode.UNAUTHENTICATED,
+        403: ErrorCode.FORBIDDEN,
+        404: ErrorCode.NOT_FOUND,
+        409: ErrorCode.CONFLICT,
+      }[err.status as 401 | 403 | 404 | 409] ?? ErrorCode.VALIDATION_ERROR;
     return c.json(body(code, err.message), err.status);
   }
   const requestId = crypto.randomUUID();
-  console.error(`[api] ${requestId}`, err);
+  console.error(`[api] ${requestId} ${err.name}`);
   return c.json(body(ErrorCode.INTERNAL, "Something went wrong", { requestId }), 500);
 };
 

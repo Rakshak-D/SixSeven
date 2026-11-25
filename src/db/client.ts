@@ -1,11 +1,21 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as authSchema from "./auth-schema";
+import { databaseUrl } from "./config";
 import * as schema from "./schema";
 
-const url = process.env.DATABASE_URL ?? "postgres://slate:slate@localhost:5432/slate";
+const createClient = () => {
+  const sql = postgres(databaseUrl().href, { max: 10 });
+  return { sql, db: drizzle(sql, { schema: { ...schema, ...authSchema } }) };
+};
 
-/** Raw postgres.js client, for the few queries Drizzle can't express (e.g. the guarded stock UPDATE). */
-export const sql = postgres(url, { max: 10 });
-export const db = drizzle(sql, { schema: { ...schema, ...authSchema } });
-export type Db = typeof db;
+let client: ReturnType<typeof createClient> | undefined;
+
+// Keep build-time imports disconnected. Validate configuration when the first query needs a client.
+export function getDatabase() {
+  client ??= createClient();
+  return client;
+}
+
+export type Db = ReturnType<typeof getDatabase>["db"];
+export type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];

@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M2 auth and project access
+
+- Timestamp: 2026-11-25 15:59:48+05:30
+- Milestone/task ID: M2
+- Branch: be/auth-projects
+- Scope: real Better Auth sessions and credentials, approved auth bridge, scoped project access, repeatable demo seed and core Drizzle tables.
+- Files: database config, schema, seed and migrations; Next auth bridge and backend auth/project services and routes; API integration tests, PostgreSQL CI and development docs.
+- API or database changes: enabled the three published auth operations and four project operations. Added migrations 0001_auth_projects and 0002_stock_ledger_guards. Project creation, membership assignment and audit writes are transactional.
+- Verification: 28 shared tests, typecheck, production build, local OpenAPI/registration smoke check and Compose configuration parsing passed. Database integration runs in CI against a disposable PostgreSQL 16 service.
+- Dependencies added: none.
+- Limits: no authorized isolated local PostgreSQL instance was available. No local database or Docker service was started. Delivery and usage business workflows remain planned.
+- Frontend implications: the published auth and project response contracts are unchanged. The backend exposes real cookies and project-scoped roles.
+- Git reference: be/auth-projects from 3c794317efe4377376ca9a1a1f7b813102546b9b (M1 merge).
+- Next action: verify hosted migration, seed, auth and isolation checks before integration.
+
 ## Entry — M1 shared API contracts
 
 - Timestamp: 2026-11-25 15:37:00+05:30

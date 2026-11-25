@@ -1,6 +1,6 @@
 # Frontend ownership: src/app/
 
-Read the root AGENTS.md first. Claude owns frontend pages, layouts, route-group layouts, client providers, and UI behavior under this directory. The exception is src/app/api/[[...route]]/route.ts, which is the server bridge and belongs to Codex.
+Read the root AGENTS.md first. Claude owns frontend pages, layouts, route-group layouts, client providers, and UI behavior under this directory. The Hono and Better Auth bridges under src/app/api belong to Codex.
 
 Do not edit API routes, server modules, database access, authentication or authorization logic, shared API schemas, or docs/API.md. Request backend work or contract changes in docs/FRONTEND_LEDGER.md or a GitHub issue.
 

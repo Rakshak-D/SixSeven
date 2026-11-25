@@ -19,13 +19,15 @@ jobs:
         env:
           POSTGRES_USER: slate
           POSTGRES_PASSWORD: slate
-          POSTGRES_DB: slate
+          POSTGRES_DB: slate_test
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U slate -d slate"
+          --health-cmd "pg_isready -U slate -d slate_test"
           --health-interval 3s --health-timeout 3s --health-retries 20
     env:
-      DATABASE_URL: postgres://slate:slate@localhost:5432/slate
+      DATABASE_URL: postgres://slate:slate@127.0.0.1:5432/slate_test
+      SLATE_MIGRATION_DATABASE: slate_test
+      SLATE_TEST_DATABASE: "1"
       BETTER_AUTH_SECRET: ci-only-secret-not-used-anywhere-else
       BETTER_AUTH_URL: http://localhost:3000
       UPLOAD_DIR: /tmp/uploads
@@ -42,5 +44,15 @@ jobs:
       - run: pnpm typecheck
       - name: Migrate (Postgres 16)
         run: pnpm db:migrate
+      - name: Seed disposable demo fixtures twice
+        env:
+          SLATE_DEMO_SEED: "1"
+        run: |
+          SLATE_DEMO_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$SLATE_DEMO_PASSWORD"
+          echo "SLATE_DEMO_PASSWORD=$SLATE_DEMO_PASSWORD" >> "$GITHUB_ENV"
+          export SLATE_DEMO_PASSWORD
+          pnpm db:seed
+          pnpm db:seed
       - name: Tests (Vitest)
         run: pnpm test

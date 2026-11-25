@@ -1,6 +1,6 @@
 # Slate API contract
 
-[Specification](SPECIFICATION.md) defines the approved domain rules. Schema names below are exports from `src/shared/schemas/<module>.ts` unless noted. Each domain path is relative to `/api/v1`. Contract availability, backend readiness and frontend integration are tracked separately. No new route is registered in M1. `GET /api/v1/doc` describes registered routes only.
+[Specification](SPECIFICATION.md) defines the approved domain rules. Schema names below are exports from `src/shared/schemas/<module>.ts` unless noted. Each domain path is relative to `/api/v1`. Contract availability, backend readiness and frontend integration are tracked separately. `GET /api/v1/doc` describes registered routes, including the four project operations implemented in M2.
 
 ## Conventions
 
@@ -18,7 +18,7 @@
 
 ## Authentication (P0)
 
-These are native Better Auth 1.7.27 email/password route paths at the default `/api/auth` base, separate from Hono. There are no path or query inputs in Slate's email/password flow. The Next.js auth bridge is planned. Sign-in uses same-origin JSON and omits callbackURL. Slate's bridge must allowlist successful JSON using the shared schemas before sending it, retaining the native status and Set-Cookie headers. Native sign-in returns a token and native session can return a token, IP and user agent. Slate's public schema drops those fields and uses only the cookie for session transport. Use cookie-aware fetch with credentials included. Do not store tokens or passwords in browser storage.
+Slate's Next.js bridge serves these Better Auth 1.7.27 email/password routes at `/api/auth`, separate from Hono. Sign-in uses same-origin JSON. The bridge validates bodies and returns only fields in the published success schemas while preserving the native status and all Set-Cookie headers. Session transport uses the signed cookie. Use cookie-aware fetch with credentials included. The bridge exposes the three operations below.
 
 | Method and full path | Access | Body → success | Error behavior |
 |---|---|---|---|
@@ -26,13 +26,13 @@ These are native Better Auth 1.7.27 email/password route paths at the default `/
 | POST /api/auth/sign-out | Public and idempotent for missing session | No body or `SignOutInput` → 200 `SignOutResponse` | 403 on rejected origin; unexpected failures use native errors |
 | GET /api/auth/get-session | Public | — → 200 `SessionResponse`, null if absent or expired | Unexpected auth failures use native errors |
 
-Auth errors follow native Better Auth JSON (top-level `message` and optional `code`, parsed with `AuthErrorResponse`); same-origin and rate protections can reject requests before a handler. The cookie is signed, HTTP-only and secure over HTTPS. Sign-out clears it and attempts server-side invalidation. Session responses are private and not cached. Use GET /api/v1/projects after sign-in to discover memberships and the current user's role in each project. There is no global role claim.
+Auth errors use the top-level `message` and optional `code` parsed by `AuthErrorResponse`. The bridge preserves native credential and origin errors. Cookies are signed and HTTP-only, and production requires HTTPS with secure cookies. Sessions live in PostgreSQL and expire after seven days, with native refresh eligibility after one day. Sign-out checks that the old session is unusable before returning success. Auth responses use private, no-store caching. GET /api/v1/projects discovers the authenticated user's memberships and roles.
 
-Local demo seed will create synthetic `DemoAccountEmail` entries (owner, contractor, engineer) with matching roles on the demo project. The reserved `.invalid` domain keeps the historical labels and satisfies email validation. Seed config supplies the password through local demo setup; demo login uses ordinary email sign-in. Contract: available. Backend: planned. Frontend: no integration in M1.
+The development seed provisions synthetic `DemoAccountEmail` entries with corresponding project roles. Demo login uses ordinary email sign-in. See [development setup](devops.md) for the disposable database and local password configuration. Contract: available. Backend: implemented, with PostgreSQL integration tests. Frontend: no integration delivered in M2.
 
 ## Domain operations
 
-All rows below have an available shared contract, planned backend (scaffold only), and no frontend integration delivered in M1. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer.
+All rows below have an available shared contract. The first four project operations are implemented in M2 and covered by PostgreSQL integration tests. Other rows remain planned. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer. M2 delivers backend integration.
 
 | Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
 |---|---|---|---|---|---|---|
