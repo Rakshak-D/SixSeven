@@ -35,7 +35,10 @@ export async function loadEffectiveAttendance(
 
   const corrections = rows.length
     ? await tx
-        .select({ targetId: adjustments.targetId, newValue: adjustments.newValue })
+        .select({
+          targetId: adjustments.targetId,
+          newValue: sql<string>`${adjustments.newValue}::integer::text`,
+        })
         .from(adjustments)
         .where(
           and(
