@@ -1,6 +1,5 @@
 import type { z } from "zod";
 import type {
-  AddChecklistItemInput,
   ReviewChecklistItemInput,
   VerifiedChecklistItemResponse,
   VerifiedChecklistResponse,
@@ -12,7 +11,6 @@ export type VerifiedChecklist = z.infer<typeof VerifiedChecklistResponse>;
 export type VerifiedChecklists = z.infer<typeof VerifiedChecklistsResponse>;
 export type VerifiedItem = z.infer<typeof VerifiedChecklistItemResponse>;
 export type ReviewInput = z.infer<typeof ReviewChecklistItemInput>;
-export type AddItemInput = z.input<typeof AddChecklistItemInput>;
 
 /** Items still on the plan: removals are soft, so the API keeps them with a removedAt. */
 export function activeItems(checklists: VerifiedChecklists | undefined): VerifiedItem[] {

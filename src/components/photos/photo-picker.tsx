@@ -37,12 +37,14 @@ function Thumbnail({ file }: { file: File }) {
 export function PhotoPicker({
   files,
   onChange,
+  max = MAX_PHOTOS,
 }: {
   files: File[];
   onChange: (files: File[]) => void;
+  max?: number;
 }) {
   const [open, setOpen] = useState(false);
-  const full = files.length >= MAX_PHOTOS;
+  const full = files.length >= max;
   return (
     <div>
       {open ? (

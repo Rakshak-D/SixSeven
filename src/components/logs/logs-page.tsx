@@ -25,6 +25,7 @@ import {
   foldWagesByDay,
   type SpendFilter,
 } from "@/lib/spends";
+import { RosterLog } from "./roster-log";
 
 const PAGE_DAYS = 14;
 const fixTable = {
@@ -115,7 +116,7 @@ export function LogsPage() {
     return [...days].map(([date, d]) => ({ date, ...d }));
   }, [attendance.data]);
 
-  const tabs = money ? ["spends", "stock", "attendance", "fixes"] : ["stock"];
+  const tabs = money ? ["spends", "stock", "attendance", "fixes"] : ["stock", "attendance"];
 
   return (
     <div className="animate-rise">
@@ -131,7 +132,7 @@ export function LogsPage() {
         <TabsList className="max-w-full overflow-x-auto">
           {money ? <TabsTrigger value="spends">Spends</TabsTrigger> : null}
           <TabsTrigger value="stock">Stock</TabsTrigger>
-          {money ? <TabsTrigger value="attendance">Attendance</TabsTrigger> : null}
+          <TabsTrigger value="attendance">Attendance</TabsTrigger>
           {money ? <TabsTrigger value="fixes">Fixes</TabsTrigger> : null}
         </TabsList>
 
@@ -211,6 +212,12 @@ export function LogsPage() {
             />
           )}
         </TabsContent>
+
+        {money ? null : (
+          <TabsContent value="attendance">
+            <RosterLog projectId={id} />
+          </TabsContent>
+        )}
 
         {money ? (
           <TabsContent value="attendance">

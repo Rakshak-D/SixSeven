@@ -1,41 +1,16 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Field, FormError, firstProblem, TextArea } from "@/components/forms";
+import { ProofPhoto } from "@/components/photos/proof-photo";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChecklists, useReviewChecklistItem, useTimeline } from "@/hooks/use-project-data";
 import { activeItems, latestSubmission, type VerifiedItem } from "@/lib/checklist";
 import { istDateOf } from "@/lib/dates";
 import { formatShortDate, formatTimeIst } from "@/lib/format";
-import { mocksEnabled } from "@/mocks";
 import type { ProgressResponse } from "@/shared/schemas/progress";
-
-/** A proof photo. If it cannot load (demo data has no image files), say so instead of a broken icon. */
-function Proof({ url }: { url: string }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-secondary">
-      {failed ? (
-        <ImageOff
-          role="img"
-          aria-label={mocksEnabled ? "Demo photo, no image file" : "Photo not available"}
-          className="size-6 text-muted-foreground"
-        />
-      ) : (
-        // biome-ignore lint/performance/noImgElement: protected same-origin photo, sized by the box
-        <img
-          src={url}
-          alt="Proof of completed work"
-          className="size-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      )}
-    </span>
-  );
-}
 
 function ReviewCard({
   projectId,
@@ -82,7 +57,7 @@ function ReviewCard({
           <p className="mt-3 text-[15px]">{proof.note}</p>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {proof.photos.map((photo) => (
-              <Proof key={photo.id} url={photo.url} />
+              <ProofPhoto key={photo.id} url={photo.url} alt="Proof of completed work" />
             ))}
           </div>
         </>
