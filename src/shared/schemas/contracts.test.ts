@@ -166,8 +166,45 @@ describe("auth, reports and corrections", () => {
       false,
     );
     expect(SummaryResponse.safeParse({ ...base, role: "owner" }).success).toBe(false);
-    expect(SummaryResponse.safeParse({ ...base, role: "owner", spendSplit }).success).toBe(true);
+    expect(
+      SummaryResponse.safeParse({ ...base, role: "owner", spendSplit, spendByWeek: [] }).success,
+    ).toBe(true);
     expectTypeOf<Extract<SummaryResponse, { role: "engineer" }>>().not.toHaveProperty("spendSplit");
+  });
+
+  it("validates role-specific weekly expenditure summaries", () => {
+    const base = {
+      budgetPaise: 100,
+      spendPaise: 40,
+      burnRatePaisePerDay: 10,
+      materialVariance: [],
+      stockAlerts: [],
+    };
+    const week = { weekStart: "2026-11-23", materialsPaise: 15, wagesPaise: 20, otherPaise: 5 };
+    const owner = {
+      ...base,
+      role: "owner",
+      spendSplit: { materialsPaise: 15, labourPaise: 20, otherPaise: 5 },
+      spendByWeek: [week],
+    };
+    const engineer = {
+      ...base,
+      role: "engineer",
+      spendByWeek: [{ weekStart: "2026-11-23", spendPaise: 40 }],
+    };
+    expect(SummaryResponse.safeParse(owner).success).toBe(true);
+    expect(SummaryResponse.safeParse(engineer).success).toBe(true);
+    expect(SummaryResponse.safeParse({ ...engineer, spendByWeek: [week] }).success).toBe(false);
+    expect(
+      SummaryResponse.safeParse({ ...owner, spendByWeek: [{ ...week, weekStart: "2026-11-24" }] })
+        .success,
+    ).toBe(false);
+    expectTypeOf<
+      Extract<SummaryResponse, { role: "engineer" }>["spendByWeek"][number]
+    >().toHaveProperty("spendPaise");
+    expectTypeOf<
+      Extract<SummaryResponse, { role: "owner" }>["spendByWeek"][number]
+    >().toHaveProperty("wagesPaise");
   });
 
   it("validates wage modes and dates, and permits signed dues", () => {
