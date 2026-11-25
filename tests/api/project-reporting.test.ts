@@ -476,6 +476,12 @@ describe("progress photo storage and project timeline", () => {
     expect(photoResponse.headers.get("cache-control")).toBe("private, no-store");
     expect(photoResponse.headers.get("x-content-type-options")).toBe("nosniff");
     expect(Buffer.from(await photoResponse.arrayBuffer())).toEqual(pngBytes);
+    const otherProjectId = await newProject(today);
+    await expectError(
+      await api(`/projects/${otherProjectId}/photos/${created.photos[0]?.id}`, owner),
+      404,
+      "NOT_FOUND",
+    );
     await expectError(
       await api(`/projects/${projectId}/photos/${created.photos[0]?.id}`, outsider),
       404,
