@@ -219,8 +219,20 @@ describe("auth, reports and corrections", () => {
       mode: "upi",
       paidOn: dates.to,
     };
-    expect(CreateWagePaymentInput.safeParse(payment).success).toBe(true);
-    expect(CreateWagePaymentInput.safeParse({ ...payment, mode: "cheque" }).success).toBe(false);
+    for (const [mode, reference] of [
+      ["cash", undefined],
+      ["upi", "202611250001"],
+      ["bank", "ABCD1234"],
+      ["cheque", "000123"],
+    ] as const) {
+      expect(CreateWagePaymentInput.safeParse({ ...payment, mode, reference }).success).toBe(true);
+      if (mode !== "cash") {
+        expect(CreateWagePaymentInput.safeParse({ ...payment, mode }).success).toBe(false);
+        expect(
+          CreateWagePaymentInput.safeParse({ ...payment, mode, reference: "A-B" }).success,
+        ).toBe(false);
+      }
+    }
     expect(
       WageSheetResponse.safeParse({
         ...dates,

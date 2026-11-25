@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Id, IsoDate, Label, Paise, PositivePaise, SignedPaise, Timestamp } from "./common";
 
 const PaymentKind = z.enum(["wage", "advance"]);
-const PaymentMode = z.enum(["cash", "upi", "bank"]);
+const PaymentMode = z.enum(["cash", "upi", "bank", "cheque"]);
 const payment = {
   workerId: Id,
   amountPaise: PositivePaise,
@@ -10,7 +10,27 @@ const payment = {
   mode: PaymentMode,
   paidOn: IsoDate,
 };
-export const CreateWagePaymentInput = z.strictObject({ ...payment, reference: Label.optional() });
+const paymentReferences = {
+  upi: { pattern: /^[0-9]{12}$/, message: "Enter a 12-digit UPI transaction reference" },
+  bank: {
+    pattern: /^[A-Za-z0-9]{6,22}$/,
+    message: "Enter a 6–22 character alphanumeric bank reference",
+  },
+  cheque: { pattern: /^[0-9]{6}$/, message: "Enter a 6-digit cheque number" },
+};
+export const CreateWagePaymentInput = z
+  .strictObject({
+    ...payment,
+    reference: Label.optional().describe(
+      "UPI: 12 digits. Bank: 6–22 alphanumeric characters. Cheque: 6 digits. Cash: optional.",
+    ),
+  })
+  .superRefine(({ mode, reference }, ctx) => {
+    if (mode === "cash") return;
+    const { pattern, message } = paymentReferences[mode];
+    if (!reference || !pattern.test(reference))
+      ctx.addIssue({ code: "custom", path: ["reference"], message });
+  });
 export const WagePaymentResponse = z.strictObject({
   id: Id,
   ...payment,

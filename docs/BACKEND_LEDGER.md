@@ -2,6 +2,13 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Request #9 wage payment modes
+
+- Timestamp: 2026-11-26 IST. Branch: `be/wage-payment-modes`.
+- Added cheque and mode-specific references on new wage and advance records. Clear validation errors return on `reference`. Preserved historical values by adding the PostgreSQL check as `NOT VALID`, which applies to new rows without scanning or rewriting old ones.
+- Frontend handoff: in `src/lib/spends.ts`, add `cheque: "Cheque"` to `modeLabel` to resolve TS7053. In `src/components/wages/wages-page.tsx`, offer cheque, make UPI/bank/cheque references required with mode-specific validation, and keep references as strings to preserve leading zeros.
+- Keep the PR in draft until the frontend consumer changes and full CI passes. Regenerate this unmerged migration if another migration is integrated first.
+
 ## Entry — Request #11 engineer attendance roster
 
 - Timestamp: 2026-11-26 IST. Branch: `be/attendance-roster`.

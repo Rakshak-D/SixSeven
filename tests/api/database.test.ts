@@ -88,8 +88,8 @@ it("creates project-scoped append-only attendance, wage and correction tables", 
   );
 
   const paymentId = crypto.randomUUID();
-  await sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, created_by)
-    values (${paymentId}, 'demo-greenfield', ${workerId}, 25000, 'wage', 'upi', '2026-11-25', ${contractor.id})`;
+  await sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, reference, created_by)
+    values (${paymentId}, 'demo-greenfield', ${workerId}, 25000, 'wage', 'upi', '2026-11-25', '202611250003', ${contractor.id})`;
   const adjustmentId = crypto.randomUUID();
   await sql`insert into adjustments (id, project_id, target_table, target_id, old_value, new_value, reason, actor_id)
     values (${adjustmentId}, 'demo-greenfield', 'attendance', ${attendanceId}, 1, 2, 'Verified signed site sheet', ${contractor.id})`;

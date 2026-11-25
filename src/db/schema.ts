@@ -28,7 +28,7 @@ export const projectRole = pgEnum("project_role", [
 ]);
 export const movementType = pgEnum("movement_type", ["delivery", "usage", "adjustment"]);
 export const wagePaymentKind = pgEnum("wage_payment_kind", ["wage", "advance"]);
-export const wagePaymentMode = pgEnum("wage_payment_mode", ["cash", "upi", "bank"]);
+export const wagePaymentMode = pgEnum("wage_payment_mode", ["cash", "upi", "bank", "cheque"]);
 export const adjustmentTarget = pgEnum("adjustment_target", [
   "stock_movements",
   "attendance",
@@ -184,6 +184,15 @@ export const wagePayments = pgTable(
     index("wage_payments_project_day_idx").on(t.projectId, t.paidOn, t.workerId),
     index("wage_payments_worker_day_idx").on(t.projectId, t.workerId, t.paidOn),
     check("wage_payment_amount_paise_valid", sql`${t.amountPaise} between 1 and 9007199254740991`),
+    check(
+      "wage_payment_reference_by_mode",
+      sql`case ${t.mode}::text
+      when 'cash' then true
+      when 'upi' then ${t.reference} is not null and ${t.reference} ~ '^[0-9]{12}$'
+      when 'bank' then ${t.reference} is not null and ${t.reference} ~ '^[A-Za-z0-9]{6,22}$'
+      when 'cheque' then ${t.reference} is not null and ${t.reference} ~ '^[0-9]{6}$'
+      else false end`,
+    ),
   ],
 );
 

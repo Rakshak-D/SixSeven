@@ -359,7 +359,7 @@ async function seed() {
             kind: "wage",
             mode: "bank",
             paidOn: "2026-11-22",
-            reference: "DEMO-WAGE-001",
+            reference: "DEMOWAGE001",
           },
         },
         {

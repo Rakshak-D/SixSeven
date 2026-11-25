@@ -279,6 +279,7 @@ describe("project financial summary", () => {
       kind: "wage",
       mode: "upi",
       paidOn: today,
+      reference: "202611250002",
     });
     expect(wageResponse.status).toBe(201);
     const wagePayment = WagePaymentResponse.parse(await wageResponse.json());
