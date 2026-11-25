@@ -32,7 +32,7 @@ The development seed provisions synthetic `DemoAccountEmail` entries with corres
 
 ## Domain operations
 
-All rows below have an available shared contract. The four project operations are verified in M2. The eight M3 operations for materials, workers, deliveries, usages, stock and movement history are verified by [PostgreSQL CI #19](https://github.com/Rakshak-D/SixSeven/actions/runs/45598875957). M4 attendance, wage payment, correction and wage-sheet handlers are implemented on `be/labour-accounting`; PostgreSQL CI verification is pending. Later operations remain planned. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer. Frontend integration is tracked separately in the frontend ledger.
+All rows below have an available shared contract. The four project operations are verified in M2. The eight M3 operations for materials, workers, deliveries, usages, stock and movement history are verified by [PostgreSQL CI #19](https://github.com/Rakshak-D/SixSeven/actions/runs/45598875957). M4 attendance, wage payment, correction and wage-sheet handlers are implemented and verified against PostgreSQL by [PR #11 CI #28](https://github.com/Rakshak-D/SixSeven/actions/runs/45610135246); merge and main CI remain pending. Later operations remain planned. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer. Frontend integration is tracked separately in the frontend ledger.
 
 | Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
 |---|---|---|---|---|---|---|

@@ -2,20 +2,20 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
-## Entry — M4 PostgreSQL CI corrections
+## Entry — M4 PostgreSQL CI correction and verification
 
-- Timestamp: 2026-11-25 17:23:24+05:30
+- Timestamp: 2026-11-25 17:35:58+05:30
 - Milestone/task ID: M4 verification follow-up
 - Branch: be/labour-accounting
 - Scope: fix defects exposed by the first PostgreSQL-backed PR run and tighten effective-history verification.
 - Files affected: labour list services, correction history ordering, PostgreSQL integration tests, and API documentation.
 - API or database changes: attendance and wage-payment history now read originals and their effective corrections within repeatable-read, read-only transactions. Payment paise are parsed to safe JSON numbers. Adjustment history orders by the identity sequence used for effective correction selection.
-- Verification commands and outcomes: PR #11 CI run #27 passed Biome, typecheck, migration 0003, migration-upgrade, and two-run seed idempotence; Vitest reported 77 passed and 4 failed. The four failures exposed a string-valued effective paise response, the attendance effective-value read path, a reversed newest-first history assertion, and a PDF assertion that searched raw encoded bytes. After fixes, local Biome, typecheck, 33 shared/OpenAPI/export tests, and production build passed. The PostgreSQL suite has not yet rerun.
+- Verification commands and outcomes: PR #11 CI run #27 passed Biome, typecheck, migration 0003, migration-upgrade, and two-run seed idempotence; Vitest reported 77 passed and 4 failed. The failures exposed string-valued effective paise, the attendance effective-value read, a reversed newest-first assertion, and PDF text searched in raw encoded bytes. After fixes, local Biome, typecheck, 33 shared/OpenAPI/export tests, and production build passed. PR #11 CI run #28 passed all steps, including PostgreSQL migration, migration-upgrade, twice-seeded fixture comparison, and 81 tests across 10 files.
 - Dependencies added: none.
-- Known limitations: all four PostgreSQL test failures need confirmation against a fresh CI run; merge is not authorized until that run passes.
+- Known limitations: post-merge main CI remains to be verified. The CI PostgreSQL 16 service was disposable; no local database was started.
 - Frontend implications: no frontend implementation or frontend ledger changes; response shapes remain the published contracts.
-- Commit or PR reference: [PR #11](https://github.com/Rakshak-D/SixSeven/pull/11), initial CI run #27.
-- Next action: publish the fix, rerun the complete PostgreSQL CI suite, and resolve any remaining failures.
+- Commit or PR reference: [PR #11](https://github.com/Rakshak-D/SixSeven/pull/11), current reviewed head `b324994428648d33a430c56cb1790cb9a7815f15`; CI run #28 passed.
+- Next action: verify the exact PR head and diff, merge with the established merge-commit strategy, then verify main CI.
 
 ## Entry — M4 labour accounting implementation
 
