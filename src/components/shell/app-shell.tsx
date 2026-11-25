@@ -11,6 +11,7 @@ import { useProjects } from "@/hooks/use-projects";
 import { ApiClientError } from "@/lib/api/client";
 import { mocksEnabled } from "@/mocks";
 import { ActionSheet } from "./action-sheet";
+import { AiAssistantWidget } from "./ai-assistant-widget";
 import { Dock } from "./dock";
 import { activeTabIndex, roleNav } from "./nav";
 import { ProjectProvider } from "./project-context";
@@ -120,6 +121,7 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         open={actionOpen}
         onOpenChange={setActionOpen}
       />
+      <AiAssistantWidget />
     </ProjectProvider>
   );
 }

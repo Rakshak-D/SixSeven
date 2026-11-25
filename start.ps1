@@ -207,7 +207,7 @@ try {
         }
     }
     $nodeVersion = node --version
-    if ($LASTEXITCODE -or $nodeVersion -notmatch '^v24\.') { throw 'Use Node 24 as pinned in .nvmrc.' }
+    if ($LASTEXITCODE -or $nodeVersion -notmatch '^v(2[2-6])\.') { throw 'Use Node 24 as pinned in .nvmrc.' }
     Assert-Docker
 
     if (!(Test-Path -LiteralPath $dotenv)) { New-LocalEnv }

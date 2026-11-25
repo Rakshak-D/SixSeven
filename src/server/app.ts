@@ -2,6 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { errorHandler, notFound, validationHook } from "./middleware/errors";
 import { activity } from "./routes/activity";
 import { adjustments } from "./routes/adjustments";
+import { aiRouter } from "./routes/ai";
 import { attendance } from "./routes/attendance";
 import { checklists } from "./routes/checklists";
 import { deliveries } from "./routes/deliveries";
@@ -39,6 +40,7 @@ app.route("/", progress);
 app.route("/", proposals);
 app.route("/", activity);
 app.route("/", checklists);
+app.route("/", aiRouter);
 
 app.doc("/doc", {
   openapi: "3.0.0",
