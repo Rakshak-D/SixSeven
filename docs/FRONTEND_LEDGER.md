@@ -27,10 +27,57 @@ proposed method + path, fields, priority / blocking.
 | 7 | **Task completion with photo proof, checked by the engineer.** Item status `todo / doing / waiting / done / sent_back`. Contractor: `POST /checklist-items/:id/start`, `POST /checklist-items/:id/completion` (multipart, 1 photo required, note required) → `waiting`. Engineer: `POST /checklist-items/:id/review {decision: accept / send_back, note}` (note ≥ 10 chars for send back). Proof photos join the timeline. | Today → Tasks, Site, owner progress | High; core of the owner view | Open |
 | 8 | **Checklist edits need a reason and keep history.** Engineer: add item `POST /projects/:id/checklist-items {phase, task, reason}`, rename `PATCH /checklist-items/:id {task, reason}`, delete (soft) with reason. Each item returns its change history. | Site checklist | Medium | Open |
 | 9 | **Payment modes and references:** add `Cheque`; reference required by mode: UPI 12-digit transaction ID, Bank UTR/reference 6–22 letters or digits, Cheque 6-digit number, Cash none. Changes `wages.CreateWagePaymentInput`. | Wages → record payment | Medium | Open |
-| 10 | **Weekly spend series in the summary** for the overview chart: `spendByWeek: [{weekStart, materialsPaise, wagesPaise, otherPaise}]` (engineer gets totals only). Stock-over-time and checklist progress the frontend can derive from movements and checklist reads. | Owner overview charts | Medium | Open |
+| 10 | **Weekly spend series in the summary** for the overview chart: `spendByWeek: [{weekStart, materialsPaise, wagesPaise, otherPaise}]` (engineer gets totals only). Stock-over-time and checklist progress the frontend can derive from movements and checklist reads. | Owner overview charts | Medium | Contract available (`SummaryResponse.spendByWeek`, PR #13); backend planned for M5 |
 | 11 | **Engineer can read the dated attendance log without money fields** (who came each day), so the engineer's Logs screen matches the owner's. | Logs screen | Low | Open |
+| 12 | **Project team list with names and phone numbers** for the dashboard's Team panel (tap to call the engineer or contractor). Today there is no route that lists members, and `ProjectMemberResponse` is only `{userId, role}`. Proposed: `GET /projects/:id/members` for any member, returning `[{userId, role, name, phone?}]`; the phone is optional, set by the user (`PATCH /me {phone}`, Indian mobile format), and visible only to members of a shared project. Until it lands the panel shows roles only. | Dashboard → Team panel | Low | Open |
+| 13 | **Anti-fraud: per-bag codes at delivery.** The engineer scans each bag's code (the brand's printed QR, or a numbered tamper-evident sticker we supply) while verifying a delivery, and the codes are linked to that delivery. Proposed: `POST /deliveries/:id/bag-codes {codes[]}` for the engineer; a code already known in the project gives 409. The delivery returns `verifiedBy`, `verifiedAt`, `bagCodeCount`. | Today → Delivery, engineer verify | High; core of the anti-fraud plan | Open |
+| 14 | **Anti-fraud: bag codes required at use.** `CreateUsageInput` gains `bagCodes[]` (one per bag used). It saves only if every code belongs to a delivery of that material in the project and is unused; otherwise it is refused with distinct error codes (`BAG_CODE_UNKNOWN`, `BAG_CODE_USED`, `BAG_CODE_WRONG_MATERIAL`). Later: an empty-bag count checked against bags used. | Today → Usage | High | Open |
+| 15 | **Anti-fraud: steel hold point.** A checklist item flagged as a pour cannot move to done ("ready to pour") until the engineer attaches photos of the bar markings (brand, BIS mark, MTC number). Proposed: a `requiresSteelProof` flag on checklist items and a refusal code when proof is missing. | Site → checklist | Medium | Open |
+| 16 | **Approved suppliers and locked bank details.** The owner approves each supplier (name, GSTIN, bank account). A bank change is a pending request that needs owner approval, waits 24 to 48 hours, and alerts the owner. Contractors cannot read bank fields or call these routes. Proposed: `GET/POST /projects/:id/suppliers`, `POST /suppliers/:id/bank-change-requests`, `POST /bank-change-requests/:id/approve`. | Owner → suppliers | High | Open |
+| 17 | **Pre-approved orders, spending rules and a delegate.** The owner creates orders `{supplierId, materialId, qty, maxUnitPricePaise}`, sets rules `{perBillCapPaise, perWeekCapPaise}`, and may name one delegate (a family member, or the engineer up to a limit; never the contractor). Proposed: `POST /projects/:id/orders`, `PUT /projects/:id/payment-rules`, `PUT /projects/:id/delegate`. | Owner → orders and rules | High | Open |
+| 18 | **Mock payment release.** When the engineer verifies a delivery that matches an order (supplier, quantity, price cap) and fits the rules, the server creates a mock payment for an amount it calculates, with an idempotency key. Anything else waits in an owner pending list: `GET /projects/:id/payments?status=pending`, `POST /payments/approve {ids[]}` (approve all), `PUT /projects/:id/auto-pay {paused}`. Every auto-payment appears in activity. Responses say the provider is a mock. This changes the specification rule that contractors record payments; it needs technical-lead approval. | Owner → approvals, digest | High; changes a P0 rule | Open |
+| 19 | **Fraud flags** in the summary for owners: new supplier, bank change, a rate far above recent buys, a payment with no verified delivery, an entry with no engineer confirmation, repeated delays. Proposed `fraudFlags: [{kind, refType, refId, raisedOn}]` on `SummaryResponse` for owners only. | Owner dashboard | Medium | Open |
 
 ## Entries
+
+### 2026-11-25 19:42 IST · Anti-fraud plan into AGENTS.md, charts and type settled
+
+- **Branch / commit:** `fe/workflow-requests`, fast-forwarded to `main` at `c56504f`.
+- **Handoff to Codex (AGENTS.md edited by Claude):** the frontend developer approved the team doc
+  "SixSeven: Anti-Fraud and Payments Plan" and asked Claude to record it in the AGENTS.md files
+  directly. This is a one-off exception to the rule that Codex maintains them; please review it.
+  Files: root `AGENTS.md` (new "Planned feature: anti-fraud and payments" section), `src/server/`,
+  `src/db/`, `src/shared/`, `src/app/` and `tests/` AGENTS.md (one planned-rules paragraph each). Every
+  addition is marked PLANNED and not yet authorized. Expected from Codex: fold the plan into
+  `docs/SPECIFICATION.md` (including the contractor payment rule change, which needs technical-lead
+  approval), `docs/DECISIONS.md`, a contract and a milestone, then answer requests 13 to 19.
+- **Design decisions:** headings in Newsreader, body in Geist. Charts are smooth lines with an area
+  fill that fades out, light vertical guides, a ringed end dot with the value above it, and the current
+  point marked in the accent colour; dragging moves the dot back in time. There is no planned or expected
+  spend: projects have no spend plan, so the hatched "planned" bars are gone. The overview chart is
+  total spent over time from `spendByWeek` (request 10, contract available). The hero number is now
+  "left in budget", so the chart and the hero don't repeat the same figure.
+- **Files changed:** `docs/FRONTEND_LEDGER.md` (requests 13 to 19, request 10 status, this entry), the
+  six AGENTS.md files above.
+- **Mocked vs live:** nothing in `src/` yet; the direction board is a private design canvas.
+- **Tests:** none for docs-only changes.
+- **Next:** Codex reviews the AGENTS.md handoff; frontend starts plan stage 1 (design tokens).
+
+### 2026-11-25 17:30 IST · Visual direction reset
+
+- **Branch / commit:** `fe/workflow-requests` (ledger only).
+- **Done:** the frontend developer dropped the "Slate and chalk" look (yellow action colour, earlier
+  type) entirely; the round 2 workflow stays. New direction from four references: modern serif for
+  headings, modern sans for body, warm near-black and cream themes (both first-class), one orange
+  action colour, a grainy gradient orb as decoration only, floating top navigation on desktop and a
+  floating bottom dock on phone, solid surfaces (no glass blur), smooth motion that stops under
+  reduced motion. A direction board (static page, not app code) comes next for review.
+- **Files changed:** `docs/FRONTEND_LEDGER.md` (backend request 12, this entry).
+- **API dependencies:** request 12 (team list with names and phones); weekly spend chart still needs
+  request 10.
+- **Mocked vs live:** nothing in `src/` yet.
+- **Tests:** none for a docs-only change.
+- **Next:** direction board for review, then the plan's staged PRs.
 
 ### 2026-11-25 16:40 IST · Prototype round 2 from the frontend developer's review
 
