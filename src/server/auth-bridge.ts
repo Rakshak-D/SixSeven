@@ -60,12 +60,16 @@ export async function authHandler(request: Request) {
     if (url.pathname === "/api/auth/sign-out") {
       // The native sign-out handler may report success even if session deletion failed.
       // Read the same cookie via a GET with refresh disabled before acknowledging logout.
-      const session = await auth.api.getSession({
-        headers: request.headers,
-        query: { disableCookieCache: true, disableRefresh: true },
-      });
-      if (session)
+      try {
+        const session = await auth.api.getSession({
+          headers: request.headers,
+          query: { disableCookieCache: true, disableRefresh: true },
+        });
+        if (session)
+          return errorResponse(500, "INTERNAL", "Unable to invalidate the session", cookies);
+      } catch {
         return errorResponse(500, "INTERNAL", "Unable to invalidate the session", cookies);
+      }
     }
 
     // Preserve each Set-Cookie line. The body has changed, so native entity headers no longer apply.

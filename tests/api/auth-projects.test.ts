@@ -152,6 +152,7 @@ describe("email/password authentication", () => {
       post: true,
     });
     expect(rejected.status).toBe(403);
+    expect(AuthErrorResponse.parse(await rejected.json()).code).toBe("INVALID_ORIGIN");
     const response = await authRequest("sign-out", { cookie, post: true });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });

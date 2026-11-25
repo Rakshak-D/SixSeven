@@ -11,6 +11,7 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Files: database config, schema, seed and migrations; Next auth bridge and backend auth/project services and routes; API integration tests, PostgreSQL CI and development docs.
 - API or database changes: enabled the three published auth operations and four project operations. Added migrations 0001_auth_projects and 0002_stock_ledger_guards. Project creation, membership assignment and audit writes are transactional.
 - Verification: 28 shared tests, typecheck, production build, local OpenAPI/registration smoke check and Compose configuration parsing passed. Database integration runs in CI against a disposable PostgreSQL 16 service.
+- First hosted run #15 passed migrations, both seed executions and project/database cases. Two assertions caught Better Auth's default origin-check bypass in test mode. The configuration now enables native origin and CSRF checks explicitly in every environment. The same assertions gate the corrected run.
 - Dependencies added: none.
 - Limits: no authorized isolated local PostgreSQL instance was available. No local database or Docker service was started. Delivery and usage business workflows remain planned.
 - Frontend implications: the published auth and project response contracts are unchanged. The backend exposes real cookies and project-scoped roles.

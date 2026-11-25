@@ -35,7 +35,12 @@ export function createAuth(db: Db | Transaction, { provisioning = false } = {}) 
     basePath: "/api/auth",
     secret,
     trustedOrigins: [baseURL],
-    advanced: { useSecureCookies: baseURL.startsWith("https:") },
+    advanced: {
+      useSecureCookies: baseURL.startsWith("https:"),
+      // Better Auth skips origin checks by default in test mode.
+      disableOriginCheck: false,
+      disableCSRFCheck: false,
+    },
     emailAndPassword: { enabled: true, disableSignUp: !provisioning, autoSignIn: false },
     session: {
       expiresIn: 60 * 60 * 24 * 7,
