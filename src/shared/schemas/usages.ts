@@ -5,7 +5,7 @@ export const CreateUsageInput = z.strictObject({
   materialId: Id,
   qty: PositiveQty,
   occurredOn: IsoDate,
-  note: Note.optional(),
+  note: Note,
 });
 export const UsageResponse = z.strictObject({
   id: Id,

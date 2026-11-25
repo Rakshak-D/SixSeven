@@ -260,7 +260,10 @@ describe("progress and reviewed decisions", () => {
 
   it("validates proposal decisions and their response states", () => {
     expect(DecideProposalInput.safeParse({ decision: "accept" }).success).toBe(false);
-    expect(DecideProposalInput.safeParse({ decision: "approve" }).success).toBe(true);
+    expect(DecideProposalInput.safeParse({ decision: "approve" }).success).toBe(false);
+    expect(
+      DecideProposalInput.safeParse({ decision: "approve", note: "Approved on site" }).success,
+    ).toBe(true);
     expect(
       ProposalResponse.safeParse({
         id: "p1",

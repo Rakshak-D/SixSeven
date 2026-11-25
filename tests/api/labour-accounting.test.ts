@@ -449,6 +449,7 @@ describe("attendance and wage accounting", () => {
       qty: 10.123,
       unitCostPaise: 4_150,
       supplier: "Correction yard",
+      note: "Synthetic correction delivery",
       challanNo: crypto.randomUUID(),
       occurredOn: day,
     });
@@ -662,12 +663,14 @@ describe("attendance and wage accounting", () => {
           qty: 5.125,
           unitCostPaise: 4_150,
           supplier: "Zero reversal yard",
+          note: "Synthetic reversal delivery",
           challanNo: crypto.randomUUID(),
           occurredOn: "2026-11-25",
         })
       ).json(),
     );
     const usage = await call(projectId, "usages", contractor, {
+      note: "Synthetic usage reversal",
       materialId: material.id,
       qty: 2.125,
       occurredOn: "2026-11-25",
@@ -819,6 +822,7 @@ describe("attendance and wage accounting", () => {
           qty: 20.5,
           unitCostPaise: 4_150,
           supplier: "Audit rollback yard",
+          note: "Synthetic rollback delivery",
           challanNo: crypto.randomUUID(),
           occurredOn: "2026-11-25",
         })

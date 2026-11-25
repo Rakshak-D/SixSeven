@@ -2,6 +2,11 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Required operational notes (#21)
+
+- Branch `be/required-operation-notes`. New delivery and usage writes, checklist acceptance and proposal decisions require `Note`. Proposal decisions store the note in their audit event. Historical responses remain readable. Change-request actions already require notes and wage payment notes are in #29.
+- Frontend handoff: add a nonblank decision note to the proposal flow in `src/components/owner/approvals-list.tsx` and submit it through `src/hooks/use-project-data.ts`. Verify that all delivery, usage and checklist review submissions and fixtures send notes. Keep the rollout in draft until the proposal consumer is ready.
+
 ## Entry — Request #4 engineer-led project setup
 
 - Timestamp: 2026-11-26 IST. Branch: `be/project-invitations`.
