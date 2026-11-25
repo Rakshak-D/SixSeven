@@ -8,6 +8,7 @@ import type {
   AttendanceListQuery,
   AttendanceListResponse,
   AttendanceResponse,
+  AttendanceRosterResponse,
   CreateAttendanceInput,
 } from "@/shared/schemas/attendance";
 import { DailyRatePaise, HalfDays } from "@/shared/schemas/common";
@@ -129,14 +130,7 @@ export async function listAttendance(
         createdAt: attendance.createdAt,
       })
       .from(attendance)
-      .where(
-        and(
-          eq(attendance.projectId, projectId),
-          query.from ? sql`${attendance.workDate} >= ${query.from}::date` : undefined,
-          query.to ? sql`${attendance.workDate} <= ${query.to}::date` : undefined,
-          query.workerId ? eq(attendance.workerId, query.workerId) : undefined,
-        ),
-      )
+      .where(attendanceFilter(projectId, query))
       .orderBy(desc(attendance.workDate), desc(attendance.createdAt), desc(attendance.id));
 
     const corrections = rows.length
@@ -165,6 +159,58 @@ export async function listAttendance(
       effectiveHalfDays: HalfDays.parse(effective.get(row.id) ?? row.halfDays),
       ratePaise: DailyRatePaise.parse(row.ratePaise),
       createdAt: row.createdAt.toISOString(),
+    }));
+  });
+}
+
+function attendanceFilter(projectId: string, query: AttendanceListQuery) {
+  return and(
+    eq(attendance.projectId, projectId),
+    query.from ? sql`${attendance.workDate} >= ${query.from}::date` : undefined,
+    query.to ? sql`${attendance.workDate} <= ${query.to}::date` : undefined,
+    query.workerId ? eq(attendance.workerId, query.workerId) : undefined,
+  );
+}
+
+export async function listAttendanceRoster(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+  query: AttendanceListQuery,
+): Promise<AttendanceRosterResponse> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`set transaction isolation level repeatable read read only`);
+    await requireProjectAccess(tx, actor, projectId);
+    const latest = tx
+      .select({ halfDays: adjustments.newValue })
+      .from(adjustments)
+      .where(
+        and(
+          eq(adjustments.projectId, attendance.projectId),
+          eq(adjustments.targetTable, "attendance"),
+          eq(adjustments.targetId, attendance.id),
+        ),
+      )
+      .orderBy(desc(adjustments.sequenceNo))
+      .limit(1);
+    const rows = await tx
+      .select({
+        id: attendance.id,
+        workerId: attendance.workerId,
+        workerName: workers.name,
+        workDate: attendance.workDate,
+        effectiveHalfDays: sql<number>`coalesce((${latest})::integer, ${attendance.halfDays})`,
+      })
+      .from(attendance)
+      .innerJoin(
+        workers,
+        and(eq(workers.projectId, attendance.projectId), eq(workers.id, attendance.workerId)),
+      )
+      .where(attendanceFilter(projectId, query))
+      .orderBy(desc(attendance.workDate), desc(attendance.createdAt), desc(attendance.id));
+    return rows.map((row) => ({
+      ...row,
+      effectiveHalfDays: HalfDays.parse(row.effectiveHalfDays),
     }));
   });
 }
