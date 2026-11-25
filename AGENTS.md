@@ -57,6 +57,20 @@ The shared Zod schemas in src/shared/** and docs/API.md are the single API contr
 
 Claude may use only development fixtures derived from the agreed shared contract. Mark mock data clearly in the UI and in FRONTEND_LEDGER.md; never return a fake success that looks live. Keep contract availability, backend readiness, and frontend integration as separate statuses. Breaking contract changes require coordination and a contract-only integration step before dependent work is merged.
 
+## Planned feature: anti-fraud and payments
+
+Status: PLANNED. The frontend developer approved this direction on 2026-11-25 in the team doc "SixSeven: Anti-Fraud and Payments Plan". It is not yet in docs/SPECIFICATION.md or docs/API.md, and no milestone is assigned. Before any implementation, Codex folds it into the specification, the shared contract and a milestone. Backend requests 13 to 19 in docs/FRONTEND_LEDGER.md carry the details.
+
+The problem it answers: a contractor buys genuine material, shows the owner the real bill, resells the stock and builds with cheaper material. The fix checks material again at the moment of use and keeps the contractor out of the money flow. Once authorized, these rules hold:
+
+- The contractor never starts or approves a supplier payment and never sees supplier bank details. Today the specification lets contractors record payments; changing that rule needs technical-lead approval in the specification.
+- A payment is released only for a delivery the engineer verified by scanning each bag's code, to an owner-approved supplier, for an amount the server calculates and caps at the owner's pre-approved order.
+- A usage entry saves only if every scanned bag code belongs to a delivery of that material in the same project and has not been used before.
+- A slab cannot be marked ready to pour until the engineer uploads photos of the steel markings (brand, BIS mark, MTC number).
+- A change to a supplier's bank details needs owner approval, waits through a 24 to 48 hour cooldown and alerts the owner.
+- Slate never holds money. The hackathon build uses a mock payment that the UI labels and that README.md and DISCLOSURES.md disclose. A real build would use a licensed gateway (escrow or a UPI mandate) after a legal check.
+- Never claim fraud is impossible. Collusion between the contractor and the engineer is made visible through flags and the audit trail; it is not prevented.
+
 ## Branches and integration
 
 Use:
