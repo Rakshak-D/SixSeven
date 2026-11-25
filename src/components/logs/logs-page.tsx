@@ -1,6 +1,7 @@
 "use client";
 
 import { SlidersHorizontal } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { type ReactNode, useMemo, useState } from "react";
 import { SpendRow, WageDayRow } from "@/components/data/spend-row";
 import { SpendFilterChips, SpendFilterSheet } from "@/components/filters/spend-filter-sheet";
@@ -117,6 +118,8 @@ export function LogsPage() {
   }, [attendance.data]);
 
   const tabs = money ? ["spends", "stock", "attendance", "fixes"] : ["stock", "attendance"];
+  // Home links straight to a tab with ?tab=.
+  const asked = useSearchParams().get("tab") ?? "";
 
   return (
     <div className="animate-rise">
@@ -128,7 +131,7 @@ export function LogsPage() {
         Every entry by date. Fixes never overwrite: the original stays, with the reason next to it.
       </p>
 
-      <Tabs defaultValue={tabs[0]} className="mt-6">
+      <Tabs defaultValue={tabs.includes(asked) ? asked : tabs[0]} className="mt-6">
         <TabsList className="max-w-full overflow-x-auto">
           {money ? <TabsTrigger value="spends">Spends</TabsTrigger> : null}
           <TabsTrigger value="stock">Stock</TabsTrigger>

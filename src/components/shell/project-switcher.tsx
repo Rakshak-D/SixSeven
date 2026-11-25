@@ -86,8 +86,22 @@ export function ProjectSwitcher({
         <p className="mt-6 font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]">
           This project
         </p>
-        <ul className="mt-2 space-y-1 text-muted-foreground">
-          {["Team", "Invitations", "Project settings"].map((item) => (
+        <Link
+          href={`/projects/${encodeURIComponent(current.id)}/team`}
+          onClick={() => setOpen(false)}
+          className="-mx-3 mt-2 flex min-h-12 items-center rounded-2xl px-3 font-semibold hover:bg-secondary"
+        >
+          {current.role === "engineer" ? "Team and invites" : "Team"}
+        </Link>
+        <Link
+          href="/projects"
+          onClick={() => setOpen(false)}
+          className="-mx-3 flex min-h-12 items-center rounded-2xl px-3 font-semibold hover:bg-secondary"
+        >
+          All projects and invitations
+        </Link>
+        <ul className="space-y-1 text-muted-foreground">
+          {["Project settings"].map((item) => (
             <li key={item} className="flex min-h-12 items-center justify-between">
               <span>{item}</span>
               <span className="text-sm">Not built yet</span>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ZodType } from "zod";
-import { ApiClientError, api } from "@/lib/api/client";
+import { api } from "@/lib/api/client";
+import { failIfInvalid } from "@/lib/api/validate";
 import type { ReviewInput } from "@/lib/checklist";
 import { ActivityResponse } from "@/shared/schemas/activity";
 import {
@@ -159,17 +160,6 @@ export function useDecideProposal(projectId: string) {
       client.invalidateQueries({ queryKey: [projectId, "activity"] });
     },
   });
-}
-
-function failIfInvalid<T>(schema: ZodType<T>, value: unknown) {
-  const checked = schema.safeParse(value);
-  if (checked.success) return checked.data;
-  throw new ApiClientError(
-    400,
-    "VALIDATION_ERROR",
-    checked.error.issues[0]?.message ?? "Check the form",
-    checked.error.issues,
-  );
 }
 
 /**

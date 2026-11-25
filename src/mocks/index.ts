@@ -6,6 +6,7 @@
  */
 import { changeRoutes } from "./change-routes";
 import { checklistRoutes } from "./checklist-routes";
+import { projectRoutes } from "./project-routes";
 import { demoRoutes } from "./routes";
 import type { MockRoute } from "./types";
 import { writeRoutes } from "./write-routes";
@@ -16,6 +17,7 @@ export type { MockRoute } from "./types";
 export const mocksEnabled = process.env.NEXT_PUBLIC_USE_MOCKS === "1";
 
 export const mocks: MockRoute[] = [
+  ...projectRoutes,
   ...demoRoutes,
   ...writeRoutes,
   ...checklistRoutes,

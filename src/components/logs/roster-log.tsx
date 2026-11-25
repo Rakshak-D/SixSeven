@@ -5,7 +5,8 @@ import { FormError } from "@/components/forms";
 import { FixSheet, type FixTarget } from "@/components/today/fix-sheet";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRoster } from "@/hooks/use-project-data";
+import { useChangeRequests, useRoster } from "@/hooks/use-project-data";
+import { isOpen, statusText } from "@/lib/change-requests";
 import { addDays, todayIst } from "@/lib/dates";
 import { formatIsoDate } from "@/lib/format";
 
@@ -15,6 +16,9 @@ const DAYS = 7;
 /** Who came, without pay, for the engineer. A fix goes to the contractor, then the owner. */
 export function RosterLog({ projectId }: { projectId: string }) {
   const roster = useRoster(projectId);
+  const changes = useChangeRequests(projectId);
+  const waitingFor = (entryId: string) =>
+    changes.data?.find((r) => r.kind === "attendance_fix" && r.targetId === entryId && isOpen(r));
   const [fix, setFix] = useState<FixTarget | null>(null);
   if (roster.isPending) return <Skeleton className="mt-6 h-64 rounded-3xl" />;
   if (roster.isError) return <FormError error={roster.error} />;
@@ -33,31 +37,43 @@ export function RosterLog({ projectId }: { projectId: string }) {
           <ul className="divide-y">
             {recent
               .filter((e) => e.workDate === date)
-              .map((e) => (
-                <li key={e.id} className="flex items-center gap-3 py-2">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{e.workerName}</span>
-                    <span className="block text-[15px] text-muted-foreground">
-                      {mark[e.effectiveHalfDays]}
+              .map((e) => {
+                const waiting = waitingFor(e.id);
+                return (
+                  <li key={e.id} className="flex items-center gap-3 py-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{e.workerName}</span>
+                      <span className="block text-[15px] text-muted-foreground">
+                        {mark[e.effectiveHalfDays]}
+                      </span>
+                      {waiting?.kind === "attendance_fix" ? (
+                        <span className="block text-[14px] text-warning">
+                          Fix to {mark[waiting.payload.newValue].toLowerCase()}
+                          {waiting.payload.payFullDay ? ", pay full day" : ""} ·{" "}
+                          {statusText[waiting.status]}
+                        </span>
+                      ) : null}
                     </span>
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    aria-label={`Fix ${e.workerName}, ${formatIsoDate(e.workDate)}`}
-                    onClick={() =>
-                      setFix({
-                        table: "attendance",
-                        id: e.id,
-                        title: `${e.workerName} · ${formatIsoDate(e.workDate)}`,
-                        current: e.effectiveHalfDays,
-                      })
-                    }
-                  >
-                    Fix
-                  </Button>
-                </li>
-              ))}
+                    {waiting ? null : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Fix ${e.workerName}, ${formatIsoDate(e.workDate)}`}
+                        onClick={() =>
+                          setFix({
+                            table: "attendance",
+                            id: e.id,
+                            title: `${e.workerName} · ${formatIsoDate(e.workDate)}`,
+                            current: e.effectiveHalfDays,
+                          })
+                        }
+                      >
+                        Fix
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
           </ul>
         </section>
       ))}
