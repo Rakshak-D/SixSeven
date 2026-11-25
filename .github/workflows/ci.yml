@@ -53,6 +53,10 @@ jobs:
           echo "SLATE_DEMO_PASSWORD=$SLATE_DEMO_PASSWORD" >> "$GITHUB_ENV"
           export SLATE_DEMO_PASSWORD
           pnpm db:seed
+          mkdir -p .cache
+          pnpm exec tsx tests/api/stock-seed-snapshot.ts > .cache/m3-seed-first.json
           pnpm db:seed
+          pnpm exec tsx tests/api/stock-seed-snapshot.ts > .cache/m3-seed-second.json
+          diff -u .cache/m3-seed-first.json .cache/m3-seed-second.json
       - name: Tests (Vitest)
         run: pnpm test

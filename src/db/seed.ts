@@ -1,10 +1,13 @@
 import { and, eq, sql as expression } from "drizzle-orm";
 import { createAuth } from "@/server/auth";
+import { appendStockMovement } from "@/server/services/stock-ledger";
 import { DemoAccountEmail } from "@/shared/schemas/auth";
+import { CreateDeliveryInput } from "@/shared/schemas/deliveries";
+import { CreateUsageInput } from "@/shared/schemas/usages";
 import { account, user } from "./auth-schema";
 import { getDatabase } from "./client";
 import { disposableDatabase } from "./config";
-import { materials, projectMembers, projects, workers } from "./schema";
+import { materials, projectMembers, projects, stockMovements, workers } from "./schema";
 
 const identities = {
   owner: { email: DemoAccountEmail.owner, name: "Demo Owner" },
@@ -12,6 +15,60 @@ const identities = {
   engineer: { email: DemoAccountEmail.engineer, name: "Demo Engineer" },
   isolated: { email: "isolated@demo.invalid", name: "Demo Isolation Contractor" },
 };
+
+const demoDeliveries = [
+  {
+    id: "demo-stock-cement-in",
+    materialId: "demo-cement",
+    qty: 120,
+    unitCostPaise: 41_500,
+    supplier: "Demo Supply Yard",
+    challanNo: "DEMO-001",
+    occurredOn: "2026-11-19",
+  },
+  {
+    id: "demo-stock-sand-in",
+    materialId: "demo-sand",
+    qty: 12.375,
+    unitCostPaise: 125_000,
+    supplier: "Demo Supply Yard",
+    challanNo: "DEMO-002",
+    occurredOn: "2026-11-20",
+  },
+  {
+    id: "demo-stock-steel-in",
+    materialId: "demo-steel",
+    qty: 850,
+    unitCostPaise: 6_800,
+    supplier: "Demo Supply Yard",
+    challanNo: "DEMO-003",
+    occurredOn: "2026-11-21",
+  },
+];
+
+const demoUsages = [
+  {
+    id: "demo-stock-cement-out",
+    materialId: "demo-cement",
+    qty: 104,
+    occurredOn: "2026-11-22",
+    note: "Foundation concrete",
+  },
+  {
+    id: "demo-stock-sand-out",
+    materialId: "demo-sand",
+    qty: 3.125,
+    occurredOn: "2026-11-23",
+    note: "Masonry mortar",
+  },
+  {
+    id: "demo-stock-steel-out",
+    materialId: "demo-steel",
+    qty: 325,
+    occurredOn: "2026-11-24",
+    note: "Plinth reinforcement",
+  },
+];
 
 async function seed() {
   try {
@@ -147,6 +204,40 @@ async function seed() {
           },
         ])
         .onConflictDoNothing();
+      const recorded = await tx
+        .select({ id: stockMovements.id })
+        .from(stockMovements)
+        .where(eq(stockMovements.projectId, projectId));
+      const existingMovementIds = new Set(recorded.map(({ id }) => id));
+      for (const { id, ...input } of demoDeliveries) {
+        if (!existingMovementIds.has(id)) {
+          await appendStockMovement(
+            tx,
+            { userId: contractor },
+            projectId,
+            {
+              ...CreateDeliveryInput.parse(input),
+              type: "delivery",
+            },
+            id,
+          );
+        }
+      }
+      for (const { id, ...input } of demoUsages) {
+        if (!existingMovementIds.has(id)) {
+          await appendStockMovement(
+            tx,
+            { userId: contractor },
+            projectId,
+            {
+              ...CreateUsageInput.parse(input),
+              type: "usage",
+            },
+            id,
+          );
+        }
+      }
+
       await tx
         .insert(workers)
         .values([

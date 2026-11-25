@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M3 material and stock operations
+
+- Timestamp: 2026-11-25 16:20:28+05:30
+- Milestone/task ID: M3
+- Branch: be/material-stock
+- Scope: eight published routes, role checks and exact PostgreSQL stock movements with transactional audit records. Greenfield Home seed now includes six idempotent deliveries and usages.
+- Files: inventory and stock services and routes, seed, PostgreSQL CI and API integration tests, and API/project documentation.
+- API or database changes: existing response schemas and migrations reused. Overflow returns 409 CONFLICT, low-stock comparison is inclusive, and history uses a stable newest-first sort.
+- Verification: 28 shared tests, typecheck and production build passed locally. PostgreSQL integration and concurrent request cases run in CI.
+- Dependencies added: none.
+- Limits: no authorized isolated local PostgreSQL instance was available. General adjustments are deferred.
+- Frontend implications: delivery and usage now return the committed balance; the stock and movement endpoints are backed by PostgreSQL.
+- Git reference: be/material-stock from 825829991eb3109ac6ee30c424a1b513818da87e.
+- Next action: verify the stock and concurrency cases in CI before merging.
+
 ## Entry — M2 auth and project access
 
 - Timestamp: 2026-11-25 15:59:48+05:30

@@ -24,15 +24,15 @@ app.onError(errorHandler);
 app.notFound(notFound);
 
 app.route("/", projects);
+app.route("/", materials);
+app.route("/", workers);
+app.route("/", deliveries);
+app.route("/", usages);
+app.route("/", stock);
 
 for (const router of [
   health,
-  materials,
-  workers,
-  deliveries,
-  usages,
   attendance,
-  stock,
   wagePayments,
   adjustments,
   summary,
