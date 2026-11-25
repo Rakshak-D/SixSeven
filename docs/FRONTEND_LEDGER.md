@@ -57,6 +57,24 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-26 IST · Engineer attendance fix, starting a project, invites, team
+
+- **Branch:** `fe/project-invites`.
+- **Attendance fix (reported by Max):** it sent on demo data but looked broken. It now has a
+  "Fix attendance" button on the engineer's Home (`logs?tab=attendance`), the form opens on a mark
+  that differs from the current one, and a row with a waiting fix says so and hides Fix. On the live
+  server it still needs the change-request routes (backend PR #37).
+- **Team page** (`/projects/[id]/team`): names, roles and tap-to-call from the merged
+  `GET /projects/:id/members` (handoff from PR #28). Setting your own phone is not built.
+- **Start a project and invites: MOCKED, demo data only.** Hidden on the live server, which still
+  makes the creator the contractor. `lib/invitations.ts` is a temporary copy of the shapes in
+  backend PR #30; delete it and import from `shared/schemas/projects` when that merges. Then drop the
+  `mocksEnabled` gates in `project-list.tsx` and `team-page.tsx`.
+- **Not built:** phone invites and the engineer's list of sent invites (request 24); only this
+  visit's invites show. A new project has no note field because `CreateProjectInput` has none.
+- **Checks:** Biome, typecheck, `vitest run src` (87 pass). Playwright on mocks: attendance fix from
+  Home, start a project, invite, accept an invite, the empty project's engineer pages; no page errors.
+
 ### 2026-11-26 IST · Approval chain and medical entries (MOCKED)
 
 - **Branch:** `fe/approval-chain`, built on the contract from PR #34

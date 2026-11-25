@@ -45,8 +45,43 @@ type DemoProjectConfig = {
   share: number;
 };
 
+/**
+ * A project started or joined during this session: no history yet. Its dates for sums start no
+ * later than today, so a project that starts next month still has a current week.
+ */
+export function addDemoProject(input: {
+  id: string;
+  name: string;
+  location: string;
+  role: Role;
+  startDate: string;
+  budgetPaise: number;
+}) {
+  const empty = buildWorld(input.id, 1, 1, 1, 0.5);
+  const w: DemoWorld = {
+    ...empty,
+    start: input.startDate < empty.today ? input.startDate : empty.today,
+    budgetPaise: input.budgetPaise,
+    workers: [],
+    movements: [],
+    attendance: [],
+    payments: [],
+    adjustments: [],
+    proposals: [],
+    checklists: [],
+    progress: [],
+    activity: [],
+    materials: [],
+    effectiveQty: new Map(),
+  };
+  demoProjectConfigs.push({ ...input, seed: 1, days: 1, scale: 1, share: 0.5 });
+  configuredStarts.set(input.id, input.startDate);
+  worlds.set(input.id, w);
+}
+const configuredStarts = new Map<string, string>();
+
 /** One demo project per role, so switching project switches the role. */
-const demoProjectConfigs: readonly DemoProjectConfig[] = [
+const demoProjectConfigs: DemoProjectConfig[] = [
   {
     id: "demo-greenfield",
     name: "Greenfield Home",
@@ -107,7 +142,7 @@ export function allow<R extends Role>(projectId: string, roles: R[]): R {
   return role as R;
 }
 
-function project(projectId: string) {
+export function project(projectId: string) {
   const c = demoProjectConfigs.find((p) => p.id === projectId);
   if (!c) throw new MockError(404, "NOT_FOUND", "Project not found");
   const w = world(c.id);
@@ -115,7 +150,7 @@ function project(projectId: string) {
     id: c.id,
     name: c.name,
     location: c.location,
-    startDate: w.start,
+    startDate: configuredStarts.get(c.id) ?? w.start,
     budgetPaise: w.budgetPaise,
     role: c.role,
   };

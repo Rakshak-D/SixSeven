@@ -80,7 +80,8 @@ function FixForm({
     target.table === "stock_movements"
       ? String(target.current)
       : target.table === "attendance"
-        ? String(target.current)
+        ? // Start on a different mark; the current one would only be refused.
+          String(target.current === 2 ? 1 : 2)
         : String(target.currentPaise / 100),
   );
   const [reason, setReason] = useState("");
@@ -130,6 +131,11 @@ function FixForm({
   return (
     <form onSubmit={submit} className="space-y-4">
       <p className="font-semibold">{target.title}</p>
+      {target.table === "attendance" ? (
+        <p className="-mt-3 text-[15px] text-muted-foreground">
+          Marked now: {halfDayLabel[target.current]}
+        </p>
+      ) : null}
       {target.table === "attendance" ? (
         <Field label="Correct value">
           {(id) => (
