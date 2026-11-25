@@ -193,7 +193,9 @@ export function LogsPage() {
                       </span>
                       <span className="block truncate text-[15px] text-muted-foreground">
                         {m.type === "delivery"
-                          ? `${m.supplier} · challan ${m.challanNo}`
+                          ? [m.supplier, `challan ${m.challanNo}`, m.note]
+                              .filter(Boolean)
+                              .join(" · ")
                           : (m.note ?? formatTimeIst(m.createdAt))}
                       </span>
                     </span>

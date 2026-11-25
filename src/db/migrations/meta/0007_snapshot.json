@@ -1,5 +1,5 @@
 {
-  "id": "9bb70b30-0cf4-4729-bd15-eb15c14f9a56",
+  "id": "844b4f19-566c-48fd-b342-352e6e6bb3cc",
   "prevId": "f473fd08-8626-4eda-8c56-a47fbec5fa4a",
   "version": "7",
   "dialect": "postgresql",
@@ -935,317 +935,6 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.delivery_challan_photos": {
-      "name": "delivery_challan_photos",
-      "schema": "",
-      "columns": {
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "delivery_id": {
-          "name": "delivery_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "storage_key": {
-          "name": "storage_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mime": {
-          "name": "mime",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size_bytes": {
-          "name": "size_bytes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "delivery_challan_photos_created_by_user_id_fk": {
-          "name": "delivery_challan_photos_created_by_user_id_fk",
-          "tableFrom": "delivery_challan_photos",
-          "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "delivery_challan_photo_movement_fk": {
-          "name": "delivery_challan_photo_movement_fk",
-          "tableFrom": "delivery_challan_photos",
-          "tableTo": "stock_movements",
-          "columnsFrom": [
-            "project_id",
-            "delivery_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "delivery_challan_photos_storage_key_unique": {
-          "name": "delivery_challan_photos_storage_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "storage_key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "delivery_challan_photo_media": {
-          "name": "delivery_challan_photo_media",
-          "value": "\"delivery_challan_photos\".\"size_bytes\" between 1 and 5000000 and \"delivery_challan_photos\".\"mime\" in ('image/jpeg', 'image/png', 'image/webp')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.expected_deliveries": {
-      "name": "expected_deliveries",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "material_id": {
-          "name": "material_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "qty": {
-          "name": "qty",
-          "type": "numeric(14, 3)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "supplier": {
-          "name": "supplier",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expected_on": {
-          "name": "expected_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "delivery_id": {
-          "name": "delivery_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rejection_reason": {
-          "name": "rejection_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rescheduled_on": {
-          "name": "rescheduled_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_by": {
-          "name": "decided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "expected_deliveries_project_status_day_idx": {
-          "name": "expected_deliveries_project_status_day_idx",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expected_on",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "expected_deliveries_decided_by_user_id_fk": {
-          "name": "expected_deliveries_decided_by_user_id_fk",
-          "tableFrom": "expected_deliveries",
-          "tableTo": "user",
-          "columnsFrom": [
-            "decided_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "expected_deliveries_created_by_user_id_fk": {
-          "name": "expected_deliveries_created_by_user_id_fk",
-          "tableFrom": "expected_deliveries",
-          "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "expected_deliveries_material_fk": {
-          "name": "expected_deliveries_material_fk",
-          "tableFrom": "expected_deliveries",
-          "tableTo": "materials",
-          "columnsFrom": [
-            "project_id",
-            "material_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "expected_deliveries_movement_fk": {
-          "name": "expected_deliveries_movement_fk",
-          "tableFrom": "expected_deliveries",
-          "tableTo": "stock_movements",
-          "columnsFrom": [
-            "project_id",
-            "delivery_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "expected_deliveries_delivery_id_unique": {
-          "name": "expected_deliveries_delivery_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "delivery_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "expected_delivery_qty_positive": {
-          "name": "expected_delivery_qty_positive",
-          "value": "\"expected_deliveries\".\"qty\" > 0"
-        },
-        "expected_delivery_state": {
-          "name": "expected_delivery_state",
-          "value": "\n      (\"expected_deliveries\".\"status\" = 'pending' and \"expected_deliveries\".\"delivery_id\" is null and \"expected_deliveries\".\"rejection_reason\" is null and \"expected_deliveries\".\"rescheduled_on\" is null and \"expected_deliveries\".\"decided_at\" is null and \"expected_deliveries\".\"decided_by\" is null)\n      or (\"expected_deliveries\".\"status\" = 'accepted' and \"expected_deliveries\".\"delivery_id\" is not null and \"expected_deliveries\".\"rejection_reason\" is null and \"expected_deliveries\".\"rescheduled_on\" is null and \"expected_deliveries\".\"decided_at\" is not null and \"expected_deliveries\".\"decided_by\" is not null)\n      or (\"expected_deliveries\".\"status\" = 'rejected' and \"expected_deliveries\".\"delivery_id\" is null and \"expected_deliveries\".\"rejection_reason\" is not null and char_length(btrim(\"expected_deliveries\".\"rejection_reason\")) between 10 and 2000 and \"expected_deliveries\".\"decided_at\" is not null and \"expected_deliveries\".\"decided_by\" is not null)\n    "
-        }
-      },
       "isRLSEnabled": false
     },
     "public.expenses": {
@@ -2256,16 +1945,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "stock_movements_project_id_pair_unique": {
-          "name": "stock_movements_project_id_pair_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "project_id",
-            "id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
         "stock_movement_shape": {
@@ -2490,6 +2170,18 @@
           "notNull": true,
           "default": true
         },
+        "removed_reason": {
+          "name": "removed_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2527,6 +2219,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "worker_removal_metadata": {
+          "name": "worker_removal_metadata",
+          "value": "(\"workers\".\"removed_reason\" is null and \"workers\".\"removed_at\" is null)\n          or (not \"workers\".\"active\" and \"workers\".\"removed_reason\" is not null and \"workers\".\"removed_at\" is not null\n              and char_length(btrim(\"workers\".\"removed_reason\")) between 5 and 2000)"
+        },
         "worker_daily_rate_range": {
           "name": "worker_daily_rate_range",
           "value": "\"workers\".\"daily_rate_paise\" between 2 and 9007199254740991 and \"workers\".\"daily_rate_paise\" % 2 = 0"

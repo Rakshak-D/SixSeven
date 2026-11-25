@@ -134,6 +134,7 @@ function DeliveryForm({ projectId, today }: { projectId: string; today: string }
       [rupeesToPaise(cost) === undefined, "Enter the cost per unit in rupees."],
       [!supplier.trim(), "Enter the supplier's name."],
       [!challan.trim(), "Enter the challan number."],
+      [!note.trim(), "Add a note about this delivery."],
     ]);
     setProblem(found);
     if (found) return;
@@ -145,7 +146,7 @@ function DeliveryForm({ projectId, today }: { projectId: string; today: string }
         supplier,
         challanNo: challan,
         occurredOn: date,
-        ...(note.trim() ? { note } : {}),
+        note,
       },
       {
         onSuccess: () => {
@@ -203,7 +204,7 @@ function DeliveryForm({ projectId, today }: { projectId: string; today: string }
           )}
         </Field>
       </div>
-      <Field label="Note (optional)">
+      <Field label="Note" hint="Condition, vehicle, who received it.">
         {(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
       <FormError error={problem ?? save.error} />
@@ -232,7 +233,10 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    const found = firstProblem([[parseQty(qty) === undefined, "Enter the quantity used."]]);
+    const found = firstProblem([
+      [parseQty(qty) === undefined, "Enter the quantity used."],
+      [!note.trim(), "Say where it was used."],
+    ]);
     setProblem(found);
     if (found) return;
     save.mutate(
@@ -240,7 +244,7 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
         materialId: choice.materialId,
         qty: parseQty(qty) as number,
         occurredOn: date,
-        ...(note.trim() ? { note } : {}),
+        note,
       },
       {
         onSuccess: () => {
@@ -279,7 +283,7 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
           )}
         </Field>
       </div>
-      <Field label="Where was it used? (optional)">
+      <Field label="Where was it used?">
         {(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
       <FormError error={problem ?? save.error} />
@@ -441,7 +445,7 @@ function TodayEntries({
               title: `${material?.name ?? "Material"} · ${formatQty(current)} ${unit}`,
               detail:
                 m.type === "delivery"
-                  ? `${m.supplier} · challan ${m.challanNo}`
+                  ? [m.supplier, `challan ${m.challanNo}`, m.note].filter(Boolean).join(" · ")
                   : (m.note ?? "Used on site"),
               fix: {
                 table: "stock_movements",

@@ -54,8 +54,22 @@
     {
       "idx": 7,
       "version": "7",
-      "when": 1795647855942,
-      "tag": "0007_delivery_logistics",
+      "when": 1795646956289,
+      "tag": "0007_worker_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795648945446,
+      "tag": "0008_team_contacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795649313220,
+      "tag": "0009_delivery_logistics",
       "breakpoints": true
     }
   ]

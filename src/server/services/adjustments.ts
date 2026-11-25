@@ -118,7 +118,7 @@ export async function createAdjustment(
           type: "adjustment",
           materialId: target.materialId,
           occurredOn: target.occurredOn,
-          note: "Compensating stock correction",
+          note: input.reason,
           quantityMilli: delta,
         },
         crypto.randomUUID(),
