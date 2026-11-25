@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { progressPhotos, progressUpdates } from "@/db/schema";
+import type { Db, Transaction } from "@/db/client";
+import { checklistItems, progressPhotos, progressUpdates } from "@/db/schema";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
@@ -42,21 +42,15 @@ function publicPhoto(
   };
 }
 
-export async function createProgressUpdate(
+export async function writeProgressWithPhotos<T>(
   db: Db,
   actor: Actor,
   projectId: string,
   rawInput: CreateProgressInput,
-): Promise<Progress> {
+  finish: (tx: Transaction, progress: Progress) => Promise<T>,
+): Promise<T> {
   await requireProjectAccess(db, actor, projectId, ["contractor", "engineer"]);
   const input = CreateProgressInput.parse(rawInput);
-  if (input.checklistItemId) {
-    throw new ApiError(
-      400,
-      ErrorCode.VALIDATION_ERROR,
-      "Checklist links are unavailable until checklist records are implemented",
-    );
-  }
   const validated: Awaited<ReturnType<typeof validateImageUpload>>[] = [];
   for (const file of input.photos) validated.push(await validateImageUpload(file));
   const stored = await persistValidatedPhotos(validated);
@@ -64,6 +58,20 @@ export async function createProgressUpdate(
   try {
     return await db.transaction(async (tx) => {
       await requireProjectAccess(tx, actor, projectId, ["contractor", "engineer"]);
+      if (input.checklistItemId) {
+        const [item] = await tx
+          .select({ id: checklistItems.id })
+          .from(checklistItems)
+          .where(
+            and(
+              eq(checklistItems.projectId, projectId),
+              eq(checklistItems.id, input.checklistItemId),
+              sql`${checklistItems.removedAt} is null`,
+            ),
+          )
+          .for("update");
+        if (!item) throw new ApiError(404, ErrorCode.NOT_FOUND, "Checklist item not found");
+      }
       const progressId = crypto.randomUUID();
       const [update] = await tx
         .insert(progressUpdates)
@@ -71,7 +79,7 @@ export async function createProgressUpdate(
           id: progressId,
           projectId,
           note: input.note,
-          checklistItemId: null,
+          checklistItemId: input.checklistItemId ?? null,
           createdBy: actor.userId,
         })
         .returning({ id: progressUpdates.id, createdAt: progressUpdates.createdAt });
@@ -105,13 +113,16 @@ export async function createProgressUpdate(
         entityId: progressId,
       });
 
-      return ProgressResponse.parse({
-        id: update.id,
-        note: input.note,
-        checklistItemId: null,
-        createdAt: update.createdAt.toISOString(),
-        photos: photoRows.map((photo) => publicPhoto(projectId, photo)),
-      });
+      return finish(
+        tx,
+        ProgressResponse.parse({
+          id: update.id,
+          note: input.note,
+          checklistItemId: input.checklistItemId ?? null,
+          createdAt: update.createdAt.toISOString(),
+          photos: photoRows.map((photo) => publicPhoto(projectId, photo)),
+        }),
+      );
     });
   } catch (error) {
     try {
@@ -121,6 +132,15 @@ export async function createProgressUpdate(
     }
     throw error;
   }
+}
+
+export function createProgressUpdate(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+  input: CreateProgressInput,
+) {
+  return writeProgressWithPhotos(db, actor, projectId, input, async (_tx, progress) => progress);
 }
 
 export async function getProjectTimeline(

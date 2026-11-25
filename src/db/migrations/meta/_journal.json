@@ -43,6 +43,13 @@
       "when": 1795611347530,
       "tag": "0005_m5_project_reporting",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795620444886,
+      "tag": "0006_m6_workflows",
+      "breakpoints": true
     }
   ]
 }

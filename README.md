@@ -82,3 +82,5 @@ The following is the inherited declared dependency/license inventory. Codex main
 ## License
 
 MIT, see LICENSE.
+
+M6 checklist drafts run deterministically from a local template. The inherited provider packages are present in the lockfile for deferred work. Running Slate and generating checklists require no AI provider credentials.

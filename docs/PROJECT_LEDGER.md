@@ -24,6 +24,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 | M3 — material, worker and stock operations | VERIFIED | PR #8 PostgreSQL CI passed all 64 tests, including concurrent ledger writes and repeated demo seeding. |
 | M4 — attendance, wage accounting and corrections | INTEGRATED | PR #11 merged as `c34eb6e`; PR CI #29 passed all 81 tests and main CI #30 passed on the merge commit. |
 | M5 — financial summary, progress evidence and activity | INTEGRATED | PR #14 merged as `1a81e78`; PR CI #49 and main CI #50 passed migration, seed twice, Biome, typecheck and all 102 PostgreSQL-backed tests. |
+| M6 — proposals and engineer verification | VERIFIED | Contract PR #19 merged. Implementation PR #20 passed hosted PostgreSQL CI. |
 | Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities

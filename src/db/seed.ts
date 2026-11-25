@@ -20,12 +20,16 @@ import { disposableDatabase } from "./config";
 import {
   adjustments,
   attendance,
+  checklistDrafts,
+  checklistItems,
+  checklistRecords,
   expenses,
   materials,
   progressPhotos,
   progressUpdates,
   projectMembers,
   projects,
+  proposals,
   stockMovements,
   wagePayments,
   workers,
@@ -563,6 +567,73 @@ async function seed() {
           ...fixture,
           projectId,
           createdBy: contractor,
+        });
+      }
+
+      const [proposal] = await tx
+        .insert(proposals)
+        .values({
+          id: "demo-proposal-drainage",
+          projectId,
+          createdBy: engineer,
+          title: "Extend courtyard drain",
+          description: "Add a drain line before courtyard flooring.",
+          costImpactPaise: 1285000,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (proposal)
+        await recordAudit(tx, {
+          projectId,
+          actorId: engineer,
+          action: "created",
+          entity: "proposal",
+          entityId: proposal.id,
+        });
+      const draftId = "demo-checklist-draft";
+      const checklistId = "demo-checklist-record";
+      await tx
+        .insert(checklistDrafts)
+        .values({ id: draftId, projectId, createdBy: engineer })
+        .onConflictDoNothing();
+      const [checklist] = await tx
+        .insert(checklistRecords)
+        .values({
+          id: checklistId,
+          draftId,
+          projectId,
+          createdBy: engineer,
+          title: "Greenfield site verification",
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (checklist) {
+        await tx.insert(checklistItems).values([
+          {
+            id: "demo-checklist-footing",
+            projectId,
+            checklistId,
+            phase: "foundation",
+            position: 0,
+            task: "Confirm footing layout",
+            materials: [],
+          },
+          {
+            id: "demo-checklist-plinth",
+            projectId,
+            checklistId,
+            phase: "plinth",
+            position: 1,
+            task: "Record plinth level",
+            materials: [],
+          },
+        ]);
+        await recordAudit(tx, {
+          projectId,
+          actorId: engineer,
+          action: "created",
+          entity: "checklist",
+          entityId: checklist.id,
         });
       }
 
