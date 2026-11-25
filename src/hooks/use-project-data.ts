@@ -1,15 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api/client";
+import type { ZodType } from "zod";
+import { ApiClientError, api } from "@/lib/api/client";
 import { ActivityResponse } from "@/shared/schemas/activity";
-import { AdjustmentListResponse } from "@/shared/schemas/adjustments";
-import { AttendanceListResponse } from "@/shared/schemas/attendance";
+import {
+  AdjustmentListResponse,
+  AdjustmentResponse,
+  CreateAdjustmentInput,
+} from "@/shared/schemas/adjustments";
+import {
+  AttendanceListResponse,
+  AttendanceResponse,
+  CreateAttendanceInput,
+} from "@/shared/schemas/attendance";
 import { ChecklistsResponse } from "@/shared/schemas/checklist";
+import { CreateDeliveryInput, DeliveryResponse } from "@/shared/schemas/deliveries";
 import { MaterialsResponse } from "@/shared/schemas/materials";
 import { TimelineResponse } from "@/shared/schemas/progress";
 import { ProposalResponse, ProposalsResponse } from "@/shared/schemas/proposals";
 import { StockMovementsResponse, StockResponse } from "@/shared/schemas/stock";
 import { SummaryResponse } from "@/shared/schemas/summary";
-import { WagePaymentListResponse, WageSheetResponse } from "@/shared/schemas/wages";
+import { CreateUsageInput, UsageResponse } from "@/shared/schemas/usages";
+import {
+  CreateWagePaymentInput,
+  WagePaymentListResponse,
+  WagePaymentResponse,
+  WageSheetResponse,
+} from "@/shared/schemas/wages";
 import { WorkersResponse } from "@/shared/schemas/workers";
 
 /** One query per API read, keyed by project, each parsed with its shared response schema. */
@@ -129,3 +145,44 @@ export function useDecideProposal(projectId: string) {
     },
   });
 }
+
+/**
+ * A POST to a project route: validates the body with the shared input schema first (so the form can
+ * show the contract's own message), parses the response, then refreshes everything for that project.
+ */
+function useProjectPost<I, O>(
+  projectId: string,
+  path: string,
+  input: ZodType<I>,
+  output: ZodType<O>,
+) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: I) => {
+      const checked = input.safeParse(body);
+      if (!checked.success) {
+        return Promise.reject(
+          new ApiClientError(
+            400,
+            "VALIDATION_ERROR",
+            checked.error.issues[0]?.message ?? "Check the form",
+            checked.error.issues,
+          ),
+        );
+      }
+      return api("POST", `${base(projectId)}${path}`, { body: checked.data, schema: output });
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
+  });
+}
+
+export const useCreateDelivery = (id: string) =>
+  useProjectPost(id, "/deliveries", CreateDeliveryInput, DeliveryResponse);
+export const useCreateUsage = (id: string) =>
+  useProjectPost(id, "/usages", CreateUsageInput, UsageResponse);
+export const useCreateAttendance = (id: string) =>
+  useProjectPost(id, "/attendance", CreateAttendanceInput, AttendanceResponse);
+export const useCreateWagePayment = (id: string) =>
+  useProjectPost(id, "/wage-payments", CreateWagePaymentInput, WagePaymentResponse);
+export const useCreateAdjustment = (id: string) =>
+  useProjectPost(id, "/adjustments", CreateAdjustmentInput, AdjustmentResponse);

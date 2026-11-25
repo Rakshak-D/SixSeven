@@ -628,7 +628,9 @@ export function balanceOf(world: DemoWorld, materialId: string): number {
   return round(
     world.movements
       .filter((m) => m.materialId === materialId)
-      .reduce((sum, m) => sum + (m.type === "delivery" ? qtyOf(world, m) : m.qty), 0),
+      // Movements are append-only: a fix adds its own signed movement, so the balance is the plain
+      // sum. The corrected quantity (qtyOf) is for cost only.
+      .reduce((sum, m) => sum + m.qty, 0),
     3,
   );
 }

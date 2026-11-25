@@ -26,7 +26,6 @@ import {
   balanceOf,
   buildWorld,
   type DemoWorld,
-  deliveryCost,
   demoPeople,
   elapsedDays,
   spendTotals,
@@ -81,7 +80,7 @@ const demoProjectConfigs: readonly DemoProjectConfig[] = [
 
 const worlds = new Map<string, DemoWorld>();
 
-function world(projectId: string): DemoWorld {
+export function world(projectId: string): DemoWorld {
   const config = demoProjectConfigs.find((c) => c.id === projectId);
   if (!config) throw new MockError(404, "NOT_FOUND", "Project not found");
   let w = worlds.get(projectId);
@@ -98,7 +97,7 @@ function roleIn(projectId: string): Role {
   return config.role;
 }
 
-function allow(projectId: string, roles: Role[]) {
+export function allow(projectId: string, roles: Role[]) {
   if (!roles.includes(roleIn(projectId))) {
     throw new MockError(403, "FORBIDDEN", "Your role in this project can't see this");
   }
@@ -463,6 +462,3 @@ export const demoRoutes: MockRoute[] = [
     },
   },
 ];
-
-/** For tests and the delivery-cost display. */
-export { deliveryCost, world as demoWorld };

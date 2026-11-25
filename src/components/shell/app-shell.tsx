@@ -17,6 +17,8 @@ import { ProjectProvider } from "./project-context";
 import { ProjectSwitcher } from "./project-switcher";
 import { TopNav } from "./top-nav";
 
+const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
+
 function ShellMessage({ title, body }: { title: string; body: string }) {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-3 px-6 py-16">
@@ -90,10 +92,13 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         >
           <SlateMark />
         </Link>
+        <Badge variant="outline" className="shrink-0">
+          {roleLabel[project.role]}
+        </Badge>
         <div className="min-w-0 flex-1">
           <ProjectSwitcher current={project} projects={projects.data} />
         </div>
-        {mocksEnabled ? <Badge variant="secondary">Demo data</Badge> : null}
+        {mocksEnabled ? <Badge variant="secondary">Demo</Badge> : null}
         <ThemeToggle />
       </div>
       <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 pt-4 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:px-6 lg:pt-10 lg:pb-16">

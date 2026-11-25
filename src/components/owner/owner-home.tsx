@@ -170,13 +170,10 @@ export function OwnerHome() {
           <p className={eyebrow}>
             {project.location} · started {formatIsoDate(project.startDate)}
           </p>
-          <h1 className="mt-3 text-[2.4rem] leading-[1.04] sm:text-5xl">
-            Week {week},
-            <br />
-            <span className="text-muted-foreground italic">
-              {underway ? `${underway.task.toLowerCase()} under way` : "on site"}
-            </span>
-          </h1>
+          <h1 className="mt-3 text-[2.4rem] leading-[1.04] sm:text-5xl">Week {week}</h1>
+          <p className="mt-2 text-lg text-muted-foreground">
+            {underway ? `${underway.task} under way` : "On site"}
+          </p>
           <div className="mt-auto pt-8">
             <p className="text-ink-2">Left in budget</p>
             <button

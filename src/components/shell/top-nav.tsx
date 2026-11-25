@@ -9,6 +9,8 @@ import type { ProjectResponse } from "@/shared/schemas/projects";
 import { type RoleNav, tabHref } from "./nav";
 import { ProjectSwitcher } from "./project-switcher";
 
+const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
+
 const TAB_WIDTH = 104; // px; matches w-26 so the indicator can slide by index
 
 /** Desktop navigation: a floating pill at the top. Hidden below the lg breakpoint (the dock takes over). */
@@ -42,6 +44,9 @@ export function TopNav({
             <SlateLockup />
           </span>
         </Link>
+        <Badge variant="outline" className="shrink-0">
+          {roleLabel[project.role]}
+        </Badge>
         <span aria-hidden="true" className="mx-1 h-7 w-px shrink-0 bg-line-strong xl:mx-2" />
         <div className="min-w-0">
           <ProjectSwitcher current={project} projects={projects} />

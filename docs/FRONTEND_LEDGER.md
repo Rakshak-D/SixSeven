@@ -48,6 +48,33 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-25 20:48 IST · Contractor groundwork, role badge, stock fix
+
+- **Branch / commit:** `fe/contractor-screens`, stacked on `fe/owner-screens` (PR #18).
+- **Done:**
+  - Contractor write mocks (`src/mocks/write-routes.ts`) for deliveries, usages, attendance, wage
+    payments and adjustments. They refuse what the API refuses:
+    - `DUPLICATE_CHALLAN` (supplier and challan matched trimmed and case-insensitive)
+    - `INSUFFICIENT_STOCK` with `details` naming the material and its balance
+    - `CONFLICT` for attendance already saved for that day, and for a no-op fix
+    - 400 for input that fails the shared schema
+    - a fix that would overdraw stock
+  - Mock errors now carry `details` like the real API.
+  - Write hooks validate with the shared input schemas and refresh the project's data.
+- **Fixed:** the demo stock balance counted a delivery fix twice (the corrected quantity and its
+  compensating movement). The balance is now the plain sum of the append-only movements, and the
+  corrected quantity is used only for cost.
+- **Design (frontend developer):** the role (Owner, Contractor, Engineer) shows beside the logo on
+  desktop and phone. The line under "Week N" on Home is now the sans font at a smaller size.
+- **Tests:**
+  - `pnpm lint`, `pnpm typecheck`: pass.
+  - `vitest run src`: 46 pass. New: delivery adds to stock, a duplicate challan is refused, usage
+    over stock is refused with the balance, attendance saves once per day, input is validated, and a
+    delivery fix changes stock once and refuses a no-op.
+  - Playwright owner Home at 390, 1024 and 1440 px: no overflow, no errors.
+- **Next:** contractor UI (Today with Delivery, Usage and Attendance forms and fixes; Stock; Wages
+  with record payment), then the engineer side.
+
 ### 2026-11-25 20:39 IST · Owner side, full demo mocks, logo
 
 - **Branch / commit:** `fe/owner-screens`, stacked on `fe/design-tokens` (PR #16).

@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { addDays, todayIst } from "@/lib/dates";
 import { demoRoutes } from "./routes";
 import { MockError, type MockRoute } from "./types";
+import { writeRoutes } from "./write-routes";
 
 function call(method: MockRoute["method"], path: string, body?: unknown) {
   const [pathname, search = ""] = path.split("?");
   const parts = pathname.split("/");
-  for (const route of demoRoutes) {
+  for (const route of [...demoRoutes, ...writeRoutes]) {
     if (route.method !== method) continue;
     const pattern = route.path.split("/");
     if (pattern.length !== parts.length) continue;
@@ -123,5 +124,107 @@ describe("demo mocks", () => {
 
   it("refuses unknown projects", () => {
     expect(status(() => call("GET", "/projects/nope/stock"))).toBe(404);
+  });
+});
+
+describe("contractor writes", () => {
+  const contractor = projects.find((p) => p.role === "contractor") as Project;
+  const owner = projects.find((p) => p.role === "owner") as Project;
+  const base = `/projects/${contractor.id}`;
+  const materials = () => call("GET", `${base}/materials`) as { id: string }[];
+  const stockOf = (materialId: string) =>
+    (call("GET", `${base}/stock`) as { materialId: string; balance: number }[]).find(
+      (s) => s.materialId === materialId,
+    )?.balance ?? -1;
+  const today = todayIst();
+
+  it("adds a delivery to stock and refuses the same challan twice", () => {
+    const m = materials()[0].id;
+    const before = stockOf(m);
+    const body = {
+      materialId: m,
+      qty: 10,
+      unitCostPaise: 43_000,
+      supplier: "Test Traders",
+      challanNo: "T-1",
+      occurredOn: today,
+    };
+    expect((call("POST", `${base}/deliveries`, body) as { balance: number }).balance).toBe(
+      before + 10,
+    );
+    expect(
+      status(() => call("POST", `${base}/deliveries`, { ...body, supplier: " test traders " })),
+    ).toBe(409);
+    expect(status(() => call("POST", `/projects/${owner.id}/deliveries`, body))).toBe(403);
+  });
+
+  it("refuses usage over stock and says how much is left", () => {
+    const m = materials()[1].id;
+    const balance = stockOf(m);
+    try {
+      call("POST", `${base}/usages`, { materialId: m, qty: balance + 1, occurredOn: today });
+      throw new Error("should refuse");
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockError);
+      expect((e as MockError).code).toBe("INSUFFICIENT_STOCK");
+      expect((e as MockError).details).toEqual({ materialId: m, balance });
+    }
+    const used = call("POST", `${base}/usages`, { materialId: m, qty: 0.5, occurredOn: today }) as {
+      balance: number;
+    };
+    expect(used.balance).toBeCloseTo(balance - 0.5, 3);
+  });
+
+  it("saves attendance once per worker and day", () => {
+    const workers = call("GET", `${base}/workers`) as { id: string; active: boolean }[];
+    const day = addDays(today, 1);
+    const entries = workers.filter((w) => w.active).map((w) => ({ workerId: w.id, halfDays: 2 }));
+    expect(
+      (call("POST", `${base}/attendance`, { workDate: day, entries }) as { entries: unknown[] })
+        .entries,
+    ).toHaveLength(entries.length);
+    expect(status(() => call("POST", `${base}/attendance`, { workDate: day, entries }))).toBe(409);
+  });
+
+  it("validates input like the contract", () => {
+    expect(
+      status(() =>
+        call("POST", `${base}/usages`, {
+          materialId: materials()[0].id,
+          qty: -1,
+          occurredOn: today,
+        }),
+      ),
+    ).toBe(400);
+  });
+
+  it("fixes a delivery quantity, keeps history and refuses a no-op", () => {
+    const m = materials()[0].id;
+    const movement = (
+      call("GET", `${base}/movements?materialId=${m}`) as {
+        id: string;
+        type: string;
+        qty: number;
+      }[]
+    ).find((x) => x.type === "delivery") as { id: string; qty: number };
+    const before = stockOf(m);
+    const fix = call("POST", `${base}/adjustments`, {
+      targetTable: "stock_movements",
+      targetId: movement.id,
+      newValue: movement.qty - 1,
+      reason: "One bag was counted twice",
+    }) as { oldValue: number; newValue: number };
+    expect(fix.newValue).toBe(fix.oldValue - 1);
+    expect(stockOf(m)).toBeCloseTo(before - 1, 3);
+    expect(
+      status(() =>
+        call("POST", `${base}/adjustments`, {
+          targetTable: "stock_movements",
+          targetId: movement.id,
+          newValue: fix.newValue,
+          reason: "Same value again here",
+        }),
+      ),
+    ).toBe(409);
   });
 });

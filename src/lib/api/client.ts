@@ -57,7 +57,7 @@ export async function api<T>(
         return parse(await hit.mock.respond({ params: hit.params, query, body: opts.body }));
       } catch (error) {
         if (error instanceof MockError)
-          throw new ApiClientError(error.status, error.code, error.message);
+          throw new ApiClientError(error.status, error.code, error.message, error.details);
         throw error;
       }
     }
