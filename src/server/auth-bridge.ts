@@ -29,14 +29,16 @@ export async function authHandler(request: Request) {
 
   if (route.input) {
     try {
-      const body: unknown = request.body ? await request.clone().json() : undefined;
+      // Next can supply an empty stream for a browser POST with no body.
+      const text = request.body ? await request.clone().text() : "";
       if (
-        request.body &&
+        text !== "" &&
         request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() !==
           "application/json"
       ) {
         return errorResponse(400, "VALIDATION_ERROR", "Expected an application/json body");
       }
+      const body: unknown = text === "" ? undefined : JSON.parse(text);
       if (!route.input.safeParse(body).success) {
         return errorResponse(400, "VALIDATION_ERROR", "Invalid input");
       }

@@ -1,14 +1,14 @@
 "use client";
 
+import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { SlateLockup } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthErrorResponse, SignInResponse } from "@/shared/schemas/auth";
-import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -35,11 +35,7 @@ export default function SignInPage() {
 
       if (!res.ok) {
         const err = AuthErrorResponse.safeParse(data);
-        setError(
-          err.success
-            ? err.data.message
-            : "Sign-in failed. Please check your credentials.",
-        );
+        setError(err.success ? err.data.message : "Sign-in failed. Please check your credentials.");
         return;
       }
 
@@ -107,11 +103,7 @@ export default function SignInPage() {
               className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {showPassword ? (
-                <EyeOff className="size-4" />
-              ) : (
-                <Eye className="size-4" />
-              )}
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
         </div>
@@ -123,11 +115,7 @@ export default function SignInPage() {
         ) : null}
 
         <Button type="submit" disabled={loading} className="mt-2 w-full" size="lg">
-          {loading ? (
-            <Loader2 className="animate-spin" />
-          ) : (
-            <LogIn />
-          )}
+          {loading ? <Loader2 className="animate-spin" /> : <LogIn />}
           Sign in
         </Button>
       </form>
