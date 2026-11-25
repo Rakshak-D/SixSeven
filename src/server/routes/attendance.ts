@@ -5,13 +5,14 @@ import {
   AttendanceListQuery,
   AttendanceListResponse,
   AttendanceResponse,
+  AttendanceRosterResponse,
   CreateAttendanceInput,
 } from "@/shared/schemas/attendance";
 import { IdParams } from "@/shared/schemas/common";
 import { json, projectAuth, projectBody, projectErrors } from "../lib/project-route";
 import { createRouter } from "../lib/router";
 import type { AuthEnv } from "../middleware/auth";
-import { listAttendance, recordAttendance } from "../services/attendance";
+import { listAttendance, listAttendanceRoster, recordAttendance } from "../services/attendance";
 
 export const attendance = createRouter<AuthEnv>()
   .openapi(
@@ -59,6 +60,32 @@ export const attendance = createRouter<AuthEnv>()
     async (c) =>
       c.json(
         await listAttendance(
+          getDatabase().db,
+          c.get("actor"),
+          c.req.valid("param").id,
+          c.req.valid("query"),
+        ),
+        200,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/projects/{id}/attendance/roster",
+      tags: ["attendance"],
+      middleware: projectAuth,
+      request: { params: IdParams, query: AttendanceListQuery },
+      responses: {
+        200: {
+          description: "Dated attendance roster without wage or correction details",
+          content: json(AttendanceRosterResponse),
+        },
+        ...projectErrors,
+      },
+    }),
+    async (c) =>
+      c.json(
+        await listAttendanceRoster(
           getDatabase().db,
           c.get("actor"),
           c.req.valid("param").id,

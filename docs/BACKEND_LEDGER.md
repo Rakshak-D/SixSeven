@@ -10,6 +10,13 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Verification: isolated PostgreSQL upgrade and focused labour/database suite passed, 17 tests. Covers concurrent deactivation, denied writes, post-deactivation attendance rejection, historical rate preservation and a single audit event.
 - Frontend handoff: add a worker deactivation action using `DeactivateWorkerInput` and invalidate the `[id, "workers"]` query in `src/hooks/use-project-data.ts`. Render optional removal metadata in the team UI when implemented. No frontend files changed.
 
+## Entry — Request #11 engineer attendance roster
+
+- Timestamp: 2026-11-26 IST. Branch: `be/attendance-roster`.
+- New `GET /api/v1/projects/:id/attendance/roster` returns a project member's dated attendance view with the latest effective half-day units. Its query and serializer omit wage rates, totals and adjustment details. Existing financial routes and permissions remain in force. No migration or new dependencies.
+- PostgreSQL verification: `vitest run tests/api/labour-accounting.test.ts --testTimeout 20000`, 12 passed. Covers engineer output after an attendance correction, missing sessions, cross-project denial and continued 403 on the financial route.
+- Frontend handoff: update the engineer Logs query in `src/hooks/use-project-data.ts` and its consumer under `src/components/logs/` to request the roster and parse `AttendanceRosterResponse`. Render the worker name and effective half-day units. Continue using the existing financial read for owner and contractor Logs.
+
 ## Entry — M6 proposals and checklist verification
 
 - Timestamp: 2026-11-25 21:04:30+05:30

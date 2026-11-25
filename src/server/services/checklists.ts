@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Db, Transaction } from "@/db/client";
 import { checklistDrafts, checklistEvents, checklistItems, checklistRecords } from "@/db/schema";
+import { generateAiChecklist } from "@/server/ai/checklist";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
@@ -43,10 +44,28 @@ export async function generateDraft(
   actor: Actor,
   projectId: string,
   source: z.infer<typeof ChecklistSource>,
+  input?: { houseType?: string; floors?: number; rooms?: number },
 ) {
   await requireProjectAccess(db, actor, projectId, ["engineer"]);
   const draftId = crypto.randomUUID();
   await db.insert(checklistDrafts).values({ id: draftId, projectId, createdBy: actor.userId });
+
+  if (source === "ai") {
+    const aiResult = await generateAiChecklist({
+      houseType: input?.houseType,
+      floors: input?.floors,
+      rooms: input?.rooms,
+    });
+    if (aiResult?.source === "ai" && aiResult.draft.items.length > 0) {
+      return {
+        draftId,
+        source: "ai" as const,
+        fallbackReason: null,
+        draft: aiResult.draft,
+      };
+    }
+  }
+
   return {
     draftId,
     source: "template" as const,
@@ -54,7 +73,6 @@ export async function generateDraft(
     draft: template,
   };
 }
-
 function serializeItem(item: Item, history: (typeof checklistEvents.$inferSelect)[]) {
   const { id, phase, task, materials, state, removedAt } = item;
   const status = state === "todo" ? "pending" : state === "done" ? "done" : "inProgress";
