@@ -44,6 +44,7 @@ All rows below have an available shared contract. The four project operations ar
 | P0 | GET /projects/:id/materials | Members | — | — | 200 materials.MaterialsResponse | — |
 | P0 | POST /projects/:id/workers | Contractor | — | workers.CreateWorkerInput | 201 workers.WorkerResponse | — |
 | P0 | GET /projects/:id/workers | Owner, contractor | — | — | 200 workers.WorkersResponse | — |
+| P0 | POST /projects/:id/workers/:workerId/deactivate | Contractor | workers.WorkerParams | workers.DeactivateWorkerInput | 200 workers.WorkerResponse | 409 CONFLICT for an inactive worker |
 | P0 | POST /projects/:id/deliveries | Contractor | — | deliveries.CreateDeliveryInput | 201 deliveries.DeliveryResponse | DUPLICATE_CHALLAN for the same supplier and challan in this project. CONFLICT if the resulting balance exceeds numeric(14,3). |
 | P0 | POST /projects/:id/usages | Contractor | — | usages.CreateUsageInput | 201 usages.UsageResponse | INSUFFICIENT_STOCK with materialId and current balance in `InsufficientStockErrorResponse` |
 | P0 | GET /projects/:id/stock | Members | — | — | 200 stock.StockResponse | — |

@@ -2,6 +2,14 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Request #5 worker deactivation
+
+- Timestamp: 2026-11-26 IST. Branch: `be/worker-lifecycle`.
+- Contractor-only `POST /api/v1/projects/:id/workers/:workerId/deactivate`. Migration `0007_worker_lifecycle` stores the reason and timestamp. Worker lists return optional `removedReason` and `removedOn`. Existing inactive records may lack that metadata.
+- Worker and attendance writes serialize on the same row. The update and audit entry commit together. Existing wages and attendance remain available.
+- Verification: isolated PostgreSQL upgrade and focused labour/database suite passed, 17 tests. Covers concurrent deactivation, denied writes, post-deactivation attendance rejection, historical rate preservation and a single audit event.
+- Frontend handoff: add a worker deactivation action using `DeactivateWorkerInput` and invalidate the `[id, "workers"]` query in `src/hooks/use-project-data.ts`. Render optional removal metadata in the team UI when implemented. No frontend files changed.
+
 ## Entry — Live integration restart
 
 - Timestamp: 2026-11-26 IST. Branch: `be/live-integration`, based on main `4bfc586`.

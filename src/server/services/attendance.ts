@@ -41,7 +41,9 @@ export async function recordAttendance(
       const projectWorkers = await tx
         .select({ id: workers.id, dailyRatePaise: workers.dailyRatePaise, active: workers.active })
         .from(workers)
-        .where(and(eq(workers.projectId, projectId), inArray(workers.id, workerIds)));
+        .where(and(eq(workers.projectId, projectId), inArray(workers.id, workerIds)))
+        .orderBy(asc(workers.id))
+        .for("share");
       if (projectWorkers.length !== workerIds.length) {
         throw new ApiError(404, ErrorCode.NOT_FOUND, "Worker not found in this project");
       }
