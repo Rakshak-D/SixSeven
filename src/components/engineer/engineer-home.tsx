@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Sheet } from "@/components/sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
@@ -54,8 +55,20 @@ export function EngineerHome() {
         <p className={eyebrow}>Home · you are the site engineer</p>
         <h1 className="mt-3 text-5xl leading-[1.02] sm:text-6xl">{project.name}</h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          {project.location} · started {formatIsoDate(project.startDate)} · week {week}
+          {project.location} · {project.startDate > today ? "starts" : "started"}{" "}
+          {formatIsoDate(project.startDate)}
+          {project.startDate > today ? "" : ` · week ${week}`}
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/projects/${encodeURIComponent(id)}/logs?tab=attendance`}>
+              Fix attendance
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={`/projects/${encodeURIComponent(id)}/team`}>Team and invites</Link>
+          </Button>
+        </div>
         {checklists.isPending ? (
           <Skeleton className="mt-8 h-20 rounded-2xl" />
         ) : items.length === 0 ? (
