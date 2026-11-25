@@ -143,8 +143,6 @@ All routes require a session. Item IDs resolve to their project before checking 
 Checklist reads and saves retain the legacy display status and add verificationStatus, removedAt and history to items. Clients use verificationStatus for todo, doing, waiting, done and sent_back. Filter removed items using removedAt. History links submission evidence to progress IDs in the project timeline. The live PATCH accepts rename input only. The legacy status-write schema remains exported for existing development fixtures.
 
 Checklist drafts return source template. An AI request satisfying the existing input contract receives the deterministic template with fallbackReason unavailable. This milestone selects no provider and requires no AI credentials. Proposal and checklist handlers are implemented in M6. A checklist can hold forty historical items, including soft removals. Drafts can be saved once, by their creating engineer. Proposals record one owner decision without changing budget or creating a payment.
-## Change requests
-
 ## Delivery verification and bag usage
 
 | Operation | Role | Input | Success |
