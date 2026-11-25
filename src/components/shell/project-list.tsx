@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { SlateLockup, SlateTagline } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,12 +19,13 @@ export function ProjectList() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-6 pb-16 sm:px-6">
       <header className="flex items-center justify-between gap-3">
-        <span className="font-serif text-3xl leading-none">Slate</span>
+        <SlateLockup />
         <div className="flex items-center gap-2">
           {mocksEnabled ? <Badge variant="secondary">Demo data</Badge> : null}
           <ThemeToggle />
         </div>
       </header>
+      <SlateTagline className="mt-3" />
       <h1 className="mt-12 animate-rise text-5xl sm:text-6xl">Your projects</h1>
 
       {projects.isPending ? (

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
+import { SlateMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +16,8 @@ import { activeTabIndex, roleNav } from "./nav";
 import { ProjectProvider } from "./project-context";
 import { ProjectSwitcher } from "./project-switcher";
 import { TopNav } from "./top-nav";
+
+const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 
 function ShellMessage({ title, body }: { title: string; body: string }) {
   return (
@@ -81,18 +84,33 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         activeIndex={activeIndex}
         onAction={openAction}
       />
-      <div className="flex items-center gap-2 px-2 pt-3 lg:hidden">
+      <div className="flex items-center gap-1 px-2 pt-3 lg:hidden">
+        <Link
+          href="/projects"
+          aria-label="Slate, your projects"
+          className="flex size-11 shrink-0 items-center justify-center"
+        >
+          <SlateMark />
+        </Link>
+        <Badge variant="outline" className="shrink-0">
+          {roleLabel[project.role]}
+        </Badge>
         <div className="min-w-0 flex-1">
           <ProjectSwitcher current={project} projects={projects.data} />
         </div>
-        {mocksEnabled ? <Badge variant="secondary">Demo data</Badge> : null}
+        {mocksEnabled ? <Badge variant="secondary">Demo</Badge> : null}
         <ThemeToggle />
       </div>
       <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 pt-4 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:px-6 lg:pt-10 lg:pb-16">
         {children}
       </main>
       <Dock projectId={project.id} nav={nav} activeIndex={activeIndex} onAction={openAction} />
-      <ActionSheet kind={nav.action.kind} open={actionOpen} onOpenChange={setActionOpen} />
+      <ActionSheet
+        kind={nav.action.kind}
+        projectId={project.id}
+        open={actionOpen}
+        onOpenChange={setActionOpen}
+      />
     </ProjectProvider>
   );
 }

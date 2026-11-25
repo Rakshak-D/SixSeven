@@ -1,5 +1,6 @@
 // Client-only: imported by the app shell.
 import Link from "next/link";
+import { SlateLockup, SlateMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,8 @@ import { mocksEnabled } from "@/mocks";
 import type { ProjectResponse } from "@/shared/schemas/projects";
 import { type RoleNav, tabHref } from "./nav";
 import { ProjectSwitcher } from "./project-switcher";
+
+const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 
 const TAB_WIDTH = 104; // px; matches w-26 so the indicator can slide by index
 
@@ -30,13 +33,29 @@ export function TopNav({
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Link
           href="/projects"
-          className="flex h-11 items-center font-serif text-[30px] leading-none"
+          aria-label="Slate, your projects"
+          className="flex h-11 shrink-0 items-center"
         >
-          Slate
+          {/* Between 1024 and 1280 px only the mark fits next to the project name. */}
+          <span className="xl:hidden">
+            <SlateMark />
+          </span>
+          <span className="hidden xl:inline-flex">
+            <SlateLockup />
+          </span>
         </Link>
-        <span aria-hidden="true" className="mx-2 h-7 w-px bg-line-strong" />
-        <ProjectSwitcher current={project} projects={projects} />
-        {mocksEnabled ? <Badge variant="secondary">Demo data</Badge> : null}
+        <Badge variant="outline" className="shrink-0">
+          {roleLabel[project.role]}
+        </Badge>
+        <span aria-hidden="true" className="mx-1 h-7 w-px shrink-0 bg-line-strong xl:mx-2" />
+        <div className="min-w-0">
+          <ProjectSwitcher current={project} projects={projects} />
+        </div>
+        {mocksEnabled ? (
+          <Badge variant="secondary" className="hidden shrink-0 xl:inline-flex">
+            Demo data
+          </Badge>
+        ) : null}
       </div>
 
       <nav aria-label="Sections" className="relative flex rounded-full bg-secondary p-1">

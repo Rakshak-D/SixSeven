@@ -1,10 +1,5 @@
-import { SectionPlaceholder } from "@/components/shell/section-placeholder";
+import { SitePage } from "@/components/site/site-page";
 
-export default function SitePage() {
-  return (
-    <SectionPlaceholder
-      title="Site"
-      what="The checklist by phase, progress photos and proposed changes."
-    />
-  );
+export default function ProjectSitePage() {
+  return <SitePage />;
 }

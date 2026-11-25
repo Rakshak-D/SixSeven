@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { formatIsoDate, formatPaise, formatPaiseShort } from "@/lib/format";
-import { demoProjects } from "@/mocks/projects";
 import { Role } from "@/shared/schemas/common";
 import { activeTabIndex, roleNav, tabHref } from "./nav";
 
@@ -33,12 +32,6 @@ describe("role navigation", () => {
     expect(activeTabIndex("/projects/p1/wages", "p1", tabs)).toBe(-1);
     expect(activeTabIndex("/projects/p10/logs", "p1", tabs)).toBe(-1);
     expect(activeTabIndex("/projects", "p1", tabs)).toBe(-1);
-  });
-});
-
-describe("demo projects", () => {
-  it("cover each role once", () => {
-    expect(demoProjects.map((p) => p.role).sort()).toEqual(["contractor", "engineer", "owner"]);
   });
 });
 

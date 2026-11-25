@@ -9,6 +9,12 @@ checks pass) · **VERIFIED** (exercised in a browser at phone and desktop sizes)
 
 | Screen / feature | Route | API it needs | Status |
 |---|---|---|---|
+| Owner Home: left in budget, spent over time (from `spendByWeek`), needs you, today on site, recent spends with filters, material use vs plan, stock sparklines | `/projects/[id]` (owner) | summary, stock, movements, materials, activity, proposals, checklists, wage-payments, workers, adjustments | MOCKED, verified in a browser |
+| Owner approvals (centre button and Home): approve or reject proposed changes | sheet | `GET /projects/:id/proposals`, `POST /proposals/:id/decision` | MOCKED, verified in a browser |
+| Logs: spends (wages folded per day), stock movements, attendance per day, fixes with old → new and reason | `/projects/[id]/logs` | movements, materials, wage-payments, workers, attendance, adjustments | MOCKED, verified in a browser |
+| Site: work by phase, changes, progress timeline | `/projects/[id]/site` | checklists, proposals, timeline | MOCKED, verified in a browser |
+| Money: where it went, spend per week, wage sheet by range (CSV/PDF links when signed in) | `/projects/[id]/money` | summary, wage-sheet | MOCKED, verified in a browser |
+| Logo: mark and lockup in the nav, phone bar and project list; favicon | all | none | VERIFIED |
 | App shell: floating top nav (desktop), bottom dock (phone), project switcher, role action sheets, project list and home | `/projects`, `/projects/[id]` and its `logs`, `site`, `money`, `stock`, `wages` placeholders | `GET /projects` (mocked: needs a session, login not built) | MOCKED, verified in a browser |
 | Design tokens, fonts, theme toggle, restyled ui primitives | `/styleguide` (development only, 404 in production) | none | VERIFIED |
 | All main screens, round 2 (prototype page, not app code) | n/a | demo data; needs requests 4–11 | MOCKED (prototype) |
@@ -41,6 +47,119 @@ proposed method + path, fields, priority / blocking.
 | 19 | **Fraud flags** in the summary for owners: new supplier, bank change, a rate far above recent buys, a payment with no verified delivery, an entry with no engineer confirmation, repeated delays. Proposed `fraudFlags: [{kind, refType, refId, raisedOn}]` on `SummaryResponse` for owners only. | Owner dashboard | Medium | Open |
 
 ## Entries
+
+### 2026-11-26 IST · Contractor screens: Today, Stock, Wages
+
+- **Branch / commit:** `fe/contractor-screens`, with `main` merged in (M6: proposals, checklist
+  verification, Windows launcher; no frontend files conflicted).
+- **Done (all on mocks, MOCKED):**
+  - **Today** (`/projects/[id]`, contractor): tabs Delivery, Usage, Attendance, driven by `?log=`
+    so the centre Log sheet links straight to a tab. Each form shows the balance on site, checks blank
+    fields with a plain sentence, and shows the API's own refusal (duplicate challan, not enough
+    stock, attendance already saved). Attendance defaults everyone to Full and shows a count on the
+    save button; a date that is already saved is locked, and a person is changed with Fix.
+  - **Fix sheet** for stock entries, attendance and wage payments: new value plus a reason of at least
+    10 characters. The value in force is the newest correction for that record, else the original.
+  - **Stock** (contractor and engineer): per material, the balance, a low-stock flag and a 14-day area
+    chart rebuilt from the movements.
+  - **Wages**: range presets and date inputs, totals (earned, paid, advances, still due), per-worker
+    rows with Pay, a Record payment sheet, and the range's payments with Fix.
+- **Not done, needs the API:** the challan photo on a delivery and the Photo tile in the Log sheet
+  need multipart in `api()`; both say so on screen. Payment reference rules per mode wait on request 9.
+- **Files:** new `src/components/{forms.tsx,today/*,stock/*,wages/*}`; changed `project-home.tsx`,
+  `action-sheet.tsx` and the stock and wages route pages.
+- **Tests:**
+  - `pnpm lint`, `pnpm typecheck`: pass. `vitest run src`: 59 pass (new: parsing, first-problem,
+    effective value).
+  - Playwright against `next dev` (mocks) at 390 px light and 1440 px dark: delivery saves and shows
+    the new balance; blank field, duplicate challan, over-use (names the balance), short fix reason
+    and a saved fix; payment recorded. No horizontal overflow, no console errors, nothing tappable
+    under 40 px on Today, Stock and Wages.
+- **Backend since the last entry:** M6 is merged (requests 7 and 8 are in the contract); requests 4,
+  5, 6, 9, 11 to 19 are still open. Nothing here depends on them.
+- **Next:** the engineer side (Review, checklist status, Stock, Logs without money), then wiring
+  login so the mocks can be switched off.
+
+### 2026-11-25 20:48 IST · Contractor groundwork, role badge, stock fix
+
+- **Branch / commit:** `fe/contractor-screens`, stacked on `fe/owner-screens` (PR #18).
+- **Done:**
+  - Contractor write mocks (`src/mocks/write-routes.ts`) for deliveries, usages, attendance, wage
+    payments and adjustments. They refuse what the API refuses:
+    - `DUPLICATE_CHALLAN` (supplier and challan matched trimmed and case-insensitive)
+    - `INSUFFICIENT_STOCK` with `details` naming the material and its balance
+    - `CONFLICT` for attendance already saved for that day, and for a no-op fix
+    - 400 for input that fails the shared schema
+    - a fix that would overdraw stock
+  - Mock errors now carry `details` like the real API.
+  - Write hooks validate with the shared input schemas and refresh the project's data.
+- **Fixed:** the demo stock balance counted a delivery fix twice (the corrected quantity and its
+  compensating movement). The balance is now the plain sum of the append-only movements, and the
+  corrected quantity is used only for cost.
+- **Design (frontend developer):** the role (Owner, Contractor, Engineer) shows beside the logo on
+  desktop and phone. The line under "Week N" on Home is now the sans font at a smaller size.
+- **Tests:**
+  - `pnpm lint`, `pnpm typecheck`: pass.
+  - `vitest run src`: 46 pass. New: delivery adds to stock, a duplicate challan is refused, usage
+    over stock is refused with the balance, attendance saves once per day, input is validated, and a
+    delivery fix changes stock once and refuses a no-op.
+  - Playwright owner Home at 390, 1024 and 1440 px: no overflow, no errors.
+- **Next:** contractor UI (Today with Delivery, Usage and Attendance forms and fixes; Stock; Wages
+  with record payment), then the engineer side.
+
+### 2026-11-25 20:39 IST · Owner side, full demo mocks, logo
+
+- **Branch / commit:** `fe/owner-screens`, stacked on `fe/design-tokens` (PR #16).
+- **Mocks:** `src/mocks/world.ts` simulates each demo project day by day from its start date
+  (relative to today) to now:
+  - deliveries and daily usage that never go below zero
+  - attendance for the crew, weekly wage payments and a few advances
+  - three corrections (a half day, a delivery quantity, a payment amount)
+  - proposals, a checklist and progress notes
+  `src/mocks/routes.ts` answers every owner read route from that world. Every response is parsed
+  with its shared schema, the routes follow the documented role rules (engineers get 403 on
+  worker-level routes and see no payment activity), and decisions and checklist updates change the
+  in-memory world. Mocks run in the browser, so a reload resets them. `src/mocks/routes.test.ts` calls
+  every read route for every role and checks:
+  - the spend split and the weekly series add up to the total
+  - stock never goes negative
+  - only the owner can decide, and only once
+- **Screens (owner):**
+  - **Home:**
+    - left in budget, with the exact amount on tap and the split bar
+    - spent over time, the smooth area chart; drag or use the arrow keys to look back
+    - needs you: pending changes, low stock, materials over plan
+    - today on site, written as readable lines from activity
+    - recent spends with the filter sheet and removable chips
+    - material use vs plan (hatched = planned from `materialVariance`, solid = used, amber = over
+      tolerance)
+    - stock with 14-day sparklines rebuilt from dated movements
+  - **Approvals:** the centre button and Home share one list; approve and reject call the decision
+    route.
+  - **Logs:** spends, with each day's wage payments folded into one expandable line; stock
+    movements; attendance per day; fixes.
+  - **Site:** phase progress, changes, progress timeline. Photos are a labelled placeholder while
+    mocks are on; live photos use the protected same-origin route.
+  - **Money:** where it went, weekly stacked bars (materials + wages add up to the week), wage sheet
+    for this week, the last 30 days or the whole project. CSV and PDF are links to the real export;
+    under mocks they say they need sign-in.
+- **Logo:** the final "J" lockup from the logo drafts canvas. The mark (orange slab, ink courses
+  following the theme) sits in the desktop nav, the phone top bar and the project list (with the
+  tagline). `src/app/icon.svg` is the two-slab favicon. The wordmark uses Newsreader to match the
+  app (the drafts used Instrument Serif). No Apple touch icon: it needs a PNG.
+- **Honest limits shown in the UI:** "Other" spend stays at zero (no write endpoint); Team needs
+  request 12; downloads need sign-in.
+- **Tests:**
+  - `pnpm lint`, `pnpm typecheck`: pass; `vitest run src`: 41 pass.
+  - Playwright on every owner screen at 390 and 1440 px, light and dark: no overflow, no console
+    errors, nothing tappable under 44 px.
+  - Owner flows pass:
+    - approving drops the pending count
+    - the wages filter shows only wage rows, and its chip clears it
+    - the chart scrubs by keyboard
+    - fixes show old → new with the reason
+    - the wage-sheet range changes the totals
+- **Next:** contractor side (Today forms, Stock, Wages), then engineer (Review, checklist updates).
 
 ### 2026-11-25 20:12 IST · Stage 2: app shell
 

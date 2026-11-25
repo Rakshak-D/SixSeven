@@ -1,5 +1,6 @@
 import type { ZodType } from "zod";
 import { type MockRoute, mocks, mocksEnabled } from "@/mocks";
+import { MockError } from "@/mocks/types";
 import { ErrorResponse } from "@/shared/errors";
 
 const BASE = "/api/v1";
@@ -50,7 +51,16 @@ export async function api<T>(
 
   if (mocksEnabled) {
     const hit = matchMock(method, path);
-    if (hit) return parse(await hit.mock.respond({ params: hit.params, body: opts.body }));
+    if (hit) {
+      const query = new URLSearchParams(path.split("?")[1] ?? "");
+      try {
+        return parse(await hit.mock.respond({ params: hit.params, query, body: opts.body }));
+      } catch (error) {
+        if (error instanceof MockError)
+          throw new ApiClientError(error.status, error.code, error.message, error.details);
+        throw error;
+      }
+    }
   }
 
   const res = await fetch(`${BASE}${path}`, {

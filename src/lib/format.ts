@@ -34,3 +34,33 @@ const dateFormat = new Intl.DateTimeFormat("en-IN", {
 export function formatIsoDate(isoDate: string): string {
   return dateFormat.format(new Date(`${isoDate}T00:00:00Z`));
 }
+
+const qtyFormat = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 3 });
+
+/** A material quantity in Indian grouping, up to three decimals: 6000 → "6,000", 2.5 → "2.5". */
+export function formatQty(qty: number): string {
+  return qtyFormat.format(qty);
+}
+
+const timeFormat = new Intl.DateTimeFormat("en-IN", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+  timeZone: "Asia/Kolkata",
+});
+
+/** Site (IST) time of a timestamp: "4:10 pm". */
+export function formatTimeIst(timestamp: string): string {
+  return timeFormat.format(new Date(timestamp)).replace(/\s+/g, " ").toLowerCase();
+}
+
+const shortDate = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  timeZone: "UTC",
+});
+
+/** "25 Nov" for an ISO date. */
+export function formatShortDate(isoDate: string): string {
+  return shortDate.format(new Date(`${isoDate}T00:00:00Z`));
+}
