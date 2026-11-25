@@ -9,6 +9,12 @@ checks pass) · **VERIFIED** (exercised in a browser at phone and desktop sizes)
 
 | Screen / feature | Route | API it needs | Status |
 |---|---|---|---|
+| Owner Home: left in budget, spent over time (from `spendByWeek`), needs you, today on site, recent spends with filters, material use vs plan, stock sparklines | `/projects/[id]` (owner) | summary, stock, movements, materials, activity, proposals, checklists, wage-payments, workers, adjustments | MOCKED, verified in a browser |
+| Owner approvals (centre button and Home): approve or reject proposed changes | sheet | `GET /projects/:id/proposals`, `POST /proposals/:id/decision` | MOCKED, verified in a browser |
+| Logs: spends (wages folded per day), stock movements, attendance per day, fixes with old → new and reason | `/projects/[id]/logs` | movements, materials, wage-payments, workers, attendance, adjustments | MOCKED, verified in a browser |
+| Site: work by phase, changes, progress timeline | `/projects/[id]/site` | checklists, proposals, timeline | MOCKED, verified in a browser |
+| Money: where it went, spend per week, wage sheet by range (CSV/PDF links when signed in) | `/projects/[id]/money` | summary, wage-sheet | MOCKED, verified in a browser |
+| Logo: mark and lockup in the nav, phone bar and project list; favicon | all | none | VERIFIED |
 | App shell: floating top nav (desktop), bottom dock (phone), project switcher, role action sheets, project list and home | `/projects`, `/projects/[id]` and its `logs`, `site`, `money`, `stock`, `wages` placeholders | `GET /projects` (mocked: needs a session, login not built) | MOCKED, verified in a browser |
 | Design tokens, fonts, theme toggle, restyled ui primitives | `/styleguide` (development only, 404 in production) | none | VERIFIED |
 | All main screens, round 2 (prototype page, not app code) | n/a | demo data; needs requests 4–11 | MOCKED (prototype) |
@@ -41,6 +47,60 @@ proposed method + path, fields, priority / blocking.
 | 19 | **Fraud flags** in the summary for owners: new supplier, bank change, a rate far above recent buys, a payment with no verified delivery, an entry with no engineer confirmation, repeated delays. Proposed `fraudFlags: [{kind, refType, refId, raisedOn}]` on `SummaryResponse` for owners only. | Owner dashboard | Medium | Open |
 
 ## Entries
+
+### 2026-11-25 20:39 IST · Owner side, full demo mocks, logo
+
+- **Branch / commit:** `fe/owner-screens`, stacked on `fe/design-tokens` (PR #16).
+- **Mocks:** `src/mocks/world.ts` simulates each demo project day by day from its start date
+  (relative to today) to now:
+  - deliveries and daily usage that never go below zero
+  - attendance for the crew, weekly wage payments and a few advances
+  - three corrections (a half day, a delivery quantity, a payment amount)
+  - proposals, a checklist and progress notes
+  `src/mocks/routes.ts` answers every owner read route from that world. Every response is parsed
+  with its shared schema, the routes follow the documented role rules (engineers get 403 on
+  worker-level routes and see no payment activity), and decisions and checklist updates change the
+  in-memory world. Mocks run in the browser, so a reload resets them. `src/mocks/routes.test.ts` calls
+  every read route for every role and checks:
+  - the spend split and the weekly series add up to the total
+  - stock never goes negative
+  - only the owner can decide, and only once
+- **Screens (owner):**
+  - **Home:**
+    - left in budget, with the exact amount on tap and the split bar
+    - spent over time, the smooth area chart; drag or use the arrow keys to look back
+    - needs you: pending changes, low stock, materials over plan
+    - today on site, written as readable lines from activity
+    - recent spends with the filter sheet and removable chips
+    - material use vs plan (hatched = planned from `materialVariance`, solid = used, amber = over
+      tolerance)
+    - stock with 14-day sparklines rebuilt from dated movements
+  - **Approvals:** the centre button and Home share one list; approve and reject call the decision
+    route.
+  - **Logs:** spends, with each day's wage payments folded into one expandable line; stock
+    movements; attendance per day; fixes.
+  - **Site:** phase progress, changes, progress timeline. Photos are a labelled placeholder while
+    mocks are on; live photos use the protected same-origin route.
+  - **Money:** where it went, weekly stacked bars (materials + wages add up to the week), wage sheet
+    for this week, the last 30 days or the whole project. CSV and PDF are links to the real export;
+    under mocks they say they need sign-in.
+- **Logo:** the final "J" lockup from the logo drafts canvas. The mark (orange slab, ink courses
+  following the theme) sits in the desktop nav, the phone top bar and the project list (with the
+  tagline). `src/app/icon.svg` is the two-slab favicon. The wordmark uses Newsreader to match the
+  app (the drafts used Instrument Serif). No Apple touch icon: it needs a PNG.
+- **Honest limits shown in the UI:** "Other" spend stays at zero (no write endpoint); Team needs
+  request 12; downloads need sign-in.
+- **Tests:**
+  - `pnpm lint`, `pnpm typecheck`: pass; `vitest run src`: 41 pass.
+  - Playwright on every owner screen at 390 and 1440 px, light and dark: no overflow, no console
+    errors, nothing tappable under 44 px.
+  - Owner flows pass:
+    - approving drops the pending count
+    - the wages filter shows only wage rows, and its chip clears it
+    - the chart scrubs by keyboard
+    - fixes show old → new with the reason
+    - the wage-sheet range changes the totals
+- **Next:** contractor side (Today forms, Stock, Wages), then engineer (Review, checklist updates).
 
 ### 2026-11-25 20:12 IST · Stage 2: app shell
 

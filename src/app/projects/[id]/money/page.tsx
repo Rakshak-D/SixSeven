@@ -1,10 +1,5 @@
-import { SectionPlaceholder } from "@/components/shell/section-placeholder";
+import { MoneyPage } from "@/components/money/money-page";
 
-export default function MoneyPage() {
-  return (
-    <SectionPlaceholder
-      title="Money"
-      what="Where the budget went: materials, wages and other costs, week by week."
-    />
-  );
+export default function ProjectMoneyPage() {
+  return <MoneyPage />;
 }

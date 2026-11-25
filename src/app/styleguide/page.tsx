@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { SlateLockup } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export default function StyleguidePage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-24 sm:px-6">
       <header className="flex animate-drop items-center justify-between gap-4 rounded-full border bg-card py-2 pr-2 pl-6 shadow-float">
-        <span className="font-serif text-3xl leading-none">Slate</span>
+        <SlateLockup />
         <span className="hidden rounded-full border px-3 py-1 font-semibold text-muted-foreground text-sm sm:inline">
           Design tokens · development only
         </span>

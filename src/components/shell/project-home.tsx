@@ -1,5 +1,6 @@
 "use client";
 
+import { OwnerHome } from "@/components/owner/owner-home";
 import { formatIsoDate, formatPaise, formatPaiseShort } from "@/lib/format";
 import { roleNav } from "./nav";
 import { useCurrentProject } from "./project-context";
@@ -9,6 +10,7 @@ const roleLabel = { owner: "owner", contractor: "contractor", engineer: "site en
 /** Project home (Home, or Today for contractors). Shows only what the project contract carries today. */
 export function ProjectHome() {
   const project = useCurrentProject();
+  if (project.role === "owner") return <OwnerHome />;
   const title = roleNav[project.role].tabs[0].label;
   return (
     <section className="animate-rise rounded-[2.25rem] border bg-band p-6 sm:p-9">

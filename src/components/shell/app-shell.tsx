@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
+import { SlateMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,7 +82,14 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         activeIndex={activeIndex}
         onAction={openAction}
       />
-      <div className="flex items-center gap-2 px-2 pt-3 lg:hidden">
+      <div className="flex items-center gap-1 px-2 pt-3 lg:hidden">
+        <Link
+          href="/projects"
+          aria-label="Slate, your projects"
+          className="flex size-11 shrink-0 items-center justify-center"
+        >
+          <SlateMark />
+        </Link>
         <div className="min-w-0 flex-1">
           <ProjectSwitcher current={project} projects={projects.data} />
         </div>
@@ -92,7 +100,12 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         {children}
       </main>
       <Dock projectId={project.id} nav={nav} activeIndex={activeIndex} onAction={openAction} />
-      <ActionSheet kind={nav.action.kind} open={actionOpen} onOpenChange={setActionOpen} />
+      <ActionSheet
+        kind={nav.action.kind}
+        projectId={project.id}
+        open={actionOpen}
+        onOpenChange={setActionOpen}
+      />
     </ProjectProvider>
   );
 }
