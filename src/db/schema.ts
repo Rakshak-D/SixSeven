@@ -82,7 +82,8 @@ export const projectInvitations = pgTable(
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    email: text().notNull(),
+    email: text(),
+    phone: text(),
     role: projectRole().notNull(),
     invitedBy: text("invited_by")
       .notNull()
@@ -93,15 +94,17 @@ export const projectInvitations = pgTable(
   },
   (t) => [
     unique("project_invitation_email_unique").on(t.projectId, t.email),
+    unique("project_invitation_phone_unique").on(t.projectId, t.phone),
     index("project_invitation_recipient_idx").on(t.email, t.acceptedAt, t.createdAt),
     check(
       "project_invitation_recipient_canonical",
-      sql`${t.email} = lower(btrim(${t.email})) and char_length(${t.email}) between 3 and 254`,
+      sql`(${t.email} is not null and ${t.phone} is null and ${t.email} = lower(btrim(${t.email})) and char_length(${t.email}) between 3 and 254)
+        or (${t.phone} is not null and ${t.email} is null and ${t.phone} ~ '^[+]91[6-9][0-9]{9}$')`,
     ),
     check("project_invitation_role", sql`${t.role} in ('owner', 'contractor')`),
     check(
       "project_invitation_acceptance",
-      sql`(${t.acceptedBy} is null) = (${t.acceptedAt} is null)`,
+      sql`(${t.acceptedBy} is null) = (${t.acceptedAt} is null) and (${t.phone} is null or ${t.acceptedAt} is null)`,
     ),
   ],
 );

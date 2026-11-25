@@ -1,10 +1,11 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { user } from "@/db/auth-schema";
 import type { Db, Transaction } from "@/db/client";
 import { projectInvitations, projectMembers, projects } from "@/db/schema";
 import { ErrorCode } from "@/shared/errors";
 import {
   type CreateProjectInvitationInput,
+  type ProjectInvitationQuery,
   ProjectInvitationResponse,
 } from "@/shared/schemas/projects";
 import type { Actor } from "../middleware/auth";
@@ -16,9 +17,35 @@ const invitationFields = {
   id: projectInvitations.id,
   projectId: projectInvitations.projectId,
   email: projectInvitations.email,
+  phone: projectInvitations.phone,
   role: projectInvitations.role,
   createdAt: projectInvitations.createdAt,
+  acceptedAt: projectInvitations.acceptedAt,
 };
+
+function present({
+  email,
+  phone,
+  acceptedAt,
+  createdAt,
+  ...row
+}: {
+  email: string | null;
+  phone: string | null;
+  acceptedAt: Date | null;
+  createdAt: Date;
+  id: string;
+  projectId: string;
+  projectName: string;
+  role: string;
+}) {
+  return ProjectInvitationResponse.parse({
+    ...row,
+    ...(email ? { email } : { phone }),
+    status: acceptedAt ? "accepted" : "pending",
+    createdAt: createdAt.toISOString(),
+  });
+}
 
 async function accountEmail(db: Db | Transaction, actor: Actor) {
   const [account] = await db
@@ -37,12 +64,16 @@ export async function createProjectInvitation(
 ) {
   return db.transaction(async (tx) => {
     const project = await requireProjectAccess(tx, actor, projectId, ["engineer"]);
-    const email = input.email.toLowerCase();
-    const [member] = await tx
-      .select({ id: user.id })
-      .from(user)
-      .innerJoin(projectMembers, eq(projectMembers.userId, user.id))
-      .where(and(eq(projectMembers.projectId, projectId), sql`lower(${user.email}) = ${email}`));
+    const email = "email" in input ? input.email.toLowerCase() : null;
+    const phone =
+      "phone" in input ? (input.phone.startsWith("+91") ? input.phone : `+91${input.phone}`) : null;
+    const [member] = email
+      ? await tx
+          .select({ id: user.id })
+          .from(user)
+          .innerJoin(projectMembers, eq(projectMembers.userId, user.id))
+          .where(and(eq(projectMembers.projectId, projectId), sql`lower(${user.email}) = ${email}`))
+      : [];
     if (member)
       throw new ApiError(409, ErrorCode.CONFLICT, "That account already belongs to this project");
     const [invitation] = await tx
@@ -51,10 +82,11 @@ export async function createProjectInvitation(
         id: crypto.randomUUID(),
         projectId,
         email,
+        phone,
         role: input.role,
         invitedBy: actor.userId,
       })
-      .onConflictDoNothing({ target: [projectInvitations.projectId, projectInvitations.email] })
+      .onConflictDoNothing()
       .returning(invitationFields);
     if (!invitation)
       throw new ApiError(409, ErrorCode.CONFLICT, "An invitation already exists for this address");
@@ -65,11 +97,7 @@ export async function createProjectInvitation(
       entity: "invitation",
       entityId: invitation.id,
     });
-    return ProjectInvitationResponse.parse({
-      ...invitation,
-      projectName: project.name,
-      createdAt: invitation.createdAt.toISOString(),
-    });
+    return present({ ...invitation, projectName: project.name });
   });
 }
 
@@ -81,8 +109,32 @@ export async function listMyInvitations(db: Db, actor: Actor) {
     .innerJoin(projects, eq(projects.id, projectInvitations.projectId))
     .where(and(eq(projectInvitations.email, email), isNull(projectInvitations.acceptedAt)))
     .orderBy(desc(projectInvitations.createdAt), desc(projectInvitations.id));
-  return rows.map((row) =>
-    ProjectInvitationResponse.parse({ ...row, createdAt: row.createdAt.toISOString() }),
+  return rows.map(present);
+}
+
+export async function listProjectInvitations(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+  query: ProjectInvitationQuery,
+) {
+  return db.transaction(
+    async (tx) => {
+      const project = await requireProjectAccess(tx, actor, projectId, ["engineer"]);
+      const status =
+        query.status === "pending"
+          ? isNull(projectInvitations.acceptedAt)
+          : query.status === "accepted"
+            ? isNotNull(projectInvitations.acceptedAt)
+            : undefined;
+      const rows = await tx
+        .select(invitationFields)
+        .from(projectInvitations)
+        .where(and(eq(projectInvitations.projectId, projectId), status))
+        .orderBy(desc(projectInvitations.createdAt), desc(projectInvitations.id));
+      return rows.map((row) => present({ ...row, projectName: project.name }));
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
   );
 }
 

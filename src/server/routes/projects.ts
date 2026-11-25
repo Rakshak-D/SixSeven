@@ -6,6 +6,7 @@ import {
   AddProjectMemberInput,
   CreateProjectInput,
   CreateProjectInvitationInput,
+  ProjectInvitationQuery,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
   ProjectMemberResponse,
@@ -18,6 +19,7 @@ import {
   acceptProjectInvitation,
   createProjectInvitation,
   listMyInvitations,
+  listProjectInvitations,
 } from "../services/invitations";
 import {
   addProjectMember,
@@ -133,6 +135,32 @@ export const projects = createRouter<AuthEnv>()
           c.req.valid("json"),
         ),
         201,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/projects/{id}/invitations",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: IdParams, query: ProjectInvitationQuery },
+      responses: {
+        200: {
+          description: "Project invitation status for engineers",
+          content: json(ProjectInvitationsResponse),
+        },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(
+        await listProjectInvitations(
+          getDatabase().db,
+          c.get("actor"),
+          c.req.valid("param").id,
+          c.req.valid("query"),
+        ),
+        200,
       ),
   )
   .openapi(

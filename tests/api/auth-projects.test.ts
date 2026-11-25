@@ -358,6 +358,22 @@ describe("projects and scoped access", () => {
     const acceptedContractor = await call(`/invitations/${next.id}/accept`, contractor.cookie, {});
     expect(acceptedContractor.status).toBe(200);
     expect(ProjectMemberResponse.parse(await acceptedContractor.json()).role).toBe("contractor");
+    const listing = await call(`${path}?status=accepted`, engineer.cookie);
+    expect(listing.status).toBe(200);
+    expect(ProjectInvitationsResponse.parse(await listing.json())).toHaveLength(2);
+    await error(await call(path, contractor.cookie), 403, "FORBIDDEN");
+    const phoneInput = { phone: "9876543210", role: "owner" };
+    const phoneCreated = await call(path, engineer.cookie, phoneInput);
+    expect(phoneCreated.status).toBe(201);
+    const phone = ProjectInvitationResponse.parse(await phoneCreated.json());
+    expect(phone).toMatchObject({ phone: "+919876543210", status: "pending" });
+    await error(
+      await call(path, engineer.cookie, { ...phoneInput, phone: "+919876543210" }),
+      409,
+      "CONFLICT",
+    );
+    const phoneAccept = `/invitations/${phone.id}/accept`;
+    await error(await call(phoneAccept, owner.cookie, {}), 404, "NOT_FOUND");
     await error(
       await call(`/projects/${project.id}/members`, contractor.cookie, {
         email: "isolated@demo.invalid",

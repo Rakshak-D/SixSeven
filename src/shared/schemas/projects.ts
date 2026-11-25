@@ -2,22 +2,36 @@ import { z } from "zod";
 import { Id, IsoDate, Label, Paise, Role, Timestamp } from "./common";
 
 const InvitationRole = z.enum(["owner", "contractor"]);
-export const CreateProjectInvitationInput = z.strictObject({
-  email: z.string().trim().pipe(z.email().max(254)),
-  role: InvitationRole,
+export const IndianMobileInput = z
+  .string()
+  .trim()
+  .regex(/^(?:\+91)?[6-9][0-9]{9}$/);
+export const IndianMobile = z.string().regex(/^\+91[6-9][0-9]{9}$/);
+export const CreateProjectInvitationInput = z.union([
+  z.strictObject({ email: z.string().trim().pipe(z.email().max(254)), role: InvitationRole }),
+  z.strictObject({ phone: IndianMobileInput, role: InvitationRole }),
+]);
+export const ProjectInvitationStatus = z.enum(["pending", "accepted"]);
+export const ProjectInvitationQuery = z.strictObject({
+  status: ProjectInvitationStatus.optional(),
 });
-export const ProjectInvitationResponse = z.strictObject({
+const invitation = {
   id: Id,
   projectId: Id,
   projectName: Label,
-  email: z.email(),
   role: InvitationRole,
   createdAt: Timestamp,
-});
+  status: ProjectInvitationStatus,
+};
+export const ProjectInvitationResponse = z.union([
+  z.strictObject({ ...invitation, email: z.email() }),
+  z.strictObject({ ...invitation, phone: IndianMobile }),
+]);
 export const ProjectInvitationsResponse = z.array(ProjectInvitationResponse);
 export type CreateProjectInvitationInput = z.infer<typeof CreateProjectInvitationInput>;
 export type ProjectInvitationResponse = z.infer<typeof ProjectInvitationResponse>;
 export type ProjectInvitationsResponse = z.infer<typeof ProjectInvitationsResponse>;
+export type ProjectInvitationQuery = z.infer<typeof ProjectInvitationQuery>;
 
 export const AddProjectMemberInput = z.strictObject({
   email: z.email().max(254),
