@@ -7,6 +7,7 @@ import { PhotoMime } from "@/shared/schemas/progress";
 import type { Actor } from "../middleware/auth";
 import { ApiError } from "../middleware/errors";
 import { recordAudit } from "./audit";
+import { captureTimes } from "./capture-times";
 import { persistValidatedPhotos, readStoredPhoto, validateImageUpload } from "./photo-storage";
 import { requireProjectAccess } from "./projects";
 
@@ -30,9 +31,12 @@ export async function attachChallanPhoto(
   projectId: string,
   deliveryId: string,
   file: File,
+  capture: string,
 ) {
   await requireProjectAccess(db, actor, projectId, ["contractor"]);
   await requireDelivery(db, projectId, deliveryId);
+  const receivedAt = new Date();
+  const [capturedAt] = captureTimes([capture], 1, receivedAt);
   const stored = await persistValidatedPhotos([await validateImageUpload(file)]);
   try {
     const photo = stored.photos[0];
@@ -41,7 +45,14 @@ export async function attachChallanPhoto(
       await requireDelivery(tx, projectId, deliveryId);
       const [inserted] = await tx
         .insert(deliveryChallanPhotos)
-        .values({ ...photo, projectId, deliveryId, createdBy: actor.userId })
+        .values({
+          ...photo,
+          projectId,
+          deliveryId,
+          createdBy: actor.userId,
+          capturedAt,
+          receivedAt,
+        })
         .onConflictDoNothing({ target: deliveryChallanPhotos.deliveryId })
         .returning({ createdAt: deliveryChallanPhotos.createdAt });
       if (!inserted)
@@ -58,6 +69,8 @@ export async function attachChallanPhoto(
         mime: photo.mime,
         sizeBytes: photo.sizeBytes,
         createdAt: inserted.createdAt.toISOString(),
+        capturedAt: capturedAt.toISOString(),
+        receivedAt: receivedAt.toISOString(),
         url: `/api/v1/projects/${projectId}/deliveries/${deliveryId}/challan-photo`,
       });
     });

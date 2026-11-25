@@ -16,7 +16,7 @@ import {
   VerifiedChecklistsResponse,
 } from "@/shared/schemas/checklist";
 import { IdParams, Note } from "@/shared/schemas/common";
-import { PhotoFile } from "@/shared/schemas/progress";
+import { CaptureTimestampParts, PhotoFile } from "@/shared/schemas/progress";
 import { json, projectAuth, projectBody, projectErrors } from "../lib/project-route";
 import { createRouter } from "../lib/router";
 import { type AuthEnv, requireActor } from "../middleware/auth";
@@ -38,6 +38,7 @@ const binaryFile = PhotoFile.openapi({ type: "string", format: "binary" });
 const completionInput = z.strictObject({
   note: Note,
   photos: z.union([binaryFile, z.array(binaryFile).min(1).max(10)]),
+  capturedAt: CaptureTimestampParts,
 });
 const draftForm = CreateChecklistDraftInput.extend({
   plan: binaryFile.optional(),
@@ -185,7 +186,7 @@ export const checklists = createRouter<AuthEnv>()
       responses: { 200: item, ...errors, ...oversized },
     }),
     async (c) => {
-      const { note, photos } = c.req.valid("form");
+      const { note, photos, capturedAt } = c.req.valid("form");
       return c.json(
         await submitItem(
           database(),
@@ -193,6 +194,7 @@ export const checklists = createRouter<AuthEnv>()
           c.req.valid("param").id,
           note,
           Array.isArray(photos) ? photos : [photos],
+          [capturedAt].flat(),
         ),
         200,
       );

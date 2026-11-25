@@ -504,6 +504,8 @@ export const deliveryChallanPhotos = pgTable(
     projectId: text("project_id").notNull(),
     deliveryId: text("delivery_id").primaryKey(),
     storageKey: text("storage_key").notNull().unique(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
     mime: text().notNull(),
     sizeBytes: integer("size_bytes").notNull(),
     createdBy: text("created_by")
@@ -512,6 +514,13 @@ export const deliveryChallanPhotos = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    check(
+      "challan_photo_capture_window",
+      sql`
+      (${t.capturedAt} is null and ${t.receivedAt} is null)
+      or (${t.capturedAt} is not null and ${t.receivedAt} is not null
+        and ${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds')`,
+    ),
     foreignKey({
       name: "delivery_challan_photo_movement_fk",
       columns: [t.projectId, t.deliveryId],
@@ -602,6 +611,8 @@ export const progressPhotos = pgTable(
   "progress_photos",
   {
     id: text().primaryKey(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
     projectId: text("project_id").notNull(),
     progressId: text("progress_id").notNull(),
     mime: text().notNull(),
@@ -611,6 +622,13 @@ export const progressPhotos = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    check(
+      "progress_photo_capture_window",
+      sql`
+      (${t.capturedAt} is null and ${t.receivedAt} is null)
+      or (${t.capturedAt} is not null and ${t.receivedAt} is not null
+        and ${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds')`,
+    ),
     foreignKey({
       name: "progress_photos_project_update_fk",
       columns: [t.projectId, t.progressId],

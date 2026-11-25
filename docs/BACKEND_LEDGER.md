@@ -2,6 +2,12 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Photo capture timestamps (#27)
+
+- Branch `be/photo-capture-times`. New progress, checklist completion and challan uploads require an ISO `capturedAt` per image. It must be no more than ten minutes before receipt or 30 seconds ahead. Migration `0013_photo_capture_times` preserves existing metadata and constrains the new capture/receipt pairs in PostgreSQL. Medical uses the same timestamp validator.
+- Frontend handoff: send ordered `capturedAt` parts in both uploads in `src/hooks/use-project-data.ts` and single `capturedAt` with challan FormData. Use the camera capture time. Keep this PR in draft until the active clients send the required parts. Client timestamps cannot authenticate a camera.
+- Existing disposable PostgreSQL upgraded successfully. Biome, typecheck and 151 local tests passed before the final main sync. Full CI is required before integration.
+
 ## Entry — Medical claims and bill photo contract
 
 - Branch `be/medical-evidence`, requests #23 and #27. Medical bill submissions use one `capturedAt` part per `billPhotos` part in matching order. This confirms the frontend ledger's multipart convention. The author and authorized reviewers can fetch private bill images.
