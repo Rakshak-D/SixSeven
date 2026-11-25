@@ -121,7 +121,13 @@ export const checklists = createRouter<AuthEnv>()
       if (!parsed.success) throw invalid("Invalid checklist draft request");
       if (parsed.data.body.plan) await validateImageUpload(parsed.data.body.plan);
       return c.json(
-        await generateDraft(database(), c.get("actor"), c.req.valid("param").id, query.source),
+        await generateDraft(
+          database(),
+          c.get("actor"),
+          c.req.valid("param").id,
+          query.source,
+          parsed.data.body,
+        ),
         200,
       );
     },

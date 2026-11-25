@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DailyRatePaise, HalfDays, Id, IsoDate, Timestamp } from "./common";
+import { DailyRatePaise, HalfDays, Id, IsoDate, Label, Timestamp } from "./common";
 
 export const CreateAttendanceInput = z
   .strictObject({
@@ -46,6 +46,16 @@ export const AttendanceRecord = z.strictObject({
   createdAt: Timestamp,
 });
 export const AttendanceListResponse = z.array(AttendanceRecord);
+export const AttendanceRosterEntry = z.strictObject({
+  id: Id,
+  workerId: Id,
+  workerName: Label,
+  workDate: IsoDate,
+  effectiveHalfDays: HalfDays,
+});
+export const AttendanceRosterResponse = z.array(AttendanceRosterEntry);
 export type AttendanceListQuery = z.infer<typeof AttendanceListQuery>;
 export type AttendanceRecord = z.infer<typeof AttendanceRecord>;
 export type AttendanceListResponse = z.infer<typeof AttendanceListResponse>;
+export type AttendanceRosterEntry = z.infer<typeof AttendanceRosterEntry>;
+export type AttendanceRosterResponse = z.infer<typeof AttendanceRosterResponse>;

@@ -50,6 +50,7 @@ All rows below have an available shared contract. The four project operations ar
 | P0 | GET /projects/:id/movements | Members | stock.StockMovementsQuery | — | 200 stock.StockMovementsResponse, newest first | — |
 | P0 | POST /projects/:id/attendance | Contractor | — | attendance.CreateAttendanceInput | 201 attendance.AttendanceResponse | CONFLICT for existing worker/date; entire batch rolls back |
 | P0 | GET /projects/:id/attendance | Owner, contractor | attendance.AttendanceListQuery | — | 200 attendance.AttendanceListResponse | — |
+| P0 | GET /projects/:id/attendance/roster | Members | attendance.AttendanceListQuery | — | 200 attendance.AttendanceRosterResponse | — |
 | P1 | POST /projects/:id/wage-payments | Contractor | — | wages.CreateWagePaymentInput | 201 wages.WagePaymentResponse | — |
 | P1 | GET /projects/:id/wage-payments | Owner, contractor | wages.WagePaymentListQuery | — | 200 wages.WagePaymentListResponse | — |
 | P1 | POST /projects/:id/adjustments | Contractor | — | adjustments.CreateAdjustmentInput | 201 adjustments.AdjustmentResponse | INSUFFICIENT_STOCK for a compensating move that would overdraw |
@@ -70,7 +71,7 @@ All rows below have an available shared contract. The four project operations ar
 
 ## Operation details
 
-- A member invite links an existing account by email. No email delivery or invitation redemption flow. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server.
+- A member invite links an existing account by email. No email delivery or invitation redemption flow. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server. Use the attendance roster for the engineer's dated log. It returns record ID, worker ID, worker name, work date and effective half-day units after corrections. It applies the same inclusive date and optional worker filters as the financial attendance read. The financial route still returns 403 for engineers.
 - Attendance and payment list date filters are inclusive and apply to the original work or payment date. Adjustment list dates filter the correction's creation date in IST. The optional target type and target ID filters narrow correction history. Results are newest first with a stable tie-breaker. Attendance and payment list records contain both the original and effective values. Adjustment records carry the prior and replacement values, reason and session-derived actor ID.
 - Materials start at zero stock. Delivery and usage requests and responses use positive amounts. Usage is negative in movement history. Delivery supplier/challan matching is trimmed and case-insensitive within the project. The guarded stock update, signed movement and audit event commit together. The maximum balance is 99,999,999,999.999.
 - Low stock means balance is less than or equal to the threshold. Movement history orders by occurrence date, creation time and ID, all descending. A movement filter for a missing or out-of-project material returns 404.

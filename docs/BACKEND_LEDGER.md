@@ -9,8 +9,16 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Requests #7 and #8 already have server implementations. The checklist read now has accurate documentation and an OpenAPI regression for the verified response. Request #10 already has a PostgreSQL regression for weekly reconciliation and the engineer-safe projection.
 - The Better Auth bridge accepts the empty stream Next supplies for a bodyless logout. A regression reproduces that request shape. On the Windows launcher with isolated PostgreSQL 16, all three demo accounts passed sign-in, HttpOnly cookie, session lookup, scoped project discovery, logout and old-cookie denial over HTTP.
 - `start.sh --live` provides local Compose startup for Linux/macOS and shares the database identity and migration history check with Windows. Bash and Node syntax checks passed locally. Ubuntu startup is covered by a new CI job. Native macOS startup has not been exercised.
-- Frozen installation, Biome and typecheck passed. The first local backend run passed 129 tests and timed out in the baseline upgrade migration at five seconds. A rerun uses a longer test deadline for Docker Desktop.
+- Frozen installation, Biome and typecheck passed. The first local backend run passed 129 tests and timed out in the baseline upgrade migration at five seconds. A rerun with a 20-second Docker Desktop test deadline passed all 130 tests across 17 files. The hosted Ubuntu launcher also passed.
+- Frontend CI handoff: run Biome formatting and import organization for `src/app/(auth)/sign-in/page.tsx`, and Biome formatting for `src/components/shell/ai-assistant-widget.tsx`. These main-branch errors stop the full CI job before PostgreSQL tests.
 - Next: engineer-safe attendance and worker lifecycle contracts, followed by project invitations, delivery scheduling and attachments, wage mode validation and team contacts. No frontend edit is required for the auth or checklist compatibility fixes.
+
+## Entry — Request #11 engineer attendance roster
+
+- Timestamp: 2026-11-26 IST. Branch: `be/attendance-roster`.
+- New `GET /api/v1/projects/:id/attendance/roster` returns a project member's dated attendance view with the latest effective half-day units. Its query and serializer omit wage rates, totals and adjustment details. Existing financial routes and permissions remain in force. No migration or new dependencies.
+- PostgreSQL verification: `vitest run tests/api/labour-accounting.test.ts --testTimeout 20000`, 12 passed. Covers engineer output after an attendance correction, missing sessions, cross-project denial and continued 403 on the financial route.
+- Frontend handoff: update the engineer Logs query in `src/hooks/use-project-data.ts` and its consumer under `src/components/logs/` to request the roster and parse `AttendanceRosterResponse`. Render the worker name and effective half-day units. Continue using the existing financial read for owner and contractor Logs.
 
 ## Entry — M6 proposals and checklist verification
 
