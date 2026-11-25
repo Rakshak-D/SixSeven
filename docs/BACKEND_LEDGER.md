@@ -2,6 +2,22 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M0 integration
+
+- Timestamp: 2026-11-25 15:12:14+05:30
+- Milestone/task ID: M0 closure
+- Branch: main for integration, chore/m0-closure for this ledger update.
+- Scope and changes: merged the approved coordination foundation and fast-forwarded local main.
+- Files affected by this closure record: docs/PROJECT_LEDGER.md and docs/BACKEND_LEDGER.md.
+- API or database changes: none.
+- Verification: PR #3 matched reviewed head aa1b3c6d97b8c7bb225998adf8247b599b982ea0 and passed CI run #8. The merge commit has the expected parents and matches the reviewed tree. Post-merge `git diff --check`, `corepack pnpm exec vitest run src/shared/money.test.ts` (3 tests), and `corepack pnpm typecheck` passed.
+- [Main CI run #10](https://github.com/Rakshak-D/SixSeven/actions/runs/45587831421) passed on the merge commit, including migration and the Vitest suite against CI PostgreSQL.
+- Dependencies added: none.
+- Known limitations: the PostgreSQL suite was not run locally because no isolated local database was started.
+- Frontend implications: no API contract changes.
+- Commit or PR reference: [PR #3](https://github.com/Rakshak-D/SixSeven/pull/3) merged as ac00d971e80b42508a3a85c9b184a1b70b47b0bf.
+- Next action: take in the complete project specification before defining backend contracts.
+
 ## Entry — M0 publication
 
 - Timestamp: 2026-11-25 15:01:20+05:30
