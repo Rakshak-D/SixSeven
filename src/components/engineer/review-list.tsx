@@ -48,11 +48,27 @@ function ReviewCard({
 }) {
   const review = useReviewChecklistItem(projectId);
   const submission = latestSubmission(item);
-  const [sending, setSending] = useState(false);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string>();
   if (!submission?.progressId) return null;
   const progressId = submission.progressId;
+
+  function decide(decision: "accept" | "send_back") {
+    const found = firstProblem([
+      [!note.trim(), "Add a note first."],
+      [
+        decision === "send_back" && note.trim().length < 10,
+        "Say what to fix, in at least 10 characters.",
+      ],
+    ]);
+    setProblem(found);
+    if (found) return;
+    const done = decision === "accept" ? "Accepted" : "Sent back";
+    review.mutate(
+      { itemId: item.id, decision, progressId, note },
+      { onSuccess: () => toast.success(`${done}: ${item.task}`) },
+    );
+  }
 
   return (
     <li className="rounded-3xl border bg-secondary p-4">
@@ -76,58 +92,23 @@ function ReviewCard({
         </p>
       )}
 
-      {sending ? (
-        <div className="mt-4 space-y-3">
-          <Field
-            label="What should the contractor fix?"
-            hint="At least 10 characters. They will read this."
-          >
-            {(id) => <TextArea id={id} value={note} onChange={setNote} />}
-          </Field>
-          <FormError error={problem ?? review.error} />
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => setSending(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={review.isPending}
-              onClick={() => {
-                const found = firstProblem([
-                  [note.trim().length < 10, "Say what to fix, in at least 10 characters."],
-                ]);
-                setProblem(found);
-                if (found) return;
-                review.mutate(
-                  { itemId: item.id, decision: "send_back", progressId, note },
-                  { onSuccess: () => toast.success(`Sent back: ${item.task}`) },
-                );
-              }}
-            >
-              Send back
-            </Button>
-          </div>
+      <div className="mt-4 space-y-3">
+        <Field
+          label="Your note"
+          hint="Required. The contractor reads it. To send back, say what to fix (10 characters or more)."
+        >
+          {(id) => <TextArea id={id} value={note} onChange={setNote} />}
+        </Field>
+        <FormError error={problem ?? review.error} />
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" disabled={review.isPending} onClick={() => decide("send_back")}>
+            Send back / Reject
+          </Button>
+          <Button disabled={review.isPending || !proof} onClick={() => decide("accept")}>
+            Accept
+          </Button>
         </div>
-      ) : (
-        <>
-          <FormError error={review.error} />
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => setSending(true)}>
-              Send back
-            </Button>
-            <Button
-              disabled={review.isPending || !proof}
-              onClick={() =>
-                review.mutate(
-                  { itemId: item.id, decision: "accept", progressId },
-                  { onSuccess: () => toast.success(`Accepted: ${item.task}`) },
-                )
-              }
-            >
-              Accept
-            </Button>
-          </div>
-        </>
-      )}
+      </div>
     </li>
   );
 }

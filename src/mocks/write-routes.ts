@@ -211,7 +211,7 @@ export const writeRoutes: MockRoute[] = [
           materialId: m.materialId,
           occurredOn: m.occurredOn,
           createdAt: now(),
-          note: "Correction",
+          note: `Fix: ${input.reason}`,
           type: "adjustment",
           qty: Math.round(delta * 1000) / 1000,
         });

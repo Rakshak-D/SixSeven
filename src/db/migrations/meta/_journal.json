@@ -54,8 +54,15 @@
     {
       "idx": 7,
       "version": "7",
-      "when": 1795647199007,
-      "tag": "0007_team_contacts",
+      "when": 1795646956289,
+      "tag": "0007_worker_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795648945446,
+      "tag": "0008_team_contacts",
       "breakpoints": true
     }
   ]

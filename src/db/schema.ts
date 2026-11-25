@@ -116,10 +116,18 @@ export const workers = pgTable(
     category: text().notNull(),
     dailyRatePaise: paise("daily_rate_paise").notNull(),
     active: boolean().notNull().default(true),
+    removedReason: text("removed_reason"),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
     unique("workers_project_id_unique").on(t.projectId, t.id),
+    check(
+      "worker_removal_metadata",
+      sql`(${t.removedReason} is null and ${t.removedAt} is null)
+          or (not ${t.active} and ${t.removedReason} is not null and ${t.removedAt} is not null
+              and char_length(btrim(${t.removedReason})) between 5 and 2000)`,
+    ),
     check(
       "worker_daily_rate_range",
       sql`${t.dailyRatePaise} between 2 and 9007199254740991 and ${t.dailyRatePaise} % 2 = 0`,

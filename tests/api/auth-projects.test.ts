@@ -154,7 +154,18 @@ describe("email/password authentication", () => {
     });
     expect(rejected.status).toBe(403);
     expect(AuthErrorResponse.parse(await rejected.json()).code).toBe("INVALID_ORIGIN");
-    const response = await authRequest("sign-out", { cookie, post: true });
+    const response = await POST(
+      new Request(new URL("/api/auth/sign-out", process.env.BETTER_AUTH_URL), {
+        method: "POST",
+        headers: {
+          cookie,
+          origin: process.env.BETTER_AUTH_URL ?? "",
+          "sec-fetch-site": "same-origin",
+          "content-length": "0",
+        },
+        body: new Uint8Array(0),
+      }),
+    );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
     expect(response.headers.getSetCookie().some((line) => /max-age=0/i.test(line))).toBe(true);

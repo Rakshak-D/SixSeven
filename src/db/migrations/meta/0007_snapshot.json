@@ -1,5 +1,5 @@
 {
-  "id": "14c30ba4-c051-4238-950e-0e8fc24c7f69",
+  "id": "844b4f19-566c-48fd-b342-352e6e6bb3cc",
   "prevId": "f473fd08-8626-4eda-8c56-a47fbec5fa4a",
   "version": "7",
   "dialect": "postgresql",
@@ -2170,6 +2170,18 @@
           "notNull": true,
           "default": true
         },
+        "removed_reason": {
+          "name": "removed_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2207,6 +2219,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "worker_removal_metadata": {
+          "name": "worker_removal_metadata",
+          "value": "(\"workers\".\"removed_reason\" is null and \"workers\".\"removed_at\" is null)\n          or (not \"workers\".\"active\" and \"workers\".\"removed_reason\" is not null and \"workers\".\"removed_at\" is not null\n              and char_length(btrim(\"workers\".\"removed_reason\")) between 5 and 2000)"
+        },
         "worker_daily_rate_range": {
           "name": "worker_daily_rate_range",
           "value": "\"workers\".\"daily_rate_paise\" between 2 and 9007199254740991 and \"workers\".\"daily_rate_paise\" % 2 = 0"
@@ -2497,12 +2513,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "phone": {
-          "name": "phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2531,12 +2541,7 @@
         }
       },
       "policies": {},
-      "checkConstraints": {
-        "user_indian_mobile": {
-          "name": "user_indian_mobile",
-          "value": "\"user\".\"phone\" is null or \"user\".\"phone\" ~ '^[+]91[6-9][0-9]{9}$'"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.verification": {
