@@ -1,6 +1,6 @@
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { expenses, materials, projects, stockMovements } from "@/db/schema";
+import { adjustments, expenses, materials, projects, stockMovements } from "@/db/schema";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
@@ -84,6 +84,29 @@ function quantityMilli(value: string) {
   return BigInt(match[1] ?? "0") * BigInt(1_000) + BigInt((match[2] ?? "").padEnd(3, "0") || "0");
 }
 
+function quantityMagnitudeMilli(value: string) {
+  return quantityMilli(value.startsWith("-") ? value.slice(1) : value);
+}
+
+function quantityText(milli: bigint) {
+  return `${milli / BigInt(1_000)}.${String(milli % BigInt(1_000)).padStart(3, "0")}`;
+}
+
+function decimalFraction(value: string) {
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(value);
+  if (!match) throw new Error("Database returned an invalid material tolerance");
+  const fraction = match[2] ?? "";
+  const denominator = BigInt(10) ** BigInt(fraction.length);
+  const numerator = BigInt(match[1] ?? "0") * denominator + BigInt(fraction || "0");
+  return { numerator, denominator };
+}
+
+function deliveryLinePaise(quantityMilli: bigint, unitCostPaise: number) {
+  const product = quantityMilli * BigInt(unitCostPaise);
+  // Positive delivery amounts round half up, matching PostgreSQL round(numeric, 0).
+  return (product + BigInt(500)) / BigInt(1_000);
+}
+
 type Spend = { materials: bigint; wages: bigint; other: bigint };
 
 function zeroSpend(): Spend {
@@ -121,62 +144,75 @@ export async function getProjectSummary(
         unit: materials.unit,
         plannedQty: sql<string>`${materials.plannedQty}::text`,
         tolerancePct: materials.tolerancePct,
+        toleranceValue: sql<string>`${materials.tolerancePct}::numeric::text`,
         lowStockQty: sql<string>`${materials.lowStockQty}::text`,
         balance: sql<string>`${materials.stockQty}::text`,
-        usedQty: hasElapsedRange
-          ? sql<string>`coalesce((
-          select sum(coalesce((
-            select a.new_value from adjustments a
-            where a.project_id = sm.project_id and a.target_table = 'stock_movements'
-              and a.target_id = sm.id
-            order by a.sequence_no desc limit 1
-          ), abs(sm.qty)::numeric))
-          from stock_movements sm
-          where sm.project_id = ${projectId} and sm.material_id = ${materials.id}
-            and sm.type = 'usage' and sm.occurred_on >= ${from}::date
-            and sm.occurred_on <= ${to}::date
-        ), 0)::text`
-          : sql<string>`0`,
-        overTolerance: hasElapsedRange
-          ? sql<boolean>`coalesce((
-          select sum(coalesce((
-            select a.new_value from adjustments a
-            where a.project_id = sm.project_id and a.target_table = 'stock_movements'
-              and a.target_id = sm.id
-            order by a.sequence_no desc limit 1
-          ), abs(sm.qty)::numeric))
-          from stock_movements sm
-          where sm.project_id = ${projectId} and sm.material_id = ${materials.id}
-            and sm.type = 'usage' and sm.occurred_on >= ${from}::date
-            and sm.occurred_on <= ${to}::date
-        ), 0) > ${materials.plannedQty}::numeric * (100 + ${materials.tolerancePct}::numeric) / 100`
-          : sql<boolean>`false`,
       })
       .from(materials)
       .where(eq(materials.projectId, projectId))
       .orderBy(materials.name, materials.id);
 
-    const deliveryRows = hasElapsedRange
+    const movementRows = hasElapsedRange
       ? await tx
           .select({
+            id: stockMovements.id,
+            materialId: stockMovements.materialId,
+            type: stockMovements.type,
+            qty: sql<string>`${stockMovements.qty}::text`,
+            unitCostPaise: stockMovements.unitCostPaise,
             occurredOn: stockMovements.occurredOn,
-            amount: sql<string>`round(coalesce((
-              select a.new_value from adjustments a
-              where a.project_id = ${stockMovements.projectId}
-                and a.target_table = 'stock_movements' and a.target_id = ${stockMovements.id}
-              order by a.sequence_no desc limit 1
-            ), ${stockMovements.qty}::numeric) * ${stockMovements.unitCostPaise}::numeric, 0)::text`,
           })
           .from(stockMovements)
           .where(
             and(
               eq(stockMovements.projectId, projectId),
-              eq(stockMovements.type, "delivery"),
+              inArray(stockMovements.type, ["delivery", "usage"]),
               gte(stockMovements.occurredOn, from),
               lte(stockMovements.occurredOn, to),
             ),
           )
       : [];
+
+    const movementCorrections = movementRows.length
+      ? await tx
+          .select({ targetId: adjustments.targetId, newValue: adjustments.newValue })
+          .from(adjustments)
+          .where(
+            and(
+              eq(adjustments.projectId, projectId),
+              eq(adjustments.targetTable, "stock_movements"),
+              inArray(
+                adjustments.targetId,
+                movementRows.map((row) => row.id),
+              ),
+            ),
+          )
+          .orderBy(asc(adjustments.sequenceNo))
+      : [];
+    const effectiveMovementQty = new Map<string, string>();
+    for (const correction of movementCorrections)
+      effectiveMovementQty.set(correction.targetId, correction.newValue);
+
+    const usedMilliByMaterial = new Map<string, bigint>();
+    const deliveryRows: { occurredOn: string; amount: bigint }[] = [];
+    for (const movement of movementRows) {
+      const corrected = effectiveMovementQty.get(movement.id);
+      const quantity =
+        corrected !== undefined ? quantityMilli(corrected) : quantityMagnitudeMilli(movement.qty);
+      if (movement.type === "usage") {
+        usedMilliByMaterial.set(
+          movement.materialId,
+          (usedMilliByMaterial.get(movement.materialId) ?? BigInt(0)) + quantity,
+        );
+      } else {
+        if (movement.unitCostPaise === null)
+          throw new Error("Delivery movement is missing its recorded unit cost");
+        deliveryRows.push({
+          occurredOn: movement.occurredOn,
+          amount: deliveryLinePaise(quantity, movement.unitCostPaise),
+        });
+      }
+    }
 
     const expenseRows = hasElapsedRange
       ? await tx
@@ -199,7 +235,7 @@ export async function getProjectSummary(
       spendByWeek.set(week, zeroSpend());
 
     for (const row of deliveryRows) {
-      const amount = BigInt(row.amount);
+      const amount = row.amount;
       total.materials += amount;
       (spendByWeek.get(mondayOf(row.occurredOn)) ?? zeroSpend()).materials += amount;
     }
@@ -238,15 +274,22 @@ export async function getProjectSummary(
       budgetPaise: safePaise(BigInt(project.budgetPaise), "project budget"),
       spendPaise,
       burnRatePaisePerDay: safePaise(totalSpend / elapsedDays, "average daily expenditure"),
-      materialVariance: materialRows.map((row) => ({
-        materialId: row.id,
-        name: row.name,
-        unit: row.unit,
-        plannedQty: checkedQty(row.plannedQty, "planned quantity"),
-        usedQty: checkedQty(row.usedQty, "used quantity"),
-        tolerancePct: row.tolerancePct,
-        overTolerance: row.overTolerance,
-      })),
+      materialVariance: materialRows.map((row) => {
+        const plannedMilli = quantityMilli(row.plannedQty);
+        const usedMilli = usedMilliByMaterial.get(row.id) ?? BigInt(0);
+        const tolerance = decimalFraction(row.toleranceValue);
+        return {
+          materialId: row.id,
+          name: row.name,
+          unit: row.unit,
+          plannedQty: checkedQty(row.plannedQty, "planned quantity"),
+          usedQty: checkedQty(quantityText(usedMilli), "used quantity"),
+          tolerancePct: row.tolerancePct,
+          overTolerance:
+            usedMilli * BigInt(100) * tolerance.denominator >
+            plannedMilli * (BigInt(100) * tolerance.denominator + tolerance.numerator),
+        };
+      }),
       stockAlerts: materialRows
         .filter((row) => quantityMilli(row.balance) <= quantityMilli(row.lowStockQty))
         .map((row) => ({
