@@ -317,8 +317,13 @@ describe("project financial summary", () => {
       spendSplit: { materialsPaise: 4_702, labourPaise: 90_000, otherPaise: 25_000 },
     });
     expect(
-      ownerSummary.materialVariance.find(({ materialId }) => materialId === sand.id)?.overTolerance,
-    ).toBe(true);
+      ownerSummary.materialVariance.find(({ materialId }) => materialId === sand.id),
+    ).toMatchObject({
+      plannedQty: 1,
+      usedQty: 1.101,
+      tolerancePct: 10,
+      overTolerance: true,
+    });
     expect(
       ownerSummary.materialVariance.find(({ materialId }) => materialId === exactTolerance.id),
     ).toMatchObject({ plannedQty: 1, usedQty: 1.1, overTolerance: false });
