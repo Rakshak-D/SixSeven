@@ -22,7 +22,7 @@ Use equivalent project-local environment variables on other shells. Do not use l
 
 ## Database and Docker
 
-The compose database is PostgreSQL 16. Its persistent files are bind-mounted to .cache/postgres, and app uploads to .cache/uploads. Both paths are ignored and inside this workspace. Do not remove them as routine cleanup.
+The compose database is PostgreSQL 16. Its persistent files are bind-mounted to .cache/postgres, and app uploads to .cache/uploads. Both paths are ignored and inside this workspace. Uploaded images are validated and staged before database writes; database failures clean up files created by that request. A process crash between filesystem promotion and database commit can leave an orphan file, so storage does not provide distributed atomicity. Do not remove these paths as routine cleanup.
 
 Set POSTGRES_PASSWORD in the local .env file. The checked-in .env.example value is a sanitized placeholder, not a credential. Use a URL-safe local value because the app-profile DATABASE_URL is assembled from it; if using reserved URL characters, percent-encode them in the connection URL.
 

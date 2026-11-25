@@ -2,6 +2,62 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M6 proposals and checklist verification
+
+- Timestamp: 2026-11-25 21:04:30+05:30
+- Branch: be/m6-workflows
+- Scope: project-scoped proposal decisions, deterministic checklist drafts, contractor photo evidence, engineer review and append-only checklist history.
+- API and database: contract PR #19 integrates request #7 and #8. Migration 0006 adds proposal, draft, checklist, item and event tables and project-scoped links to progress evidence. Seed adds deterministic proposal and checklist records.
+- Verification: local Biome, typecheck, 32 focused tests and production build passed. The initial implementation head passed PostgreSQL migrations, repeatable seed and the full API suite in [PR #20 CI](https://github.com/Rakshak-D/SixSeven/actions/runs/45646443031).
+- Frontend: retain legacy display status, use verificationStatus for workflow and supply progressId during review. Live PATCH renames only.
+- Limitations: checklist generation uses a deterministic template. Expenses and payments are unaffected by proposals. Demo checkout and database remain at their original baseline.
+- Next action: verify the final PR head before integration.
+
+## Entry — M5 integrated and main CI verified
+
+- Timestamp: 2026-11-25 20:38:37+05:30
+- Milestone/task ID: M5 integration closure
+- Branch: `chore/m5-integration-record`
+- Scope: record the completed M5 merge and verification of the merged main tree.
+- Files affected: API, backend and project ledgers only.
+- API or database changes: none.
+- Verification commands and outcomes: PR #14 CI run #49 passed Biome, typecheck, PostgreSQL 16 migration, repeatable demo seed, and all 102 tests across 14 files at `a721c52e2d971f184bbe976d289b2dc5ee543bdb`. Main CI run #50 passed the same checks on merge commit `1a81e780fbba7a47012f928a0b86b1f64d56770e`. Local main was fast-forwarded to that merge commit and has a clean working tree.
+- Dependencies added: none.
+- Known limitations: filesystem and PostgreSQL writes are not distributed-atomic; process termination between file promotion and metadata commit can leave an orphan. Checklist references remain unavailable until M6. No local PostgreSQL service was started; database checks used disposable hosted PostgreSQL 16.
+- Frontend implications: no frontend implementation or frontend ledger changes. M5 code diff contains no frontend-owned implementation files.
+- Commit or PR reference: [PR #14](https://github.com/Rakshak-D/SixSeven/pull/14) merged as `1a81e780fbba7a47012f928a0b86b1f64d56770e`; [PR CI #49](https://github.com/Rakshak-D/SixSeven/actions/runs/45641035558); [main CI #50](https://github.com/Rakshak-D/SixSeven/actions/runs/45641473492).
+- Next action: await the next authorized milestone.
+
+## Entry — M5 reporting and progress verified before integration
+
+- Timestamp: 2026-11-25 20:32:51+05:30
+- Milestone/task ID: M5
+- Branch: `be/project-reporting`
+- Scope: project summary and weekly expenditure, secure progress-photo upload/retrieval, timeline grouping, and role-filtered project activity.
+- Files affected: API routes and services; shared wage calculation helper; reporting/progress/photo schema and migrations 0004–0005; synthetic seed and snapshot; PostgreSQL integration tests; CI and upload configuration; API, project, decision, disclosure and DevOps documentation.
+- API or database changes: implemented `GET /projects/:id/summary`, `POST /projects/:id/progress`, `GET /projects/:id/timeline`, `GET /projects/:id/photos/:photoId`, and `GET /projects/:id/activity`. Added expense, progress and photo persistence with append-only guards. Expenses contribute to reporting, but there is no expense write workflow; non-null checklist references remain rejected until M6.
+- Verification commands and outcomes: local `corepack pnpm --store-dir .cache/pnpm-store run lint`, `run typecheck`, focused Vitest (5 files / 40 tests), `exec drizzle-kit check`, production `run build`, and `git diff --check` passed. Hosted PostgreSQL CI #48 passed on exact PR head `53f4720e1332a67a7faee3b6bbac754d4be46bbd`: Biome, typecheck, migration, demo seed twice, and all 102 tests across 14 files.
+- Dependencies added: Sharp `0.35.5` for bounded image decoding and synthetic PNG fixtures.
+- Known limitations: PostgreSQL and filesystem writes are not distributed-atomic; request failures clean created files, while process termination after file promotion and before transaction commit can leave an orphan. No isolated local PostgreSQL was started; full database verification ran in hosted disposable PostgreSQL 16 CI.
+- Frontend implications: weekly summary contract is available from merged PR #13. Engineers receive aggregate summary and weekly spend only. No frontend implementation or frontend ledger files changed. Requests #4–9 and #11 remain open for product review.
+- Commit or PR reference: [PR #14](https://github.com/Rakshak-D/SixSeven/pull/14), head `53f4720e1332a67a7faee3b6bbac754d4be46bbd`; [PostgreSQL CI #48](https://github.com/Rakshak-D/SixSeven/actions/runs/45639908173) passed.
+- Next action: publish this verified checkpoint, rerun CI for the resulting head, then merge PR #14 and verify main CI.
+
+## Entry — M5 reporting and progress implementation in progress
+
+- Timestamp: 2026-11-25 19:37:18+05:30
+- Milestone/task ID: M5
+- Branch: `be/project-reporting`
+- Scope: persisted summary inputs, weekly financial reporting, private progress-photo storage, timeline and role-filtered project activity.
+- Files affected: summary/activity/progress services and routes; shared M4 wage helper; expense/progress/photo schema and migrations 0004–0005; synthetic seed and seed snapshot; PostgreSQL reporting tests; upload environment and CI configuration; API, project and decision records; Sharp dependency and disclosures.
+- API or database changes: implemented handlers for `GET /projects/:id/summary`, `POST /projects/:id/progress`, `GET /projects/:id/timeline`, `GET /projects/:id/photos/:photoId` and `GET /projects/:id/activity`. Added expense/progress/photo persistence with append-only guards. No expense write endpoint or checklist runtime was added.
+- Verification commands and outcomes: `corepack pnpm --store-dir .cache/pnpm-store run lint` passed (90 files); `typecheck` passed; focused Vitest passed (5 files, 40 tests); `exec drizzle-kit check` passed; `run build` passed; `git diff --check` passed. The PostgreSQL-backed reporting tests have not run locally because no disposable local PostgreSQL instance is authorized; exact-head hosted CI remains required.
+- Dependencies added: Sharp `0.35.5` for bounded image decoding and synthetic PNG fixtures.
+- Known limitations: database/filesystem writes are not distributed-atomic; request failures clean created files, while process termination in the documented promotion/commit gap can leave an orphan. Checklist references remain rejected until M6. Hosted PostgreSQL verification and PR publication remain.
+- Frontend implications: weekly contract is available from merged PR #13. M5 response shapes remain additive; engineers receive only aggregate weekly and summary spending fields. No frontend files or frontend ledger were changed. Requests #4–9 and #11 remain open for product review.
+- Commit or PR reference: weekly contract [PR #13](https://github.com/Rakshak-D/SixSeven/pull/13) merged as `c56504f7004a256c7704a51e89c6b4b7402f083b`; M5 implementation PR pending.
+- Next action: stage and review the complete M5 diff, publish `be/project-reporting`, and verify hosted PostgreSQL CI before merge.
+
 ## Entry — M4 integrated and main CI verified
 
 - Timestamp: 2026-11-25 17:45:43+05:30

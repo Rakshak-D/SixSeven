@@ -23,6 +23,8 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 | M2 — auth and project access | INTEGRATED | PR #7 merged and main CI #18 passed all 45 tests. |
 | M3 — material, worker and stock operations | VERIFIED | PR #8 PostgreSQL CI passed all 64 tests, including concurrent ledger writes and repeated demo seeding. |
 | M4 — attendance, wage accounting and corrections | INTEGRATED | PR #11 merged as `c34eb6e`; PR CI #29 passed all 81 tests and main CI #30 passed on the merge commit. |
+| M5 — financial summary, progress evidence and activity | INTEGRATED | PR #14 merged as `1a81e78`; PR CI #49 and main CI #50 passed migration, seed twice, Biome, typecheck and all 102 PostgreSQL-backed tests. |
+| M6 — proposals and engineer verification | VERIFIED | Contract PR #19 merged. Implementation PR #20 passed hosted PostgreSQL CI. |
 | Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities
@@ -33,7 +35,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 ## Status snapshot
 
-- Overall: M4 attendance, wage payments, append-only corrections, exact wage calculations and JSON/CSV/PDF wage sheets are implemented, merged, and verified by PR and main PostgreSQL CI.
+- Overall: M5 is integrated and verified on main. It adds append-only expense/progress/photo persistence and implements summary, weekly spend, progress upload, timeline, protected photo retrieval and activity endpoints.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
 
 ## Integration checkpoints
@@ -67,7 +69,8 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 - Ledger publication commit: 7306ca846a2390a976cdd5574259ab9758b1ae05; CI run #7 passed for this head.
 - [PR #3 — coordination foundation](https://github.com/Rakshak-D/SixSeven/pull/3) was merged with a merge commit after [CI run #8](https://github.com/Rakshak-D/SixSeven/actions/runs/45586356601) passed on reviewed head aa1b3c6d97b8c7bb225998adf8247b599b982ea0. Local main was synchronized by fast-forward. See the backend ledger for verification.
 - Latest synchronized main for M4: `c34eb6e4077f1eeb38ef3312b55df3011007d416`, merge commit for PR #11. PR CI run #29 passed migration, upgrade, repeatable seed and all 81 PostgreSQL-backed tests at head `a0d7584fa479657af0af90b7d350dc474572214f`; main CI run #30 passed on the merge commit.
+- M5: [PR #14](https://github.com/Rakshak-D/SixSeven/pull/14) merged at `1a81e780fbba7a47012f928a0b86b1f64d56770e`; [PR CI #49](https://github.com/Rakshak-D/SixSeven/actions/runs/45641035558) and [main CI #50](https://github.com/Rakshak-D/SixSeven/actions/runs/45641473492) passed all 102 PostgreSQL-backed tests. Local main is synchronized to the merge commit.
 
 ## Next authorized milestone
 
-After M4 is merged and main CI is verified, the next scope is the owner budget summary, progress/photo storage and project activity visibility.
+Await the next specification-authorized milestone. Keep frontend request items #4–9 and #11 open for separate product review; M5 did not change the project creator role, add invitation workflows, or replace checklist state transitions.

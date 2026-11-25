@@ -4,35 +4,49 @@ Slate is a construction-site progress and material tracker. The approved reposit
 
 ## Current architecture reference
 
-The scaffold contains one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth dependencies, shared Zod schemas, and OpenAPI generation. This is the approved stack for implementation.
+Slate uses one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth, shared Zod schemas, and OpenAPI generation. This is the approved stack for implementation.
 
-## Run the scaffold
+## Run Slate on Windows
 
-Needs Node 24 (.nvmrc) and pnpm 12.23.0 as pinned in package.json. Do not install pnpm globally; configure project-local package-manager caches as described in docs/devops.md. Docker provides PostgreSQL 16, or use an approved disposable project-local PostgreSQL database.
+Install Node 24 with Corepack, PowerShell 7.2 or newer, and Docker Desktop in Linux container mode. Open Docker Desktop and wait for the engine. From the repository root, run:
 
-~~~sh
-corepack pnpm install --frozen-lockfile --store-dir .cache/pnpm-store
-cp .env.example .env
-# Replace the sanitized local values in .env before starting services.
-# Docker writes image/container state outside the workspace; use only when approved.
-docker compose up -d db
-corepack pnpm db:migrate
-corepack pnpm dev
-~~~
+```powershell
+.\start.ps1             # Keep the frontend mode configured in .env
+.\start.ps1 -Prototype  # Enable frontend mocks for this run
+.\start.ps1 -Live       # Disable frontend mocks for this run
+.\start.ps1 -Seed       # Explicitly apply the repeatable demo seed, then start
+.\start.ps1 -Live -Seed # Combine live mode and demo seeding
+.\stop.ps1              # Stop this launcher session
+```
 
-Follow [development setup](docs/devops.md) to confirm the migration target and seed demo accounts. Better Auth and the project APIs use the configured PostgreSQL database. [API.md](docs/API.md) lists the implemented operations and planned features.
+The launcher creates `.env` only when missing and stores the generated demo password there. It initializes a verified empty demo database when a valid demo password is configured. To sign in, use that password with `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid`. An existing database is seeded only when you pass `-Seed`. After the launcher confirms the app responds and PostgreSQL is up, it prints the app, health and OpenAPI URLs. The generated configuration defaults to prototype mode. Use `-Live` to exercise real API integration. No AI credentials are required.
+
+The app runs in the launcher terminal. Ctrl+C exits the app and leaves PostgreSQL running. Run `.\stop.ps1` from a second terminal while the launcher is active. It stops the app and stops PostgreSQL only if that launcher session started it. An already running database is reused and stays running. With no active launcher, the stop command leaves existing services running.
+
+For a separate checkout, choose a unique `SLATE_COMPOSE_PROJECT` and unused ports. The port flags initialize a missing `.env`. Keep the same Compose project setting in both terminals:
+
+```powershell
+$env:SLATE_COMPOSE_PROJECT = 'slate-sandbox'
+.\start.ps1 -AppPort 3100 -DatabasePort 55432 -Live
+```
+
+The launcher checks the authentication origin and database identity. It requires an empty database or the matching Slate migration history, and accepts only a loopback Compose `slate_demo` database (including suffixed demo names). For existing configurations, edit `.env` explicitly to change ports. Keep `DB_PORT` and `DATABASE_URL` in sync. Process environment values take precedence over `.env`. The launcher passes the resulting database credentials and identity to Compose, migrations, seeding and the app, ahead of Next.js dotenv overrides. Use a local Docker Desktop context. Project caches and PostgreSQL data are under `.cache`. Docker Desktop manages its images and container metadata.
+
+Run a script by absolute path from any working directory. See [development setup](docs/devops.md) for manual setup on other platforms and [API.md](docs/API.md) for endpoint status.
 
 ## Checks
 
 Use the non-mutating Biome CI command and typecheck before a commit. The full Vitest suite includes a health test that requires PostgreSQL; verify DATABASE_URL and use an isolated disposable database before database-backed checks. Do not use lint:fix as a check because it rewrites files.
 
-The existing frontend ledger records no pages or live API integrations. Do not report screens, auth, database features, or API routes as implemented merely because files or route mounts exist.
+The project switcher and project pages are present. Frontend requests go through the API client, which can serve supported development fixtures in prototype mode. Live mode sends those requests to the backend. For current screen and workflow coverage, see [the frontend ledger](docs/FRONTEND_LEDGER.md) and [API status](docs/API.md).
+
+Run the PowerShell launcher regressions from an isolated worktree with an initialized disposable Compose database and no running app. Pass the sandbox project and app port to `.\tests\windows-launcher.test.ps1 -Project slate-launcher-test-local -AppPort 3100`.
 
 ## Contributor instructions
 
 AGENTS.md is canonical. Root and nested CLAUDE.md files reference the corresponding AGENTS.md. docs/API.md is the canonical contract and is written by Codex. docs/FRONTEND_LEDGER.md is maintained only by Claude after its initialization. Read docs/devops.md for local tool and data paths.
 
-AI SDK packages are present in the scaffold, but no provider, model, prompt, or AI workflow has been approved or implemented.
+AI SDK packages remain available for deferred provider work.
 
 ## Dependency licenses
 
@@ -61,6 +75,7 @@ The following is the inherited declared dependency/license inventory. Codex main
 | react-dom | MIT | runtime |
 | recharts | MIT | runtime |
 | shadcn | MIT | runtime |
+| sharp | Apache-2.0 | runtime |
 | sonner | MIT | runtime |
 | tw-animate-css | MIT | runtime |
 | zod | MIT | runtime |
@@ -81,3 +96,5 @@ The following is the inherited declared dependency/license inventory. Codex main
 ## License
 
 MIT, see LICENSE.
+
+M6 checklist drafts run deterministically from a local template. The inherited provider packages are present in the lockfile for deferred work. Running Slate and generating checklists require no AI provider credentials.

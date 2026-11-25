@@ -30,7 +30,7 @@ jobs:
       SLATE_TEST_DATABASE: "1"
       BETTER_AUTH_SECRET: ci-only-secret-not-used-anywhere-else
       BETTER_AUTH_URL: http://localhost:3000
-      UPLOAD_DIR: /tmp/uploads
+      UPLOAD_DIR: .cache/uploads
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
