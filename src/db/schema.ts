@@ -293,3 +293,82 @@ export const auditLog = pgTable(
   },
   (t) => [index("audit_project_time_idx").on(t.projectId, t.createdAt)],
 );
+
+export const expenses = pgTable(
+  "expenses",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    amountPaise: paise("amount_paise").notNull(),
+    occurredOn: date("occurred_on").notNull(),
+    description: text().notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "expenses_project_actor_fk",
+      columns: [t.projectId, t.createdBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    index("expenses_project_date_idx").on(t.projectId, t.occurredOn, t.id),
+    check("expense_amount_paise_valid", sql`${t.amountPaise} between 1 and 9007199254740991`),
+    check("expense_description_valid", sql`length(btrim(${t.description})) between 1 and 1000`),
+  ],
+);
+
+export const progressUpdates = pgTable(
+  "progress_updates",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    note: text().notNull(),
+    checklistItemId: text("checklist_item_id"),
+    createdBy: text("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "progress_updates_project_actor_fk",
+      columns: [t.projectId, t.createdBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    unique("progress_updates_project_id_unique").on(t.projectId, t.id),
+    index("progress_updates_project_time_idx").on(t.projectId, t.createdAt, t.id),
+    check("progress_note_valid", sql`length(btrim(${t.note})) between 1 and 2000`),
+    check("progress_checklist_pending_m6", sql`${t.checklistItemId} is null`),
+  ],
+);
+
+export const progressPhotos = pgTable(
+  "progress_photos",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    progressId: text("progress_id").notNull(),
+    mime: text().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    takenOn: date("taken_on").notNull(),
+    storageKey: text("storage_key").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "progress_photos_project_update_fk",
+      columns: [t.projectId, t.progressId],
+      foreignColumns: [progressUpdates.projectId, progressUpdates.id],
+    }),
+    unique("progress_photos_storage_key_unique").on(t.storageKey),
+    index("progress_photos_project_update_idx").on(t.projectId, t.progressId, t.id),
+    check("progress_photo_mime_valid", sql`${t.mime} in ('image/jpeg', 'image/png', 'image/webp')`),
+    check("progress_photo_size_valid", sql`${t.sizeBytes} between 1 and 5000000`),
+    check(
+      "progress_photo_storage_key_valid",
+      sql`${t.storageKey} ~ '^[a-f0-9-]{36}\\.(jpg|png|webp)$'`,
+    ),
+  ],
+);

@@ -29,6 +29,20 @@
       "when": 1795605086684,
       "tag": "0003_m4_labour_accounting",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795611288842,
+      "tag": "0004_m5_project_reporting",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795611347530,
+      "tag": "0005_m5_project_reporting",
+      "breakpoints": true
     }
   ]
 }
