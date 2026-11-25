@@ -20,8 +20,8 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 |---|---|---|
 | M0 — repository foundation and ownership | INTEGRATED | Approved PR #3 merged. The merged tree matches the reviewed tree, and local post-merge unit tests and typecheck passed. |
 | M1 — shared API contracts | INTEGRATED | PR #6 merged and main CI #14 passed. |
-| M2 — auth and project access | VERIFIED | PR #7 hosted PostgreSQL CI passed all 45 tests, including migration, demo provisioning, session revocation and project isolation. |
-| Next — stock operations | PLANNED | Requires M2 integration and an authorized scope. |
+| M2 — auth and project access | INTEGRATED | PR #7 merged and main CI #18 passed all 45 tests. |
+| M3 — material, worker and stock operations | VERIFIED | PR #8 PostgreSQL CI passed all 64 tests, including concurrent ledger writes and repeated demo seeding. |
 | Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities
@@ -32,7 +32,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 ## Status snapshot
 
-- Overall: M2 implements cookie auth and project creation, listing, retrieval and membership. The core database includes materials, workers, stock movements and audit history. Delivery and usage handlers are planned.
+- Overall: M3 adds the material and worker APIs plus transactional deliveries, usage, stock balances and movement history.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
 
 ## Integration checkpoints
@@ -69,4 +69,4 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 ## Next authorized milestone
 
-Recommended next scope is material and worker APIs, then transactional delivery and usage with stock and movement history.
+Recommended next scope is attendance with daily-rate snapshots and append-only corrections, including compensating stock movements through the existing ledger service.

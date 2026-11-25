@@ -67,8 +67,14 @@ it("enforces seed identity, membership uniqueness and foreign keys", async () =>
     'owner@demo.invalid', 'contractor@demo.invalid', 'engineer@demo.invalid', 'isolated@demo.invalid'
   )`,
   ).toHaveLength(4);
-  expect(await sql`select id from materials where project_id = 'demo-greenfield'`).toHaveLength(3);
-  expect(await sql`select id from workers where project_id = 'demo-greenfield'`).toHaveLength(2);
+  expect(
+    await sql`select id from materials where project_id = 'demo-greenfield'
+    and id in ('demo-cement', 'demo-sand', 'demo-steel')`,
+  ).toHaveLength(3);
+  expect(
+    await sql`select id from workers where project_id = 'demo-greenfield'
+    and id in ('demo-mason', 'demo-helper')`,
+  ).toHaveLength(2);
   await expect(sql`insert into project_members (project_id, user_id, role)
     values ('demo-greenfield', ${creator.created_by}, 'owner')`).rejects.toMatchObject({
     code: "23505",
@@ -105,20 +111,26 @@ it("enforces safe money, valid quantities, normalized challans and append-only h
   await expect(
     sql`update materials set stock_qty = 100000000000 where id = 'demo-cement'`,
   ).rejects.toMatchObject({ code: "22003" });
-  const [creator] = await sql`select created_by from projects where id = 'demo-greenfield'`;
+  const [creator] = await sql`select created_by from projects where id = 'demo-isolated'`;
   const id = crypto.randomUUID();
+  const materialId = crypto.randomUUID();
+  await sql`insert into materials (id, project_id, name, unit, planned_qty, unit_cost_paise, tolerance_pct, low_stock_qty)
+    values (${materialId}, 'demo-isolated', 'Constraint fixture', 'bag', 20, 41500, 5, 1)`;
   await expect(sql`insert into stock_movements (id, project_id, material_id, type, qty, occurred_on, created_by)
-    values (${id}, 'demo-greenfield', 'demo-cement', 'usage', 1, '2026-11-25', ${creator.created_by})`).rejects.toMatchObject(
+    values (${id}, 'demo-isolated', ${materialId}, 'usage', 1, '2026-11-25', ${creator.created_by})`).rejects.toMatchObject(
     { code: "23514" },
   );
-  await sql`insert into stock_movements (id, project_id, material_id, type, qty, unit_cost_paise, supplier, challan_no, occurred_on, created_by)
-    values (${id}, 'demo-greenfield', 'demo-cement', 'delivery', 12.375, 41500, 'Local Supply', ${id}, '2026-11-25', ${creator.created_by})`;
+  await sql.begin(async (tx) => {
+    await tx`insert into stock_movements (id, project_id, material_id, type, qty, unit_cost_paise, supplier, challan_no, occurred_on, created_by)
+      values (${id}, 'demo-isolated', ${materialId}, 'delivery', 12.375, 41500, 'Local Supply', ${id}, '2026-11-25', ${creator.created_by})`;
+    await tx`update materials set stock_qty = stock_qty + 12.375 where id = ${materialId}`;
+    await tx`insert into audit_log (id, project_id, actor_id, action, entity, entity_id)
+      values (${id}, 'demo-isolated', ${creator.created_by}, 'created', 'delivery', ${id})`;
+  });
   await expect(sql`insert into stock_movements (id, project_id, material_id, type, qty, unit_cost_paise, supplier, challan_no, occurred_on, created_by)
-    values (${crypto.randomUUID()}, 'demo-greenfield', 'demo-sand', 'delivery', 1, 41500, ' local supply ', ${` ${id.toUpperCase()} `}, '2026-11-25', ${creator.created_by})`).rejects.toMatchObject(
+    values (${crypto.randomUUID()}, 'demo-isolated', ${materialId}, 'delivery', 1, 41500, ' local supply ', ${` ${id.toUpperCase()} `}, '2026-11-25', ${creator.created_by})`).rejects.toMatchObject(
     { code: "23505", constraint_name: "stock_delivery_supplier_challan_unique" },
   );
-  await sql`insert into audit_log (id, project_id, actor_id, action, entity, entity_id)
-    values (${id}, 'demo-greenfield', ${creator.created_by}, 'created', 'delivery', ${id})`;
   await expect(sql`update stock_movements set qty = 1 where id = ${id}`).rejects.toMatchObject({
     code: "55000",
   });

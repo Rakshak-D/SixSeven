@@ -1,6 +1,6 @@
 # Slate API contract
 
-[Specification](SPECIFICATION.md) defines the approved domain rules. Schema names below are exports from `src/shared/schemas/<module>.ts` unless noted. Each domain path is relative to `/api/v1`. Contract availability, backend readiness and frontend integration are tracked separately. `GET /api/v1/doc` describes registered routes, including the four project operations implemented in M2.
+[Specification](SPECIFICATION.md) defines the approved domain rules. Schema names below are exports from `src/shared/schemas/<module>.ts` unless noted. Each domain path is relative to `/api/v1`. Contract availability, backend readiness and frontend integration are tracked separately. `GET /api/v1/doc` describes registered routes, including projects and the M3 inventory and stock operations.
 
 ## Conventions
 
@@ -32,7 +32,7 @@ The development seed provisions synthetic `DemoAccountEmail` entries with corres
 
 ## Domain operations
 
-All rows below have an available shared contract. The first four project operations are implemented in M2 and covered by PostgreSQL integration tests. Other rows remain planned. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer. M2 delivers backend integration.
+All rows below have an available shared contract. The four project operations are verified in M2. The eight M3 operations for materials, workers, deliveries, usages, stock and movement history are verified by [PostgreSQL CI #19](https://github.com/Rakshak-D/SixSeven/actions/runs/45598875957). The remaining operations are planned. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer. Frontend integration is tracked separately in the frontend ledger.
 
 | Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
 |---|---|---|---|---|---|---|
@@ -44,7 +44,7 @@ All rows below have an available shared contract. The first four project operati
 | P0 | GET /projects/:id/materials | Members | — | — | 200 materials.MaterialsResponse | — |
 | P0 | POST /projects/:id/workers | Contractor | — | workers.CreateWorkerInput | 201 workers.WorkerResponse | — |
 | P0 | GET /projects/:id/workers | Owner, contractor | — | — | 200 workers.WorkersResponse | — |
-| P0 | POST /projects/:id/deliveries | Contractor | — | deliveries.CreateDeliveryInput | 201 deliveries.DeliveryResponse | DUPLICATE_CHALLAN for the same supplier and challan in this project |
+| P0 | POST /projects/:id/deliveries | Contractor | — | deliveries.CreateDeliveryInput | 201 deliveries.DeliveryResponse | DUPLICATE_CHALLAN for the same supplier and challan in this project. CONFLICT if the resulting balance exceeds numeric(14,3). |
 | P0 | POST /projects/:id/usages | Contractor | — | usages.CreateUsageInput | 201 usages.UsageResponse | INSUFFICIENT_STOCK with materialId and current balance in `InsufficientStockErrorResponse` |
 | P0 | GET /projects/:id/stock | Members | — | — | 200 stock.StockResponse | — |
 | P0 | GET /projects/:id/movements | Members | stock.StockMovementsQuery | — | 200 stock.StockMovementsResponse, newest first | — |
@@ -68,7 +68,8 @@ All rows below have an available shared contract. The first four project operati
 ## Operation details
 
 - A member invite links an existing account by email. No email delivery or invitation redemption flow. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server.
-- Delivery and usage requests take positive amounts. Usage is negative in movement history. Delivery supplier/challan matching is trimmed and case-insensitive within the project. The guarded stock update and movement insert share a transaction.
+- Materials start at zero stock. Delivery and usage requests and responses use positive amounts. Usage is negative in movement history. Delivery supplier/challan matching is trimmed and case-insensitive within the project. The guarded stock update, signed movement and audit event commit together. The maximum balance is 99,999,999,999.999.
+- Low stock means balance is less than or equal to the threshold. Movement history orders by occurrence date, creation time and ID, all descending. A movement filter for a missing or out-of-project material returns 404.
 - Corrections accept an absolute replacement magnitude for an original delivery/usage, new half-day units for attendance, or a replacement positive payment amount. A zero replacement stock quantity reverses that movement. The server preserves movement direction, applies only the delta versus the effective quantity, and derives prior value and actor from stored records and the session. Correction and audit records are append-only. No client-supplied actor is accepted.
 - The wage sheet uses inclusive IST dates for work and payments. JSON is default. CSV/PDF use `WageExportContentType` and Content-Disposition attachment. Escape formula-like CSV cells. The server returns authoritative accrued, paid wages, advances and signed due. A negative due is an overpayment. Engineer summaries omit the spend split entirely, and engineer activity omits payment-related events, including payment corrections.
 - Progress is multipart with `note`, optional `checklistItemId`, and 1–10 repeated `photos` file parts. JPEG, PNG and WebP only, max 5,000,000 bytes each. Verify declared MIME against content during implementation. Return metadata and a project-scoped URL, never a local path or storage key. The current JSON API client is suitable for JSON calls; multipart, downloads and auth require their respective transport.
