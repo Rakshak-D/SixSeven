@@ -17,9 +17,8 @@ Maintained by Codex. Update this file when tools, external services, dependencie
 
 ## Dependencies and licenses
 
-- No dependency was added, removed, or upgraded by M0.
-- Existing package and development dependency inventory and declared license rows remain in README.md; the lockfile is retained.
-- The README license table is inherited scaffold metadata and has not been independently audited package-by-package in M0. Verify any future dependency and its license before adding it.
+- M5 adds Sharp 0.35.5 as a direct runtime dependency to decode and validate uploaded JPEG, PNG, and WebP content. The package declares Apache-2.0; the version was already present in the lockfile transitively.
+- The dependency/license inventory is maintained in README.md. Other package versions are unchanged in this milestone.
 
 ## Code sources and project license
 

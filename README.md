@@ -61,6 +61,7 @@ The following is the inherited declared dependency/license inventory. Codex main
 | react-dom | MIT | runtime |
 | recharts | MIT | runtime |
 | shadcn | MIT | runtime |
+| sharp | Apache-2.0 | runtime |
 | sonner | MIT | runtime |
 | tw-animate-css | MIT | runtime |
 | zod | MIT | runtime |
