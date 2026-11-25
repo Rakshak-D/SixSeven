@@ -132,3 +132,6 @@ export const VerifiedChecklistResponse = ChecklistResponse.extend({
   items: z.array(VerifiedChecklistItemResponse).min(1).max(40),
 });
 export const VerifiedChecklistsResponse = z.array(VerifiedChecklistResponse);
+export type VerifiedChecklistItemResponse = z.infer<typeof VerifiedChecklistItemResponse>;
+export type VerifiedChecklistResponse = z.infer<typeof VerifiedChecklistResponse>;
+export type VerifiedChecklistsResponse = z.infer<typeof VerifiedChecklistsResponse>;

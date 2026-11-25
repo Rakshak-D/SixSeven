@@ -66,7 +66,7 @@ All rows below have an available shared contract. The four project operations ar
 | P2 | POST /proposals/:id/decision | Owner | — | proposals.DecideProposalInput | 200 proposals.ProposalResponse | CONFLICT if already decided |
 | P2 | POST /projects/:id/checklists | Engineer | checklist.ChecklistDraftQuery | checklist.CreateChecklistDraftInput | 200 checklist.ChecklistDraftResponse | — |
 | P2 | POST /projects/:id/checklists/records | Engineer | — | checklist.SaveChecklistInput | 201 checklist.ChecklistResponse | CONFLICT if draft reference was already used |
-| P2 | GET /projects/:id/checklists | Members | — | — | 200 checklist.ChecklistsResponse | — |
+| P2 | GET /projects/:id/checklists | Members | — | — | 200 checklist.VerifiedChecklistsResponse | — |
 | P2 | PATCH /checklist-items/:id | Engineer | — | checklist.RenameChecklistItemInput | 200 checklist.VerifiedChecklistItemResponse | CONFLICT if removed, awaiting review, or unchanged |
 
 ## Operation details
