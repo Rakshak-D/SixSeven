@@ -6,6 +6,7 @@ import { POST as authPost } from "@/app/api/auth/[...auth]/route";
 import { getDatabase } from "@/db/client";
 import { auditLog, checklistEvents, expenses, progressPhotos, progressUpdates } from "@/db/schema";
 import { app } from "@/server/app";
+import { createAuth } from "@/server/auth";
 import {
   ensurePhotoStorage,
   persistValidatedPhotos,
@@ -771,12 +772,19 @@ describe("M6 proposals and checklist verification", () => {
       source: "template",
       fallbackReason: "unavailable",
     });
+    const email = `m6-reviewer-${crypto.randomUUID()}@demo.invalid`;
+    const password = process.env.SLATE_DEMO_PASSWORD;
+    if (!password) throw new Error("Seed the disposable database before API tests");
+    await createAuth(getDatabase().db, { provisioning: true }).api.signUpEmail({
+      body: { email, password, name: "Second test engineer" },
+    });
+    const secondEngineer = await signIn(email);
     const secondary = await api(`/projects/${project}/members`, contractor, {
-      email: "isolated@demo.invalid",
+      email,
       role: "engineer",
     });
     expect(secondary.status).toBe(201);
-    await expectError(await api(`${draftPath}/records`, outsider, payload), 404, "NOT_FOUND");
+    await expectError(await api(`${draftPath}/records`, secondEngineer, payload), 404, "NOT_FOUND");
     const save = await api(`${draftPath}/records`, engineer, payload);
     expect(save.status).toBe(201);
     const record = VerifiedChecklistResponse.parse(await save.json());
@@ -784,7 +792,7 @@ describe("M6 proposals and checklist verification", () => {
     const [first] = record.items;
     if (!first) throw new Error("Checklist fixture missing");
     const path = `/checklist-items/${first.id}`;
-    await expectError(await api(`${path}/start`, outsider, undefined, "POST"), 403, "FORBIDDEN");
+    await expectError(await api(`${path}/start`, outsider, undefined, "POST"), 404, "NOT_FOUND");
     await expectError(
       await api(path, contractor, { status: "done" }, "PATCH"),
       400,
