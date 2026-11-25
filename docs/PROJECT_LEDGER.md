@@ -7,61 +7,54 @@ Maintained by Codex. This is the coordination source of truth; Claude records fr
 - Project: Slate
 - Team: SixSeven
 - Repository: https://github.com/Rakshak-D/SixSeven
-- Problem statement reference: the inherited README calls this hackathon problem 21 and describes a construction-site tracker. The official problem statement is not present; treat that description as provisional until supplied by the technical lead.
+- Product baseline: [SPECIFICATION.md](SPECIFICATION.md), recovered from the approved repository history.
 - Event constraints: the task brief confirms a 24-hour hackathon. Start time, exact deadline, judging schedule, and remaining time are not confirmed. Time cues in older scaffold notes are unverified and are not project constraints.
-- Full architecture, dependency constraints, acceptance criteria, and feature specifications: pending technical-lead handoff.
 
 ## Current architecture reference
 
-The repository currently contains one Next.js App Router app, Hono at /api/v1, Drizzle/PostgreSQL, Better Auth dependencies, shared Zod files, and generated OpenAPI wiring. This is the scaffold topology, pending confirmation against the full specification. Do not create a separate backend application.
+The repository currently contains one Next.js App Router app, Hono at /api/v1, Drizzle/PostgreSQL, Better Auth dependencies, shared Zod files, and generated OpenAPI wiring. This is the approved topology. Do not create a separate backend application.
 
 ## Milestones and dependencies
 
 | Milestone | State | Dependency / exit condition |
 |---|---|---|
 | M0 — repository foundation and ownership | INTEGRATED | Approved PR #3 merged. The merged tree matches the reviewed tree, and local post-merge unit tests and typecheck passed. |
-| M1 — specification intake | PLANNED | Requires the full official problem statement, architecture, dependencies, features, event deadline, and acceptance criteria. |
-| M2 — API and data contract | PLANNED | Requires M1; define and review the shared contract before dependent frontend/backend work. |
-| M3 — authorized vertical slice | PLANNED | Requires M2 and a technical-lead-approved milestone. Scope comes only from the supplied specification. |
-| M4 — integrated verification and demo readiness | PLANNED | Requires implemented backend and frontend paths plus approved test data and environment. |
-
-This is an ordering for coordination, not a feature commitment. Re-plan M1 onward against the official specification.
+| M1 — shared API contracts | VERIFIED | Shared tests, typecheck, lint and production/browser builds passed. Merge and main CI verify integration. |
+| Next — backend foundation and vertical slice | PLANNED | Requires M1 integration and an authorized scope. |
+| Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities
 
-- P0: receive the complete specification and exact event deadline before feature work.
-- P1: after M1, agree the first API/data contract and build only the authorized user journey.
-- P2: after a complete journey works, address specification-approved polish and remaining lower-priority work.
-
-Feature-level priority is not assigned until the official brief is available.
+- P0: implement auth, project membership and core site operations after contract integration.
+- P1: financial reporting, progress and audit operations.
+- P2: proposals and reviewed checklist drafts.
 
 ## Status snapshot
 
-- Overall: M0 integrated. M1 specification intake is planned pending the technical-lead handoff.
-- Existing scaffold: one health handler and OpenAPI document generator; all other route modules are empty routers. Database schemas are empty, initial migration is SELECT 1, seed is a no-op, and current tests cover health plus the shared money helper.
+- Overall: M0 integrated. M1 publishes core, reporting, progress, proposal and checklist contracts. Auth and domain routes await implementation.
+- Existing scaffold: one health handler and OpenAPI document generator. Database schemas are empty, the initial migration is SELECT 1, and the seed is a no-op. Shared schema tests now complement the health and money tests.
 - No business feature is recorded as implemented or integrated.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
 
 ## Integration checkpoints
 
-1. Technical lead supplies and approves the full problem statement, stack, deadline, and acceptance criteria.
-2. Codex updates docs/API.md and shared schemas from the approved specification; merge the contract-only change before dependent work.
+1. Technical lead approved the repository baseline. See SPECIFICATION.md.
+2. Integrate M1 shared schemas and docs/API.md before dependent implementation.
 3. Codex implements backend routes and data rules with backend tests.
 4. Claude implements frontend pages using the agreed contract and clearly marked contract-derived mocks.
 5. Integrate active work with merge commits and exercise the approved end-to-end journey before marking INTEGRATED.
 
 ## Blockers
 
-- Official problem statement and feature specification not yet supplied.
 - Event start/end time and confirmed schedule not supplied.
-- Authentication/authorization contract and endpoint request/response schemas are not defined for the proposed routes.
+- Auth wiring, scoped authorization, database schema and domain handlers are pending.
 - GitHub reports main as unprotected. Repository rulesets were empty at M0 inspection; do not change settings without approval. Enforce PR-only behavior in agent instructions.
 - No project-local database was started or verified in M0.
 
 ## Risks
 
 - The repository is public; all committed content is public.
-- The scaffold contains detailed product assumptions and unimplemented route/schema notes that could be mistaken for requirements.
+- Published schemas still require live handlers and integration verification.
 - External Claude artifact links in the inherited instructions were not read or verified in this work.
 - Branch protection is absent, so contributors must honor the PR-only process.
 - The frontend ledger records that a prior scaffold session started local services and used paths outside the project; this M0 run did not verify or alter that prior environment state.
@@ -77,4 +70,4 @@ Feature-level priority is not assigned until the official brief is available.
 
 ## Next authorized milestone
 
-M1 specification intake only after the technical lead supplies the detailed project brief and exact time constraints. Do not begin business-feature implementation before that handoff.
+Recommended next scope is auth and project membership with isolated PostgreSQL tests, then a delivery-to-usage stock transaction. Begin under the next authorized milestone.

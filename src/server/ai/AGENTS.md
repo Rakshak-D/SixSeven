@@ -1,6 +1,6 @@
 # AI integrations: src/server/ai/
 
-Codex owns server-side AI integrations, provider configuration, validation, error handling, and tests. No AI feature, provider, model, data flow, or fallback is authorized until the full specification and an explicit milestone select it.
+Codex owns server-side AI integrations, provider configuration, validation, error handling, and tests. The checklist draft and template fallback are specified in docs/SPECIFICATION.md. Provider selection and runtime integration belong to a later authorized milestone.
 
 Keep credentials in environment variables and out of source control and logs. Validate model output against the canonical shared schema before returning or persisting it. Clearly identify generated suggestions and preserve any required human review from the confirmed specification. Tests must not call live model APIs; use deterministic fixtures.
 

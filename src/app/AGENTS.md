@@ -6,6 +6,6 @@ Do not edit API routes, server modules, database access, authentication or autho
 
 Build only against an agreed API contract in src/shared/** and docs/API.md. Do not invent request or response fields. Frontend mocks belong in src/mocks/**, must validate against the shared Zod schemas, and must be clearly identified as development fixtures. They must not masquerade as live functionality or silently report fake success.
 
-Do not begin product pages or workflows until the full project specification and an authorized milestone are available. For root layout or provider changes that affect API wiring, authentication, environment variables, or server integration, record a handoff before editing and coordinate with Codex.
+Use docs/SPECIFICATION.md for authorized frontend milestones. For root layout or provider changes that affect API wiring, authentication, environment variables, or server integration, record a handoff before editing and coordinate with Codex.
 
 Claude records pages/components, endpoints consumed, mocked versus live behavior, backend requests, integration failures, frontend verification, and commit/PR references in FRONTEND_LEDGER.md. Do not record a feature as verified without exercising it.
