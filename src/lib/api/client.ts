@@ -1,9 +1,8 @@
 import type { ZodType } from "zod";
-import { type MockRoute, mocks } from "@/mocks";
+import { type MockRoute, mocks, mocksEnabled } from "@/mocks";
 import { ErrorResponse } from "@/shared/errors";
 
 const BASE = "/api/v1";
-const useMocks = process.env.NEXT_PUBLIC_USE_MOCKS === "1";
 
 /** Thrown for every non-2xx response; `message` is safe to show the user. */
 export class ApiClientError extends Error {
@@ -49,7 +48,7 @@ export async function api<T>(
 ): Promise<T> {
   const parse = (data: unknown) => (opts.schema ? opts.schema.parse(data) : (data as T));
 
-  if (useMocks) {
+  if (mocksEnabled) {
     const hit = matchMock(method, path);
     if (hit) return parse(await hit.mock.respond({ params: hit.params, body: opts.body }));
   }

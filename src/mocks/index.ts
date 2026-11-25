@@ -4,11 +4,13 @@
  * Delete an entry the moment docs/API.md marks its route `live`.
  * Fixtures must pass the route's shared Zod schema (src/shared/schemas/*).
  */
-export type MockRoute = {
-  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
-  /** Path after /api/v1, with :params, e.g. "/projects/:id/stock". */
-  path: string;
-  respond: (ctx: { params: Record<string, string>; body: unknown }) => unknown;
-};
+import { projectMocks } from "./projects";
+import type { MockRoute } from "./types";
 
-export const mocks: MockRoute[] = [];
+export type { MockRoute } from "./types";
+
+/** True when the app is running on these fixtures; the UI must say so. */
+export const mocksEnabled = process.env.NEXT_PUBLIC_USE_MOCKS === "1";
+
+// GET /projects is live, but it needs a session and login is not built yet.
+export const mocks: MockRoute[] = [...projectMocks];
