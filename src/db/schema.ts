@@ -250,6 +250,7 @@ export const stockMovements = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    unique("stock_movements_project_id_pair_unique").on(t.projectId, t.id),
     foreignKey({
       name: "stock_movement_project_material_fk",
       columns: [t.projectId, t.materialId],
@@ -271,6 +272,82 @@ export const stockMovements = pgTable(
         (${t.type} <> 'usage' or ${t.qty} < 0)
         and ${t.supplier} is null and ${t.challanNo} is null and ${t.unitCostPaise} is null)
     )`,
+    ),
+  ],
+);
+
+export const expectedDeliveries = pgTable(
+  "expected_deliveries",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    materialId: text("material_id").notNull(),
+    qty: quantity("qty").notNull(),
+    supplier: text().notNull(),
+    expectedOn: date("expected_on").notNull(),
+    note: text(),
+    status: text().$type<"pending" | "accepted" | "rejected">().notNull().default("pending"),
+    deliveryId: text("delivery_id").unique(),
+    rejectionReason: text("rejection_reason"),
+    rescheduledOn: date("rescheduled_on"),
+    decidedBy: text("decided_by").references(() => user.id),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "expected_deliveries_material_fk",
+      columns: [t.projectId, t.materialId],
+      foreignColumns: [materials.projectId, materials.id],
+    }),
+    foreignKey({
+      name: "expected_deliveries_movement_fk",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    index("expected_deliveries_project_status_day_idx").on(
+      t.projectId,
+      t.status,
+      t.expectedOn,
+      t.id,
+    ),
+    check("expected_delivery_qty_positive", sql`${t.qty} > 0`),
+    check(
+      "expected_delivery_state",
+      sql`
+      (${t.status} = 'pending' and ${t.deliveryId} is null and ${t.rejectionReason} is null and ${t.rescheduledOn} is null and ${t.decidedAt} is null and ${t.decidedBy} is null)
+      or (${t.status} = 'accepted' and ${t.deliveryId} is not null and ${t.rejectionReason} is null and ${t.rescheduledOn} is null and ${t.decidedAt} is not null and ${t.decidedBy} is not null)
+      or (${t.status} = 'rejected' and ${t.deliveryId} is null and ${t.rejectionReason} is not null and char_length(btrim(${t.rejectionReason})) between 10 and 2000 and ${t.decidedAt} is not null and ${t.decidedBy} is not null)
+    `,
+    ),
+  ],
+);
+
+export const deliveryChallanPhotos = pgTable(
+  "delivery_challan_photos",
+  {
+    projectId: text("project_id").notNull(),
+    deliveryId: text("delivery_id").primaryKey(),
+    storageKey: text("storage_key").notNull().unique(),
+    mime: text().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "delivery_challan_photo_movement_fk",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    check(
+      "delivery_challan_photo_media",
+      sql`${t.sizeBytes} between 1 and 5000000 and ${t.mime} in ('image/jpeg', 'image/png', 'image/webp')`,
     ),
   ],
 );

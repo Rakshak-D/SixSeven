@@ -2,6 +2,15 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Request #6 expected deliveries and challan evidence
+
+- Timestamp: 2026-11-26 IST. Branch: `be/delivery-logistics`.
+- Added project scheduling and history, contractor acceptance through the existing stock transaction, rejection with reason and optional replacement date, and activity entries. Added protected single-photo attachment and retrieval for recorded deliveries. Both reuse the project's existing authorization; attachment storage reuses progress image validation and private file storage.
+- Migration `0007_delivery_logistics` adds schedules, evidence metadata and cross-project foreign keys. Regenerate the unmerged migration when an earlier schema PR lands.
+- Verification: isolated PostgreSQL 16 fresh migration and seed, scoped Biome, typecheck and all 132 Vitest tests passed. Checks cover concurrent acceptance, stock invariants, role and project access, rejected arrival history, image content and bytes, duplicate attachment cleanup and append-only triggers.
+- Frontend handoff: connect schedule queries and actions in `src/hooks/use-project-data.ts` and `src/components/today/today-page.tsx`. After recording a delivery, upload the selected photo as FormData field `photo` using the returned delivery ID. Report a photo failure separately from a successfully recorded delivery. The optional activity label for `expectedDelivery` belongs in `src/lib/activity.ts`.
+- Requests #13–19 remain planned. Current stock, approvals, checklists and evidence validate application records. There are no per-bag scan or use gates, steel hold-point enforcement, supplier bank workflow, pre-approved order rules, simulated payment release or fraud scorecards in this batch. Keep those contracts separate from real money movement and avoid claims of physical authenticity.
+
 ## Entry — Request #11 engineer attendance roster
 
 - Timestamp: 2026-11-26 IST. Branch: `be/attendance-roster`.
