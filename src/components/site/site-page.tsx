@@ -1,7 +1,9 @@
 "use client";
 
-import { Camera, Plus } from "lucide-react";
+import { BriefcaseMedical, Camera, Plus } from "lucide-react";
 import { useState } from "react";
+import { ChangeList } from "@/components/approvals/change-list";
+import { MedicalSheet } from "@/components/approvals/medical-sheet";
 import { ApprovalsList } from "@/components/owner/approvals-list";
 import { ProofSheet } from "@/components/photos/proof-sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
@@ -68,6 +70,7 @@ export function SitePage() {
   const done = items.filter((i) => i.verificationStatus === "done").length;
   const [photos, setPhotos] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [medical, setMedical] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -78,7 +81,11 @@ export function SitePage() {
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h1 className="text-5xl">Site</h1>
           {project.role !== "owner" ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setMedical(true)}>
+                <BriefcaseMedical aria-hidden="true" />
+                Medical expense
+              </Button>
               <Button variant="outline" onClick={() => setPhotos(true)}>
                 <Camera aria-hidden="true" />
                 Add photos
@@ -161,16 +168,24 @@ export function SitePage() {
         </Section>
 
         <div className="space-y-6">
+          {project.role !== "owner" ? (
+            <Section title="Approvals" sub="Every step stays on record, with its note.">
+              <ChangeList projectId={project.id} viewer={project.role} />
+            </Section>
+          ) : null}
           <Section
-            title="Changes"
+            title={project.role === "owner" ? "Changes" : "Proposals"}
             sub={
               project.role === "owner"
-                ? "Proposed by the engineer or contractor; you decide."
+                ? "Changes and proposals; you decide."
                 : "Proposed changes and the owner's decisions."
             }
           >
             {project.role === "owner" ? (
-              <ApprovalsList projectId={project.id} />
+              <div className="space-y-6">
+                <ApprovalsList projectId={project.id} />
+                <ChangeList projectId={project.id} viewer="owner" settled />
+              </div>
             ) : proposals.isPending ? (
               <Skeleton className="h-40 rounded-2xl" />
             ) : (
@@ -250,6 +265,12 @@ export function SitePage() {
         </div>
       </div>
       <ProofSheet projectId={project.id} open={photos} onOpenChange={setPhotos} />
+      <MedicalSheet
+        projectId={project.id}
+        viewer={project.role}
+        open={medical}
+        onOpenChange={setMedical}
+      />
       {checklists.data ? (
         <AddTaskSheet
           projectId={project.id}
