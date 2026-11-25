@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DailyRatePaise, HalfDays, Id, IsoDate } from "./common";
+import { DailyRatePaise, HalfDays, Id, IsoDate, Timestamp } from "./common";
 
 export const CreateAttendanceInput = z
   .strictObject({
@@ -29,3 +29,23 @@ export const AttendanceResponse = z.strictObject({
 
 export type CreateAttendanceInput = z.infer<typeof CreateAttendanceInput>;
 export type AttendanceResponse = z.infer<typeof AttendanceResponse>;
+
+export const AttendanceListQuery = z
+  .strictObject({ from: IsoDate.optional(), to: IsoDate.optional(), workerId: Id.optional() })
+  .refine(({ from, to }) => !from || !to || from <= to, {
+    path: ["to"],
+    message: "End date must be on or after start date",
+  });
+export const AttendanceRecord = z.strictObject({
+  id: Id,
+  workerId: Id,
+  workDate: IsoDate,
+  halfDays: HalfDays,
+  effectiveHalfDays: HalfDays,
+  ratePaise: DailyRatePaise,
+  createdAt: Timestamp,
+});
+export const AttendanceListResponse = z.array(AttendanceRecord);
+export type AttendanceListQuery = z.infer<typeof AttendanceListQuery>;
+export type AttendanceRecord = z.infer<typeof AttendanceRecord>;
+export type AttendanceListResponse = z.infer<typeof AttendanceListResponse>;

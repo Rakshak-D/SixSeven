@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HalfDays, Id, PositivePaise, Qty, Timestamp } from "./common";
+import { HalfDays, Id, IsoDate, PositivePaise, Qty, Timestamp } from "./common";
 
 const reason = z.string().trim().min(10).max(2_000);
 const target = { targetId: Id, reason };
@@ -32,3 +32,18 @@ export const AdjustmentResponse = z.discriminatedUnion("targetTable", [
 
 export type CreateAdjustmentInput = z.infer<typeof CreateAdjustmentInput>;
 export type AdjustmentResponse = z.infer<typeof AdjustmentResponse>;
+
+export const AdjustmentListQuery = z
+  .strictObject({
+    from: IsoDate.optional(),
+    to: IsoDate.optional(),
+    targetTable: z.enum(["stock_movements", "attendance", "wage_payments"]).optional(),
+    targetId: Id.optional(),
+  })
+  .refine(({ from, to }) => !from || !to || from <= to, {
+    path: ["to"],
+    message: "End date must be on or after start date",
+  });
+export const AdjustmentListResponse = z.array(AdjustmentResponse);
+export type AdjustmentListQuery = z.infer<typeof AdjustmentListQuery>;
+export type AdjustmentListResponse = z.infer<typeof AdjustmentListResponse>;
