@@ -67,6 +67,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 - M0 foundation commit: 7941f25fe38365cb851732ffd1c0996d6c3f30ac.
 - Ledger publication commit: 7306ca846a2390a976cdd5574259ab9758b1ae05; CI run #7 passed for this head.
 - [PR #3 — coordination foundation](https://github.com/Rakshak-D/SixSeven/pull/3) was merged with a merge commit after [CI run #8](https://github.com/Rakshak-D/SixSeven/actions/runs/45586356601) passed on reviewed head aa1b3c6d97b8c7bb225998adf8247b599b982ea0. Local main was synchronized by fast-forward. See the backend ledger for verification.
+- Latest synchronized main for M4: `56c8786770ebc88593b3098f049e2c79f4ba858e`, the merge of PR #10, which changed only `docs/FRONTEND_LEDGER.md`. GitHub reported no status checks for that merge commit; PR #11 CI run #27 passed migration, upgrade and seed steps but failed four labour integration tests, now corrected on `be/labour-accounting` pending rerun.
 
 ## Next authorized milestone
 

@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { attendance, workers } from "@/db/schema";
+import { adjustments, attendance, workers } from "@/db/schema";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
@@ -116,38 +116,55 @@ export async function listAttendance(
   projectId: string,
   query: AttendanceListQuery,
 ): Promise<AttendanceListResponse> {
-  await requireProjectAccess(db, actor, projectId, ["owner", "contractor"]);
-  const rows = await db
-    .select({
-      id: attendance.id,
-      workerId: attendance.workerId,
-      workDate: attendance.workDate,
-      halfDays: attendance.halfDays,
-      effectiveHalfDays: sql<number>`coalesce((
-        select new_value::integer from adjustments
-        where project_id = ${attendance.projectId} and target_table = 'attendance'
-          and target_id = ${attendance.id}
-        order by sequence_no desc limit 1
-      ), ${attendance.halfDays})`,
-      ratePaise: attendance.ratePaise,
-      createdAt: attendance.createdAt,
-    })
-    .from(attendance)
-    .where(
-      and(
-        eq(attendance.projectId, projectId),
-        query.from ? sql`${attendance.workDate} >= ${query.from}::date` : undefined,
-        query.to ? sql`${attendance.workDate} <= ${query.to}::date` : undefined,
-        query.workerId ? eq(attendance.workerId, query.workerId) : undefined,
-      ),
-    )
-    .orderBy(desc(attendance.workDate), desc(attendance.createdAt), desc(attendance.id));
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`set transaction isolation level repeatable read read only`);
+    await requireProjectAccess(tx, actor, projectId, ["owner", "contractor"]);
+    const rows = await tx
+      .select({
+        id: attendance.id,
+        workerId: attendance.workerId,
+        workDate: attendance.workDate,
+        halfDays: attendance.halfDays,
+        ratePaise: attendance.ratePaise,
+        createdAt: attendance.createdAt,
+      })
+      .from(attendance)
+      .where(
+        and(
+          eq(attendance.projectId, projectId),
+          query.from ? sql`${attendance.workDate} >= ${query.from}::date` : undefined,
+          query.to ? sql`${attendance.workDate} <= ${query.to}::date` : undefined,
+          query.workerId ? eq(attendance.workerId, query.workerId) : undefined,
+        ),
+      )
+      .orderBy(desc(attendance.workDate), desc(attendance.createdAt), desc(attendance.id));
 
-  return rows.map((row) => ({
-    ...row,
-    halfDays: HalfDays.parse(row.halfDays),
-    effectiveHalfDays: HalfDays.parse(row.effectiveHalfDays),
-    ratePaise: DailyRatePaise.parse(row.ratePaise),
-    createdAt: row.createdAt.toISOString(),
-  }));
+    const corrections = rows.length
+      ? await tx
+          .select({ targetId: adjustments.targetId, newValue: adjustments.newValue })
+          .from(adjustments)
+          .where(
+            and(
+              eq(adjustments.projectId, projectId),
+              eq(adjustments.targetTable, "attendance"),
+              inArray(
+                adjustments.targetId,
+                rows.map((row) => row.id),
+              ),
+            ),
+          )
+          .orderBy(asc(adjustments.sequenceNo))
+      : [];
+    const effective = new Map<string, number>();
+    for (const correction of corrections)
+      effective.set(correction.targetId, Number(correction.newValue));
+
+    return rows.map((row) => ({
+      ...row,
+      halfDays: HalfDays.parse(row.halfDays),
+      effectiveHalfDays: HalfDays.parse(effective.get(row.id) ?? row.halfDays),
+      ratePaise: DailyRatePaise.parse(row.ratePaise),
+      createdAt: row.createdAt.toISOString(),
+    }));
+  });
 }
