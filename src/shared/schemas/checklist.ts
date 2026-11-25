@@ -86,7 +86,13 @@ export type UpdateChecklistItemInput = z.infer<typeof UpdateChecklistItemInput>;
 export type ChecklistItemResponse = z.infer<typeof ChecklistItemResponse>;
 export type ChecklistResponse = z.infer<typeof ChecklistResponse>;
 export type ChecklistsResponse = z.infer<typeof ChecklistsResponse>;
-export const ChecklistVerificationStatus = z.enum(["todo", "doing", "waiting", "done", "sent_back"]);
+export const ChecklistVerificationStatus = z.enum([
+  "todo",
+  "doing",
+  "waiting",
+  "done",
+  "sent_back",
+]);
 export const ChecklistChangeReason = z.string().trim().min(10).max(2000);
 export const ReviewChecklistItemInput = z.discriminatedUnion("decision", [
   z.strictObject({ decision: z.literal("accept"), note: z.string().trim().max(2000).optional() }),
