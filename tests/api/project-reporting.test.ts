@@ -12,6 +12,7 @@ import {
   readStoredPhoto,
   validateImageUpload,
 } from "@/server/services/photo-storage";
+import { loadEffectiveAttendance } from "@/server/services/wage-calculations";
 import { ErrorResponse } from "@/shared/errors";
 import { AttendanceListResponse, AttendanceResponse } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
@@ -251,6 +252,18 @@ describe("project financial summary", () => {
         ratePaise: 90_000,
       }),
     );
+    const { db } = getDatabase();
+    const effectiveAttendance = await db.transaction((tx) =>
+      loadEffectiveAttendance(tx, projectId, startDate, today),
+    );
+    expect(effectiveAttendance).toContainEqual(
+      expect.objectContaining({
+        workerId: worker.id,
+        workDate: today,
+        halfDays: "2",
+        ratePaise: "90000",
+      }),
+    );
 
     const wageResponse = await api(`/projects/${projectId}/wage-payments`, contractor, {
       workerId: worker.id,
@@ -277,7 +290,6 @@ describe("project financial summary", () => {
     });
     expect(advance.status).toBe(201);
 
-    const { db } = getDatabase();
     await db.insert(expenses).values({
       id: crypto.randomUUID(),
       projectId,
