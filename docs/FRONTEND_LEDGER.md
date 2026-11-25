@@ -57,6 +57,30 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-26 IST · Owner suppliers and autopay (MOCKED, demo data only)
+
+- **Branch:** `fe/supplier-autopay`, on top of `fe/project-invites` (PR #38).
+- **Status: MOCKED, and hidden on the live server.** No contract exists, so
+  `lib/supplier-payments.ts` holds frontend-only shapes and the release rules for the demo. **The
+  server must own these rules** (requests 16–18 and 25): replace the file's shapes with shared ones
+  and never let a browser decide a payment.
+- **Owner (Money):** suppliers with approval, per-supplier autopay with per-bill and per-week limits,
+  pause all, approved orders, a bank-account change that needs approval then a 24-hour hold with an
+  alert, waiting payments with the reason, and history. Home "Needs you" counts waiting payments.
+- **Engineer (Home):** "Deliveries to verify", with a required note and no prices.
+- **Contractor:** every supplier route answers 403 and no screen shows any of it.
+- **Release rule:** after verification, a payment leaves by itself only for an approved supplier with
+  a matching order, a rate within it, enough quantity left, autopay on and not paused, inside both
+  limits. The amount never exceeds the order. A held bill is judged again each time it is read, and
+  only the owner can then pay it.
+- **Not built:** bag-code scanning (requests 13 and 14), so verification is only the engineer's word;
+  the steel hold point (15), the delegate (17) and fraud flags (19). Do not describe this as fraud
+  prevention.
+- **Handoff to Codex:** `README.md` and `DISCLOSURES.md` must say the payment is a mock (AGENTS.md).
+- **Checks:** Biome, typecheck, `vitest run src` (96 pass). Playwright on mocks: approve supplier and
+  order, pay a held bill, bank change and alert, pause, autopay, add supplier, engineer verification,
+  contractor sees nothing; 390, 768 and 1440, no sideways scroll at 390 and 1440.
+
 ### 2026-11-26 IST · Engineer attendance fix, starting a project, invites, team
 
 - **Branch:** `fe/project-invites`.
