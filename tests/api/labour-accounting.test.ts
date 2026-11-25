@@ -14,6 +14,7 @@ import {
   WagePaymentResponse,
   WageSheetResponse,
 } from "@/shared/schemas/wages";
+import { WorkerResponse, WorkersResponse } from "@/shared/schemas/workers";
 import { testDatabase } from "./database-fixture";
 
 const projectId = "demo-greenfield";
@@ -106,6 +107,56 @@ async function newMaterial(actor = contractor) {
 }
 
 describe("attendance and wage accounting", () => {
+  it("deactivates a worker once, preserves historical wages and rejects new attendance", async () => {
+    const worker = await newWorker();
+    const recorded = await call(projectId, "attendance", contractor, {
+      workDate: "2026-11-24",
+      entries: [{ workerId: worker.id, halfDays: 1 }],
+    });
+    expect(recorded.status).toBe(201);
+    const path = `workers/${worker.id}/deactivate`;
+    const reason = "Worker's contract ended";
+    await failure(await call(projectId, path, owner, { reason }), 403, "FORBIDDEN");
+    await failure(await call(projectId, path, outsider, { reason }), 404, "NOT_FOUND");
+    await failure(
+      await call(projectId, path, contractor, { reason: "   no" }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const attempts = await Promise.all([
+      call(projectId, path, contractor, { reason }),
+      call(projectId, path, contractor, { reason }),
+    ]);
+    expect(attempts.map((response) => response.status).sort()).toEqual([200, 409]);
+    const [success] = attempts.filter((response) => response.ok);
+    const updated = WorkerResponse.parse(await success.json());
+    expect(updated).toMatchObject({
+      id: worker.id,
+      active: false,
+      removedReason: reason,
+      removedOn: expect.any(String),
+    });
+    const listing = await call(projectId, "workers", owner);
+    expect(WorkersResponse.parse(await listing.json()).find((row) => row.id === worker.id)).toEqual(
+      updated,
+    );
+    await failure(
+      await call(projectId, "attendance", contractor, {
+        workDate: "2026-11-25",
+        entries: [{ workerId: worker.id, halfDays: 2 }],
+      }),
+      409,
+      "CONFLICT",
+    );
+    const history = await call(projectId, `attendance?workerId=${worker.id}`, owner);
+    expect(AttendanceListResponse.parse(await history.json())).toMatchObject([
+      { ratePaise: worker.dailyRatePaise, halfDays: 1 },
+    ]);
+    const { sql } = getDatabase();
+    expect(
+      await sql`select id from audit_log where entity = 'worker' and action = 'updated' and entity_id = ${worker.id}`,
+    ).toHaveLength(1);
+  });
   it("requires a session and hides labour records from engineers and nonmembers", async () => {
     const day = "2026-11-20";
     await failure(

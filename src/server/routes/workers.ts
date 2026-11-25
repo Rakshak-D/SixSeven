@@ -1,11 +1,18 @@
 import { createRoute } from "@hono/zod-openapi";
 import { getDatabase } from "@/db/client";
+import { ErrorResponse } from "@/shared/errors";
 import { IdParams } from "@/shared/schemas/common";
-import { CreateWorkerInput, WorkerResponse, WorkersResponse } from "@/shared/schemas/workers";
+import {
+  CreateWorkerInput,
+  DeactivateWorkerInput,
+  WorkerParams,
+  WorkerResponse,
+  WorkersResponse,
+} from "@/shared/schemas/workers";
 import { json, projectAuth, projectBody, projectErrors } from "../lib/project-route";
 import { createRouter } from "../lib/router";
 import type { AuthEnv } from "../middleware/auth";
-import { createWorker, listWorkers } from "../services/inventory";
+import { createWorker, deactivateWorker, listWorkers } from "../services/inventory";
 
 export const workers = createRouter<AuthEnv>()
   .openapi(
@@ -45,4 +52,25 @@ export const workers = createRouter<AuthEnv>()
     }),
     async (c) =>
       c.json(await listWorkers(getDatabase().db, c.get("actor"), c.req.valid("param").id), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/projects/{id}/workers/{workerId}/deactivate",
+      tags: ["workers"],
+      middleware: projectAuth,
+      request: { ...projectBody(DeactivateWorkerInput), params: WorkerParams },
+      responses: {
+        200: { description: "Worker deactivated", content: json(WorkerResponse) },
+        ...projectErrors,
+        409: { description: "Worker already inactive", content: json(ErrorResponse) },
+      },
+    }),
+    async (c) => {
+      const { id, workerId } = c.req.valid("param");
+      return c.json(
+        await deactivateWorker(getDatabase().db, c.get("actor"), id, workerId, c.req.valid("json")),
+        200,
+      );
+    },
   );
