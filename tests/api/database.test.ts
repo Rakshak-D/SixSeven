@@ -88,8 +88,8 @@ it("creates project-scoped append-only attendance, wage and correction tables", 
   );
 
   const paymentId = crypto.randomUUID();
-  await sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, reference, created_by)
-    values (${paymentId}, 'demo-greenfield', ${workerId}, 25000, 'wage', 'upi', '2026-11-25', '202611250003', ${contractor.id})`;
+  await sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, reference, note, created_by)
+    values (${paymentId}, 'demo-greenfield', ${workerId}, 25000, 'wage', 'upi', '2026-11-25', '202611250003', 'Synthetic payment', ${contractor.id})`;
   const adjustmentId = crypto.randomUUID();
   await sql`insert into adjustments (id, project_id, target_table, target_id, old_value, new_value, reason, actor_id)
     values (${adjustmentId}, 'demo-greenfield', 'attendance', ${attendanceId}, 1, 2, 'Verified signed site sheet', ${contractor.id})`;
@@ -106,8 +106,8 @@ it("creates project-scoped append-only attendance, wage and correction tables", 
       values (${crypto.randomUUID()}, 'demo-greenfield', 'attendance', ${attendanceId}, 1, 1, 'Same value is not a correction', ${contractor.id})`,
   ).rejects.toMatchObject({ code: "23514", constraint_name: "adjustment_values_differ" });
   await expect(
-    sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, created_by)
-      values (${crypto.randomUUID()}, 'demo-greenfield', ${workerId}, 0, 'wage', 'cash', '2026-11-25', ${contractor.id})`,
+    sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, note, created_by)
+      values (${crypto.randomUUID()}, 'demo-greenfield', ${workerId}, 0, 'wage', 'cash', '2026-11-25', 'Synthetic payment', ${contractor.id})`,
   ).rejects.toMatchObject({ code: "23514", constraint_name: "wage_payment_amount_paise_valid" });
   await expect(
     sql`insert into wage_payments (id, project_id, worker_id, amount_paise, kind, mode, paid_on, created_by)

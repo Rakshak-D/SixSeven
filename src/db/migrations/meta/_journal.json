@@ -57,6 +57,13 @@
       "when": 1795647353401,
       "tag": "0007_wage_payment_modes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795648844180,
+      "tag": "0008_require_wage_payment_note",
+      "breakpoints": true
     }
   ]
 }

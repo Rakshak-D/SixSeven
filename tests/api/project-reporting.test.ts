@@ -278,6 +278,7 @@ describe("project financial summary", () => {
       amountPaise: 25_000,
       kind: "wage",
       mode: "upi",
+      note: "Synthetic worker payment",
       paidOn: today,
       reference: "202611250002",
     });
@@ -295,6 +296,7 @@ describe("project financial summary", () => {
       amountPaise: 10_000,
       kind: "advance",
       mode: "cash",
+      note: "Synthetic worker payment",
       paidOn: today,
     });
     expect(advance.status).toBe(201);

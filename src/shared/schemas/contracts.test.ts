@@ -218,6 +218,7 @@ describe("auth, reports and corrections", () => {
       kind: "advance",
       mode: "upi",
       paidOn: dates.to,
+      note: "Paid for site work",
     };
     for (const [mode, reference] of [
       ["cash", undefined],
@@ -233,6 +234,12 @@ describe("auth, reports and corrections", () => {
         ).toBe(false);
       }
     }
+    expect(
+      CreateWagePaymentInput.safeParse({ ...payment, mode: "cash", reference: "OLD123" }).success,
+    ).toBe(false);
+    expect(CreateWagePaymentInput.safeParse({ ...payment, mode: "cash", note: " " }).success).toBe(
+      false,
+    );
     expect(
       WageSheetResponse.safeParse({
         ...dates,

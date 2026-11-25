@@ -117,6 +117,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 1000,
       kind: "wage",
       mode: "cheque",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-24",
     };
     await failure(
@@ -135,9 +136,9 @@ describe("attendance and wage accounting", () => {
     });
     const { sql } = getDatabase();
     await expect(sql`insert into wage_payments
-      (id, project_id, worker_id, amount_paise, kind, mode, paid_on, reference, created_by)
+      (id, project_id, worker_id, amount_paise, kind, mode, paid_on, reference, note, created_by)
       values (${crypto.randomUUID()}, ${projectId}, ${worker.id}, 1000, 'wage', 'upi',
-        '2026-11-24', 'invalid', ${contractor.userId})`).rejects.toMatchObject({
+        '2026-11-24', 'invalid', 'Synthetic payment', ${contractor.userId})`).rejects.toMatchObject({
       code: "23514",
       constraint_name: "wage_payment_reference_by_mode",
     });
@@ -192,6 +193,7 @@ describe("attendance and wage accounting", () => {
         amountPaise: 100,
         kind: "wage",
         mode: "cash",
+        note: "Synthetic worker payment",
         paidOn: day,
       }),
       401,
@@ -345,6 +347,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 50_000,
       kind: "wage",
       mode: "upi",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-22",
       reference: "202611250001",
     });
@@ -355,6 +358,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 10_000,
       kind: "advance",
       mode: "cash",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-23",
     });
     expect(advance.status).toBe(201);
@@ -392,6 +396,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 25_000,
       kind: "wage",
       mode: "bank",
+      note: "Synthetic worker payment",
       paidOn: day,
       reference: "BANKREF001",
     });
@@ -507,6 +512,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 20_000,
       kind: "wage",
       mode: "cash",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-25",
     });
     const paymentId = WagePaymentResponse.parse(await payment.json()).id;
@@ -655,6 +661,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 100_000,
       kind: "wage",
       mode: "bank",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-26",
       reference: "BANKREF002",
     });
@@ -781,6 +788,7 @@ describe("attendance and wage accounting", () => {
         amountPaise: maxPaise,
         kind,
         mode: "bank",
+        note: "Synthetic worker payment",
         paidOn: date,
         reference: `overflow0${index}`,
       });

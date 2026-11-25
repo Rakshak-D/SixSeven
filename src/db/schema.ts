@@ -169,6 +169,7 @@ export const wagePayments = pgTable(
     mode: wagePaymentMode().notNull(),
     paidOn: date("paid_on").notNull(),
     reference: text(),
+    note: text(),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id),
@@ -187,11 +188,15 @@ export const wagePayments = pgTable(
     check(
       "wage_payment_reference_by_mode",
       sql`case ${t.mode}::text
-      when 'cash' then true
+      when 'cash' then ${t.reference} is null
       when 'upi' then ${t.reference} is not null and ${t.reference} ~ '^[0-9]{12}$'
       when 'bank' then ${t.reference} is not null and ${t.reference} ~ '^[A-Za-z0-9]{6,22}$'
       when 'cheque' then ${t.reference} is not null and ${t.reference} ~ '^[0-9]{6}$'
       else false end`,
+    ),
+    check(
+      "wage_payment_note_required",
+      sql`${t.note} is not null and char_length(btrim(${t.note})) between 1 and 2000`,
     ),
   ],
 );

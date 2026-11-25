@@ -43,6 +43,7 @@ export async function recordWagePayment(
       mode: input.mode,
       paidOn: input.paidOn,
       reference: input.reference ?? null,
+      note: input.note,
       createdBy: actor.userId,
     });
     await recordAudit(tx, {
@@ -74,6 +75,7 @@ export async function listWagePayments(
         mode: wagePayments.mode,
         paidOn: wagePayments.paidOn,
         reference: wagePayments.reference,
+        note: wagePayments.note,
         createdAt: wagePayments.createdAt,
       })
       .from(wagePayments)

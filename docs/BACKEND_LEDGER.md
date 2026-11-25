@@ -2,6 +2,11 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Request #22 wage notes and mode references
+
+- Branch: `be/wage-payment-modes`, PR #29. Published the existing `CreateWagePaymentInput` with required `note`, no cash reference and the mode-specific references. Exported `WagePaymentMode`. Historical reads accept null or absent notes and preserve original references.
+- Frontend handoff: `src/lib/spends.ts` must label `cheque`. Wage entry forms and mock fixtures must include a note and omit a cash reference. The UI should render a legacy note as absent. This remains a draft pending consumer readiness and migration sequencing.
+
 ## Entry — Request #9 wage payment modes
 
 - Timestamp: 2026-11-26 IST. Branch: `be/wage-payment-modes`.
