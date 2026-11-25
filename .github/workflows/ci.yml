@@ -60,3 +60,31 @@ jobs:
           diff -u .cache/m3-seed-first.json .cache/m3-seed-second.json
       - name: Tests (Vitest)
         run: pnpm test
+  live-launcher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - name: Start a fresh local demo in live mode
+        env:
+          CI: "false"
+          SLATE_COMPOSE_PROJECT: slate-launcher-ci
+        run: |
+          mkdir -p .cache
+          bash -n start.sh
+          ./start.sh --live > .cache/launcher.log 2>&1 &
+          launcher=$!
+          trap 'kill "$launcher" 2>/dev/null || true' EXIT
+          for attempt in {1..180}; do
+            if curl -fsS http://127.0.0.1:3000/api/v1/health 2>/dev/null |
+                jq -e '.ok == true and .db == "up"' >/dev/null; then
+              exit 0
+            fi
+            kill -0 "$launcher" 2>/dev/null || break
+            sleep 1
+          done
+          cat .cache/launcher.log
+          exit 1

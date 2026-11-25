@@ -2,6 +2,16 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Live integration restart
+
+- Timestamp: 2026-11-26 IST. Branch: `be/live-integration`, based on main `4bfc586`.
+- Recovered verified checklist type exports from the stopped recovery worktree. Its frontend changes and audit artifacts remain in that worktree. This batch carries no frontend implementation or migration changes.
+- Requests #7 and #8 already have server implementations. The checklist read now has accurate documentation and an OpenAPI regression for the verified response. Request #10 already has a PostgreSQL regression for weekly reconciliation and the engineer-safe projection.
+- The Better Auth bridge accepts the empty stream Next supplies for a bodyless logout. A regression reproduces that request shape. On the Windows launcher with isolated PostgreSQL 16, all three demo accounts passed sign-in, HttpOnly cookie, session lookup, scoped project discovery, logout and old-cookie denial over HTTP.
+- `start.sh --live` provides local Compose startup for Linux/macOS and shares the database identity and migration history check with Windows. Bash and Node syntax checks passed locally. Ubuntu startup is covered by a new CI job. Native macOS startup has not been exercised.
+- Frozen installation, Biome and typecheck passed. The first local backend run passed 129 tests and timed out in the baseline upgrade migration at five seconds. A rerun uses a longer test deadline for Docker Desktop.
+- Next: engineer-safe attendance and worker lifecycle contracts, followed by project invitations, delivery scheduling and attachments, wage mode validation and team contacts. No frontend edit is required for the auth or checklist compatibility fixes.
+
 ## Entry — M6 proposals and checklist verification
 
 - Timestamp: 2026-11-25 21:04:30+05:30
