@@ -43,7 +43,7 @@ function mockReply(query: string): string {
       "**Steel (Fe500 @ 1%)**",
       "• ~80–100 kg/m³ of concrete → **~1,130–1,415 kg**",
       "",
-      "Add 5–8% wastage. Use M20 (1:1.5:3) for a 5\" slab.",
+      'Add 5–8% wastage. Use M20 (1:1.5:3) for a 5" slab.',
       "",
       "*(Demo mode — connect AI_API_KEY for live calculations)*",
     ].join("\n");
@@ -122,10 +122,7 @@ export function AiAssistantWidget() {
     // In mock/demo mode, return canned responses immediately
     if (mocksEnabled) {
       await new Promise((r) => setTimeout(r, 400)); // small delay for realism
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: mockReply(userQuery) },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: mockReply(userQuery) }]);
       setIsLoading(false);
       return;
     }
@@ -197,7 +194,9 @@ export function AiAssistantWidget() {
               </div>
               <div>
                 <h3 className="font-semibold text-sm leading-none">Slate AI Copilot</h3>
-                <p className="text-muted-foreground text-xs mt-1">Calculations &amp; Site Planning</p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Calculations &amp; Site Planning
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-1.5">

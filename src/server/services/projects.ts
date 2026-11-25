@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { user } from "@/db/auth-schema";
 import type { Db, Transaction } from "@/db/client";
 import { auditLog, projectMembers, projects } from "@/db/schema";
@@ -9,9 +9,13 @@ import type { Role } from "@/shared/schemas/common";
 import type {
   AddProjectMemberInput,
   CreateProjectInput,
+  MyPhoneResponse,
   ProjectMemberResponse,
   ProjectResponse,
+  ProjectTeamResponse,
+  UpdateMyPhoneInput,
 } from "@/shared/schemas/projects";
+import { normalizeIndianMobile } from "@/shared/schemas/projects";
 
 const projectFields = {
   id: projects.id,
@@ -47,6 +51,39 @@ export async function listProjects(db: Db, actor: Actor): Promise<ProjectRespons
     .innerJoin(projectMembers, eq(projects.id, projectMembers.projectId))
     .where(eq(projectMembers.userId, actor.userId))
     .orderBy(asc(projects.createdAt), asc(projects.id));
+}
+
+export async function listProjectTeam(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+): Promise<ProjectTeamResponse> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`set transaction isolation level repeatable read read only`);
+    await requireProjectAccess(tx, actor, projectId);
+    const members = await tx
+      .select({ userId: user.id, role: projectMembers.role, name: user.name, phone: user.phone })
+      .from(projectMembers)
+      .innerJoin(user, eq(user.id, projectMembers.userId))
+      .where(eq(projectMembers.projectId, projectId))
+      .orderBy(asc(user.name), asc(user.id));
+    return members.map(({ phone, ...member }) => (phone === null ? member : { ...member, phone }));
+  });
+}
+
+export async function updateMyPhone(
+  db: Db,
+  actor: Actor,
+  { phone }: UpdateMyPhoneInput,
+): Promise<MyPhoneResponse> {
+  const canonical = phone === null ? null : normalizeIndianMobile(phone);
+  const [updated] = await db
+    .update(user)
+    .set({ phone: canonical, updatedAt: sql`now()` })
+    .where(eq(user.id, actor.userId))
+    .returning({ phone: user.phone });
+  if (!updated) throw new ApiError(401, ErrorCode.UNAUTHENTICATED, "Sign in to continue");
+  return updated;
 }
 
 export async function createProject(

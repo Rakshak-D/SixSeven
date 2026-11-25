@@ -5,6 +5,7 @@ import { projectInvitations, projectMembers, projects } from "@/db/schema";
 import { ErrorCode } from "@/shared/errors";
 import {
   type CreateProjectInvitationInput,
+  normalizeIndianMobile,
   type ProjectInvitationQuery,
   ProjectInvitationResponse,
 } from "@/shared/schemas/projects";
@@ -65,8 +66,7 @@ export async function createProjectInvitation(
   return db.transaction(async (tx) => {
     const project = await requireProjectAccess(tx, actor, projectId, ["engineer"]);
     const email = "email" in input ? input.email.toLowerCase() : null;
-    const phone =
-      "phone" in input ? (input.phone.startsWith("+91") ? input.phone : `+91${input.phone}`) : null;
+    const phone = "phone" in input ? normalizeIndianMobile(input.phone) : null;
     const [member] = email
       ? await tx
           .select({ id: user.id })

@@ -6,12 +6,15 @@ import {
   AddProjectMemberInput,
   CreateProjectInput,
   CreateProjectInvitationInput,
+  MyPhoneResponse,
   ProjectInvitationQuery,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectsResponse,
+  ProjectTeamResponse,
+  UpdateMyPhoneInput,
 } from "@/shared/schemas/projects";
 import { createRouter } from "../lib/router";
 import { type AuthEnv, requireActor } from "../middleware/auth";
@@ -25,7 +28,9 @@ import {
   addProjectMember,
   createProject,
   listProjects,
+  listProjectTeam,
   requireProjectAccess,
+  updateMyPhone,
 } from "../services/projects";
 
 const json = <T>(schema: T) => ({ "application/json": { schema } });
@@ -197,4 +202,37 @@ export const projects = createRouter<AuthEnv>()
         await acceptProjectInvitation(getDatabase().db, c.get("actor"), c.req.valid("param").id),
         200,
       ),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/projects/{id}/members",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: IdParams },
+      responses: {
+        200: {
+          description: "Project team and shared contact information",
+          content: json(ProjectTeamResponse),
+        },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(await listProjectTeam(getDatabase().db, c.get("actor"), c.req.valid("param").id), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "patch",
+      path: "/me",
+      tags: ["projects"],
+      middleware: auth,
+      request: { body: { required: true, content: json(UpdateMyPhoneInput) } },
+      responses: {
+        200: { description: "Updated caller contact information", content: json(MyPhoneResponse) },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(await updateMyPhone(getDatabase().db, c.get("actor"), c.req.valid("json")), 200),
   );

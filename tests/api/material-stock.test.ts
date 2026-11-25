@@ -1,12 +1,21 @@
+import { readdir } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
+import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/auth/[...auth]/route";
 import { getDatabase } from "@/db/client";
 import { app } from "@/server/app";
+import { ensurePhotoStorage } from "@/server/services/photo-storage";
 import { appendStockMovement } from "@/server/services/stock-ledger";
 import { ErrorResponse, InsufficientStockErrorResponse } from "@/shared/errors";
+import { ActivityResponse } from "@/shared/schemas/activity";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
-import { DeliveryResponse } from "@/shared/schemas/deliveries";
+import {
+  ChallanPhotoResponse,
+  DeliveryResponse,
+  ExpectedDeliveriesResponse,
+  ExpectedDeliveryResponse,
+} from "@/shared/schemas/deliveries";
 import { MaterialResponse, MaterialsResponse } from "@/shared/schemas/materials";
 import { StockMovementsResponse, StockResponse } from "@/shared/schemas/stock";
 import { UsageResponse } from "@/shared/schemas/usages";
@@ -266,6 +275,122 @@ describe("project membership and contracts", () => {
 });
 
 describe("stock ledger", () => {
+  it("records expected delivery acceptance once and keeps rejected arrivals out of stock", async () => {
+    const item = await material();
+    const schedule = async () => {
+      const result = await call(greenfield, "expected-deliveries", engineer, {
+        materialId: item.id,
+        qty: 10,
+        supplier: "Synthetic scheduled supplier",
+        expectedOn: date,
+      });
+      expect(result.status).toBe(201);
+      return ExpectedDeliveryResponse.parse(await result.json());
+    };
+    const first = await schedule();
+    const accept = (actor: { cookie: string }, body: unknown) =>
+      app.request(`/api/v1/expected-deliveries/${first.id}/accept`, {
+        method: "POST",
+        headers: { cookie: actor.cookie, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const actual = delivery(item.id, 8.5);
+    await failure(await accept(outsider, actual), 404, "NOT_FOUND");
+    await failure(await accept(engineer, actual), 403, "FORBIDDEN");
+    await failure(
+      await accept(contractor, { ...actual, materialId: "demo-cement" }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const attempts = await Promise.all([accept(contractor, actual), accept(contractor, actual)]);
+    expect(attempts.map(({ status }) => status).sort()).toEqual([201, 409]);
+    const [accepted] = attempts.filter(({ ok }) => ok);
+    const persisted = DeliveryResponse.parse(await accepted.json());
+    expect(persisted.balance).toBe(8.5);
+    const second = await schedule();
+    const reject = await app.request(`/api/v1/expected-deliveries/${second.id}/reject`, {
+      method: "POST",
+      headers: { cookie: contractor.cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        reason: "Supplier arrived with damaged packages",
+        newDate: "2026-11-26",
+      }),
+    });
+    expect(reject.status).toBe(200);
+    expect(ExpectedDeliveryResponse.parse(await reject.json())).toMatchObject({
+      status: "rejected",
+      rejectionReason: "Supplier arrived with damaged packages",
+      rescheduledOn: "2026-11-26",
+    });
+    expect(await ledger(item.id)).toMatchObject({ balance: "8.500", movements: 1 });
+    const pending = await call(greenfield, "expected-deliveries", owner);
+    const rescheduled = ExpectedDeliveriesResponse.parse(await pending.json()).filter(
+      (row) => row.materialId === item.id,
+    );
+    expect(rescheduled).toMatchObject([{ status: "pending", expectedOn: "2026-11-26" }]);
+    const history = await call(greenfield, "expected-deliveries?status=all", owner);
+    expect(ExpectedDeliveriesResponse.parse(await history.json())).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: first.id, status: "accepted", deliveryId: persisted.id }),
+        expect.objectContaining({ id: second.id, status: "rejected" }),
+      ]),
+    );
+    const activity = ActivityResponse.parse(
+      await (await call(greenfield, "activity", owner)).json(),
+    );
+    expect(activity).toContainEqual(
+      expect.objectContaining({
+        entity: "expectedDelivery",
+        action: "rejected",
+        entityId: second.id,
+      }),
+    );
+  });
+
+  it("protects challan images and cleans a rejected duplicate upload", async () => {
+    const item = await material();
+    const stored = await deliver(delivery(item.id, 1));
+    const resource = `deliveries/${stored.id}/challan-photo`;
+    const png = await sharp({ create: { width: 2, height: 2, channels: 3, background: "white" } })
+      .png()
+      .toBuffer();
+    const upload = (
+      bytes: Uint8Array<ArrayBuffer>,
+      actor: { cookie: string },
+      projectId = greenfield,
+    ) => {
+      const form = new FormData();
+      form.set("photo", new File([bytes], "challan.png", { type: "image/png" }));
+      return app.request(`/api/v1/projects/${projectId}/${resource}`, {
+        method: "POST",
+        headers: { cookie: actor.cookie },
+        body: form,
+      });
+    };
+    await failure(await call(greenfield, resource), 401, "UNAUTHENTICATED");
+    await failure(await upload(Uint8Array.from(png), owner), 403, "FORBIDDEN");
+    await failure(await upload(Uint8Array.from(png), outsider, otherSite), 404, "NOT_FOUND");
+    await failure(await upload(Uint8Array.of(1, 2, 3), contractor), 400, "VALIDATION_ERROR");
+    const uploaded = await upload(Uint8Array.from(png), contractor);
+    expect(uploaded.status).toBe(201);
+    const photo = ChallanPhotoResponse.parse(await uploaded.json());
+    expect(photo).toMatchObject({
+      deliveryId: stored.id,
+      mime: "image/png",
+      sizeBytes: png.length,
+    });
+    const served = await app.request(photo.url, { headers: { cookie: owner.cookie } });
+    expect(served.status).toBe(200);
+    expect(served.headers.get("cache-control")).toBe("private, no-store");
+    expect(served.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(Buffer.from(await served.arrayBuffer())).toEqual(png);
+    await failure(await call(otherSite, resource, outsider), 404, "NOT_FOUND");
+    const { root } = await ensurePhotoStorage();
+    const files = (await readdir(root)).sort();
+    await failure(await upload(Uint8Array.from(png), contractor), 409, "CONFLICT");
+    expect((await readdir(root)).sort()).toEqual(files);
+    expect(await ledger(item.id)).toMatchObject({ balance: "1.000", movements: 1 });
+  });
   it("uses exact fractional quantities, flags the threshold inclusively and depletes to zero", async () => {
     const created = await material();
     expect((await deliver(delivery(created.id, 30.125))).balance).toBe(30.125);
@@ -478,9 +603,20 @@ describe("stock ledger", () => {
     ]);
     expect(await ledger(created.id)).toMatchObject({ balance: "2.000", movements: 3, audits: 3 });
     const { sql } = getDatabase();
-    for (const table of ["stock_movements", "audit_log"]) {
-      await expect(sql`truncate table ${sql(table)}`).rejects.toMatchObject({ code: "55000" });
-    }
+    await expect(sql`truncate table stock_movements`).rejects.toMatchObject({ code: "0A000" });
+    // Include the foreign key dependents to exercise the append-only trigger itself.
+    await expect(
+      sql.begin(async (tx) => {
+        await tx`truncate table stock_movements, delivery_challan_photos, expected_deliveries`;
+        throw new Error("Stock movement truncation unexpectedly succeeded");
+      }),
+    ).rejects.toMatchObject({ code: "55000" });
+    await expect(
+      sql.begin(async (tx) => {
+        await tx`truncate table audit_log`;
+        throw new Error("Audit log truncation unexpectedly succeeded");
+      }),
+    ).rejects.toMatchObject({ code: "55000" });
   });
 
   it("preserves seeded unit, fractional and low-stock examples", async () => {

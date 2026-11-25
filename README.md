@@ -32,7 +32,22 @@ $env:SLATE_COMPOSE_PROJECT = 'slate-sandbox'
 
 The launcher checks the authentication origin and database identity. It requires an empty database or the matching Slate migration history, and accepts only a loopback Compose `slate_demo` database (including suffixed demo names). For existing configurations, edit `.env` explicitly to change ports. Keep `DB_PORT` and `DATABASE_URL` in sync. Process environment values take precedence over `.env`. The launcher passes the resulting database credentials and identity to Compose, migrations, seeding and the app, ahead of Next.js dotenv overrides. Use a local Docker Desktop context. Project caches and PostgreSQL data are under `.cache`. Docker Desktop manages its images and container metadata.
 
-Run a script by absolute path from any working directory. See [development setup](docs/devops.md) for manual setup on other platforms and [API.md](docs/API.md) for endpoint status.
+Run a script by absolute path from any working directory.
+
+## Run Slate on Linux or macOS
+
+Install Node 24, Corepack and a running local Docker Engine with Compose v2. Run from the repository root:
+
+```bash
+./start.sh --live
+./start.sh --live --seed  # Seed an existing disposable demo database
+```
+
+The shell launcher always uses live APIs. It creates a missing `.env` with local credentials, verifies the checkout's Compose database before migrations and runs the app in the foreground. An empty demo database with a valid demo password is seeded on first startup. Use the same demo emails and local password described above. Ctrl+C stops the app, leaving PostgreSQL and its data in place. Use the printed health endpoint to confirm the app is ready.
+
+For an isolated checkout set a unique `SLATE_COMPOSE_PROJECT`, and configure unused ports in `.env` using `DB_PORT`, `DATABASE_URL` and `BETTER_AUTH_URL`.
+
+See [development setup](docs/devops.md) for manual setup and [API.md](docs/API.md) for endpoint status.
 
 ## Checks
 

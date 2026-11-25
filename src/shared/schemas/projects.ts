@@ -7,6 +7,8 @@ export const IndianMobileInput = z
   .trim()
   .regex(/^(?:\+91)?[6-9][0-9]{9}$/);
 export const IndianMobile = z.string().regex(/^\+91[6-9][0-9]{9}$/);
+export const normalizeIndianMobile = (phone: string) =>
+  IndianMobile.parse(phone.startsWith("+91") ? phone : `+91${phone}`);
 export const CreateProjectInvitationInput = z.union([
   z.strictObject({ email: z.string().trim().pipe(z.email().max(254)), role: InvitationRole }),
   z.strictObject({ phone: IndianMobileInput, role: InvitationRole }),
@@ -38,6 +40,16 @@ export const AddProjectMemberInput = z.strictObject({
   role: z.enum(["owner", "engineer"]),
 });
 export const ProjectMemberResponse = z.strictObject({ userId: Id, role: Role });
+export const UpdateMyPhoneInput = z.strictObject({
+  phone: IndianMobileInput.nullable(),
+});
+export const MyPhoneResponse = z.strictObject({ phone: IndianMobile.nullable() });
+export const ProjectTeamResponse = z.array(
+  ProjectMemberResponse.extend({
+    name: Label,
+    phone: IndianMobile.optional(),
+  }),
+);
 
 export const CreateProjectInput = z.strictObject({
   name: Label,
@@ -57,6 +69,9 @@ export const ProjectsResponse = z.array(ProjectResponse);
 
 export type AddProjectMemberInput = z.infer<typeof AddProjectMemberInput>;
 export type ProjectMemberResponse = z.infer<typeof ProjectMemberResponse>;
+export type UpdateMyPhoneInput = z.infer<typeof UpdateMyPhoneInput>;
+export type MyPhoneResponse = z.infer<typeof MyPhoneResponse>;
+export type ProjectTeamResponse = z.infer<typeof ProjectTeamResponse>;
 export type CreateProjectInput = z.infer<typeof CreateProjectInput>;
 export type ProjectResponse = z.infer<typeof ProjectResponse>;
 export type ProjectsResponse = z.infer<typeof ProjectsResponse>;
