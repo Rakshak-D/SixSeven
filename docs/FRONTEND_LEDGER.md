@@ -68,6 +68,7 @@ proposed method + path, fields, priority / blocking.
 - **Wage payments:** UPI needs a 12-digit ID and Bank needs 6 to 22 letters or digits. Cash hides
   the reference and requires a note. **Until request 22, the cash note is sent as `reference`**,
   because the schema has no note field. Please move those values when `note` lands.
+- **Also fixed:** the selected tab's label vanished while hovered or tapped (`ui/tabs.tsx`).
 - **Waiting on the contract:** the Cheque mode (`be/wage-payment-modes`) and a note on UPI and bank
   payments (request 22). Proposal decision notes arrive with the approval chain (request 20).
 - **Camera:** `components/photos/camera-view.tsx`. A live viewfinder, back camera preferred, with the
