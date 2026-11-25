@@ -249,7 +249,7 @@ export async function listAdjustments(
           : undefined,
       ),
     )
-    .orderBy(desc(adjustments.createdAt), desc(adjustments.sequenceNo));
+    .orderBy(desc(adjustments.sequenceNo));
 
   return rows.map((row) =>
     AdjustmentResponse.parse({

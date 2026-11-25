@@ -387,6 +387,15 @@ describe("attendance and wage accounting", () => {
     const listedAttendance = AttendanceListResponse.parse(
       await (await call(projectId, `attendance?workerId=${worker.id}`, owner)).json(),
     );
+    const attendanceHistory = AdjustmentListResponse.parse(
+      await (
+        await call(projectId, `adjustments?targetTable=attendance&targetId=${attendanceId}`, owner)
+      ).json(),
+    );
+    expect(attendanceHistory.map(({ oldValue, newValue }) => [oldValue, newValue])).toEqual([
+      [2, 0],
+      [1, 2],
+    ]);
     expect(listedAttendance[0]).toMatchObject({
       halfDays: 1,
       effectiveHalfDays: 0,
@@ -493,7 +502,7 @@ describe("attendance and wage accounting", () => {
       ).json(),
     );
     expect(rows).toHaveLength(2);
-    expect(rows[0].newValue).toBe(rows[1].oldValue);
+    expect(rows[0].oldValue).toBe(rows[1].newValue);
     expect([21_000, 22_000]).toContain(rows[0].newValue);
   });
 
@@ -601,8 +610,11 @@ describe("attendance and wage accounting", () => {
     expect(pdfResponse.headers.get("content-disposition")).toContain("attachment");
     const pdf = Buffer.from(await pdfResponse.arrayBuffer());
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
-    expect(pdf.toString("latin1")).toContain("Slate Wage Sheet");
-    expect(pdf.toString("latin1")).toContain("INR");
+    const readable = Array.from(pdf.toString("latin1").matchAll(/<([0-9a-f]+)>/g), ([, hex]) =>
+      Buffer.from(hex, "hex").toString("latin1"),
+    ).join("");
+    expect(readable).toContain("Slate Wage Sheet");
+    expect(readable).toContain("INR");
   });
 
   it("rolls back attendance when the audit insert fails", async () => {

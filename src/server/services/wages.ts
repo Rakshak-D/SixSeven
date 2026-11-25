@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import type { Db } from "@/db/client";
-import { attendance, projects, wagePayments, workers } from "@/db/schema";
+import { adjustments, attendance, projects, wagePayments, workers } from "@/db/schema";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
+import { PositivePaise } from "@/shared/schemas/common";
 import type {
   CreateWagePaymentInput,
   WagePaymentListQuery,
@@ -60,35 +61,58 @@ export async function listWagePayments(
   projectId: string,
   query: WagePaymentListQuery,
 ): Promise<WagePaymentListResponse> {
-  await requireProjectAccess(db, actor, projectId, ["owner", "contractor"]);
-  const rows = await db
-    .select({
-      id: wagePayments.id,
-      workerId: wagePayments.workerId,
-      amountPaise: wagePayments.amountPaise,
-      effectiveAmountPaise: sql<number>`coalesce((
-        select new_value::bigint from adjustments
-        where project_id = ${wagePayments.projectId} and target_table = 'wage_payments'
-          and target_id = ${wagePayments.id}
-        order by sequence_no desc limit 1
-      ), ${wagePayments.amountPaise})`,
-      kind: wagePayments.kind,
-      mode: wagePayments.mode,
-      paidOn: wagePayments.paidOn,
-      reference: wagePayments.reference,
-      createdAt: wagePayments.createdAt,
-    })
-    .from(wagePayments)
-    .where(
-      and(
-        eq(wagePayments.projectId, projectId),
-        query.from ? sql`${wagePayments.paidOn} >= ${query.from}::date` : undefined,
-        query.to ? sql`${wagePayments.paidOn} <= ${query.to}::date` : undefined,
-        query.workerId ? eq(wagePayments.workerId, query.workerId) : undefined,
-      ),
-    )
-    .orderBy(desc(wagePayments.paidOn), desc(wagePayments.createdAt), desc(wagePayments.id));
-  return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`set transaction isolation level repeatable read read only`);
+    await requireProjectAccess(tx, actor, projectId, ["owner", "contractor"]);
+    const rows = await tx
+      .select({
+        id: wagePayments.id,
+        workerId: wagePayments.workerId,
+        amountPaise: wagePayments.amountPaise,
+        kind: wagePayments.kind,
+        mode: wagePayments.mode,
+        paidOn: wagePayments.paidOn,
+        reference: wagePayments.reference,
+        createdAt: wagePayments.createdAt,
+      })
+      .from(wagePayments)
+      .where(
+        and(
+          eq(wagePayments.projectId, projectId),
+          query.from ? sql`${wagePayments.paidOn} >= ${query.from}::date` : undefined,
+          query.to ? sql`${wagePayments.paidOn} <= ${query.to}::date` : undefined,
+          query.workerId ? eq(wagePayments.workerId, query.workerId) : undefined,
+        ),
+      )
+      .orderBy(desc(wagePayments.paidOn), desc(wagePayments.createdAt), desc(wagePayments.id));
+
+    const corrections = rows.length
+      ? await tx
+          .select({ targetId: adjustments.targetId, newValue: adjustments.newValue })
+          .from(adjustments)
+          .where(
+            and(
+              eq(adjustments.projectId, projectId),
+              eq(adjustments.targetTable, "wage_payments"),
+              inArray(
+                adjustments.targetId,
+                rows.map((row) => row.id),
+              ),
+            ),
+          )
+          .orderBy(asc(adjustments.sequenceNo))
+      : [];
+    const effective = new Map<string, number>();
+    for (const correction of corrections)
+      effective.set(correction.targetId, Number(correction.newValue));
+
+    return rows.map((row) => ({
+      ...row,
+      amountPaise: PositivePaise.parse(row.amountPaise),
+      effectiveAmountPaise: PositivePaise.parse(effective.get(row.id) ?? row.amountPaise),
+      createdAt: row.createdAt.toISOString(),
+    }));
+  });
 }
 
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);

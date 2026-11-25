@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M4 PostgreSQL CI corrections
+
+- Timestamp: 2026-11-25 17:23:24+05:30
+- Milestone/task ID: M4 verification follow-up
+- Branch: be/labour-accounting
+- Scope: fix defects exposed by the first PostgreSQL-backed PR run and tighten effective-history verification.
+- Files affected: labour list services, correction history ordering, PostgreSQL integration tests, and API documentation.
+- API or database changes: attendance and wage-payment history now read originals and their effective corrections within repeatable-read, read-only transactions. Payment paise are parsed to safe JSON numbers. Adjustment history orders by the identity sequence used for effective correction selection.
+- Verification commands and outcomes: PR #11 CI run #27 passed Biome, typecheck, migration 0003, migration-upgrade, and two-run seed idempotence; Vitest reported 77 passed and 4 failed. The four failures exposed a string-valued effective paise response, the attendance effective-value read path, a reversed newest-first history assertion, and a PDF assertion that searched raw encoded bytes. After fixes, local Biome, typecheck, 33 shared/OpenAPI/export tests, and production build passed. The PostgreSQL suite has not yet rerun.
+- Dependencies added: none.
+- Known limitations: all four PostgreSQL test failures need confirmation against a fresh CI run; merge is not authorized until that run passes.
+- Frontend implications: no frontend implementation or frontend ledger changes; response shapes remain the published contracts.
+- Commit or PR reference: [PR #11](https://github.com/Rakshak-D/SixSeven/pull/11), initial CI run #27.
+- Next action: publish the fix, rerun the complete PostgreSQL CI suite, and resolve any remaining failures.
+
 ## Entry — M4 labour accounting implementation
 
 - Timestamp: 2026-11-25 17:04:10+05:30
