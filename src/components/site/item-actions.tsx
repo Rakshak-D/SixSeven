@@ -7,7 +7,12 @@ import { ProofSheet } from "@/components/photos/proof-sheet";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useEditChecklist, useStartChecklistItem } from "@/hooks/use-project-data";
+import {
+  useChangeRequests,
+  useCreateChange,
+  useStartChecklistItem,
+} from "@/hooks/use-project-data";
+import { describeChange, isOpen, statusText } from "@/lib/change-requests";
 import type { VerifiedChecklists, VerifiedItem } from "@/lib/checklist";
 import { ChecklistPhase } from "@/shared/schemas/checklist";
 import type { Role } from "@/shared/schemas/common";
@@ -28,11 +33,24 @@ export function ItemActions({
   const [proof, setProof] = useState(false);
   const [editing, setEditing] = useState(false);
   const sentBackNote = [...item.history].reverse().find((e) => e.kind === "sent_back")?.note;
+  const changes = useChangeRequests(projectId);
+  const waiting = (changes.data ?? []).find(
+    (r) => "targetId" in r && r.targetId === item.id && isOpen(r),
+  );
+  // The task keeps its current name until the owner accepts, so show what is waiting under it.
+  const pendingLine = waiting ? (
+    <p className="mb-2 text-[14px] text-warning">
+      {describeChange(waiting, { items: [item] }).title} asked ·{" "}
+      {waiting.kind === "checklist_rename" ? `new name “${waiting.payload.task}” · ` : ""}
+      {statusText[waiting.status]}
+    </p>
+  ) : null;
 
   if (role === "contractor") {
     const s = item.verificationStatus;
     return (
       <div className="w-full pb-2">
+        {pendingLine}
         {s === "sent_back" && sentBackNote ? (
           <p className="mb-2 text-[15px] text-destructive">Engineer: {sentBackNote}</p>
         ) : null}
@@ -66,14 +84,17 @@ export function ItemActions({
   if (role === "engineer" && item.verificationStatus !== "waiting") {
     return (
       <div className="w-full pb-2">
-        <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-          Edit
-        </Button>
+        {pendingLine}
+        {waiting ? null : (
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        )}
         <EditItemSheet projectId={projectId} item={item} open={editing} onOpenChange={setEditing} />
       </div>
     );
   }
-  return null;
+  return pendingLine ? <div className="w-full">{pendingLine}</div> : null;
 }
 
 function EditItemSheet({
@@ -87,20 +108,25 @@ function EditItemSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { rename, remove } = useEditChecklist(projectId);
+  const save = useCreateChange(projectId);
   const [task, setTask] = useState(item.task);
   const [reason, setReason] = useState("");
   const [problem, setProblem] = useState<string>();
   const reasonProblem = firstProblem([
     [reason.trim().length < 10, "Say why, in at least 10 characters. It stays in the history."],
   ]);
+  const sent = () => {
+    toast.success("Sent to the contractor for a vote");
+    setReason("");
+    onOpenChange(false);
+  };
 
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
       title="Edit task"
-      description="Changes keep their history and reason."
+      description="Nothing changes now. The contractor votes, then the owner decides."
     >
       <div className="space-y-4">
         <Field label="Task">
@@ -109,29 +135,24 @@ function EditItemSheet({
         <Field label="Why?">
           {(id) => <TextArea id={id} value={reason} onChange={setReason} />}
         </Field>
-        <FormError error={problem ?? rename.error ?? remove.error} />
+        <FormError error={problem ?? save.error} />
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant="outline"
-            disabled={remove.isPending}
+            disabled={save.isPending}
             onClick={() => {
               setProblem(reasonProblem);
               if (reasonProblem) return;
-              remove.mutate(
-                { itemId: item.id, reason },
-                {
-                  onSuccess: () => {
-                    toast.success(`Removed: ${item.task}`);
-                    onOpenChange(false);
-                  },
-                },
+              save.mutate(
+                { kind: "checklist_remove", targetId: item.id, payload: {}, note: reason },
+                { onSuccess: sent },
               );
             }}
           >
-            Remove task
+            Ask to remove
           </Button>
           <Button
-            disabled={rename.isPending}
+            disabled={save.isPending}
             onClick={() => {
               const found =
                 firstProblem([
@@ -140,18 +161,13 @@ function EditItemSheet({
                 ]) ?? reasonProblem;
               setProblem(found);
               if (found) return;
-              rename.mutate(
-                { itemId: item.id, task, reason },
-                {
-                  onSuccess: () => {
-                    toast.success("Task renamed");
-                    onOpenChange(false);
-                  },
-                },
+              save.mutate(
+                { kind: "checklist_rename", targetId: item.id, payload: { task }, note: reason },
+                { onSuccess: sent },
               );
             }}
           >
-            Save name
+            Ask to rename
           </Button>
         </div>
       </div>
@@ -171,7 +187,7 @@ export function AddTaskSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { add } = useEditChecklist(projectId);
+  const save = useCreateChange(projectId);
   const [phase, setPhase] = useState<(typeof ChecklistPhase.options)[number]>("foundation");
   const [task, setTask] = useState("");
   const [reason, setReason] = useState("");
@@ -183,7 +199,7 @@ export function AddTaskSheet({
       open={open}
       onOpenChange={onOpenChange}
       title="Add a task"
-      description="It joins the saved checklist."
+      description="It joins the checklist after the contractor's vote and the owner's yes."
     >
       <div className="space-y-4">
         <Field label="Phase">
@@ -203,11 +219,11 @@ export function AddTaskSheet({
         <Field label="Why add it?">
           {(id) => <TextArea id={id} value={reason} onChange={setReason} />}
         </Field>
-        <FormError error={problem ?? add.error} />
+        <FormError error={problem ?? save.error} />
         <Button
           size="lg"
           className="w-full"
-          disabled={add.isPending || !checklist}
+          disabled={save.isPending || !checklist}
           onClick={() => {
             const found = firstProblem([
               [!task.trim(), "The task needs a name."],
@@ -215,11 +231,15 @@ export function AddTaskSheet({
             ]);
             setProblem(found);
             if (found || !checklist) return;
-            add.mutate(
-              { checklistId: checklist.id, phase, task, materials: [], reason },
+            save.mutate(
+              {
+                kind: "checklist_add",
+                payload: { checklistId: checklist.id, phase, task, materials: [] },
+                note: reason,
+              },
               {
                 onSuccess: () => {
-                  toast.success(`Added: ${task}`);
+                  toast.success("Sent to the contractor for a vote");
                   setTask("");
                   setReason("");
                   onOpenChange(false);
@@ -228,7 +248,7 @@ export function AddTaskSheet({
             );
           }}
         >
-          Add task
+          Ask to add
         </Button>
       </div>
     </Sheet>

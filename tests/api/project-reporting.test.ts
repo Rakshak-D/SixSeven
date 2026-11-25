@@ -4,7 +4,14 @@ import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 import { POST as authPost } from "@/app/api/auth/[...auth]/route";
 import { getDatabase } from "@/db/client";
-import { auditLog, checklistEvents, expenses, progressPhotos, progressUpdates } from "@/db/schema";
+import {
+  auditLog,
+  checklistEvents,
+  expenses,
+  progressPhotos,
+  progressUpdates,
+  projectMembers,
+} from "@/db/schema";
 import { app } from "@/server/app";
 import { createAuth } from "@/server/auth";
 import {
@@ -18,6 +25,7 @@ import { ErrorResponse } from "@/shared/errors";
 import { ActivityResponse } from "@/shared/schemas/activity";
 import { AttendanceListResponse, AttendanceResponse } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
+import { ChangeRequest, ChangeRequestsResponse } from "@/shared/schemas/change-requests";
 import {
   ChecklistDraftResponse,
   VerifiedChecklistItemResponse,
@@ -25,7 +33,11 @@ import {
 } from "@/shared/schemas/checklist";
 import { DeliveryResponse } from "@/shared/schemas/deliveries";
 import { ProgressResponse, TimelineResponse } from "@/shared/schemas/progress";
-import { ProjectMemberResponse, ProjectResponse } from "@/shared/schemas/projects";
+import {
+  ProjectInvitationResponse,
+  ProjectMemberResponse,
+  ProjectResponse,
+} from "@/shared/schemas/projects";
 import { ProposalResponse } from "@/shared/schemas/proposals";
 import { SummaryResponse } from "@/shared/schemas/summary";
 import { UsageResponse } from "@/shared/schemas/usages";
@@ -108,7 +120,7 @@ function monday(value: string) {
 }
 
 async function newProject(startDate: string, budgetPaise = 25_000_000) {
-  const response = await api("/projects", contractor, {
+  const response = await api("/projects", engineer, {
     name: "Synthetic M5 reporting project",
     location: "Demo site",
     startDate,
@@ -116,13 +128,16 @@ async function newProject(startDate: string, budgetPaise = 25_000_000) {
   });
   expect(response.status).toBe(201);
   const project = ProjectResponse.parse(await response.json());
-  for (const [email, role] of [
-    [DemoAccountEmail.owner, "owner"],
-    [DemoAccountEmail.engineer, "engineer"],
+  for (const [email, role, recipient] of [
+    [DemoAccountEmail.owner, "owner", owner],
+    [DemoAccountEmail.contractor, "contractor", contractor],
   ] as const) {
-    const member = await api(`/projects/${project.id}/members`, contractor, { email, role });
-    expect(member.status).toBe(201);
-    ProjectMemberResponse.parse(await member.json());
+    const invite = await api(`/projects/${project.id}/invitations`, engineer, { email, role });
+    expect(invite.status).toBe(201);
+    const { id } = ProjectInvitationResponse.parse(await invite.json());
+    const member = await api(`/invitations/${id}/accept`, recipient, {}, "POST");
+    expect(member.status).toBe(200);
+    expect(ProjectMemberResponse.parse(await member.json()).role).toBe(role);
   }
   return project.id;
 }
@@ -142,6 +157,85 @@ async function imageFile(type: "png" | "jpeg" | "webp" = "png") {
     file: new File([new Uint8Array(bytes)], `fixture.${type}`, { type: mime }),
   };
 }
+
+describe("medical reimbursements", () => {
+  it("keeps bills private and reconciles one partial mock reimbursement", async () => {
+    const today = dateString(new Date());
+    const id = await newProject(today);
+    const worker = await api(`/projects/${id}/workers`, contractor, {
+      name: "Synthetic bill worker",
+      category: "mason",
+      dailyRatePaise: 80_000,
+    });
+    expect(worker.status).toBe(201);
+    const { id: workerId } = await worker.json();
+    const image = await imageFile();
+    const form = (capturedAt: string) => {
+      const data = new FormData();
+      data.set("workerId", workerId);
+      data.set("billPaise", "24000");
+      data.set("incidentOn", today);
+      data.set("note", "Synthetic medical evidence");
+      data.append("billPhotos", image.file);
+      data.append("capturedAt", capturedAt);
+      return data;
+    };
+    const path = `/projects/${id}/medical-expenses`;
+    await expectError(
+      await api(path, contractor, form(new Date(Date.now() - 601_000).toISOString())),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const capture = new Date().toISOString();
+    await expectError(await api(path, outsider, form(capture)), 404, "NOT_FOUND");
+    const submitted = await api(path, contractor, form(capture));
+    expect(submitted.status).toBe(201);
+    const claim = await submitted.json();
+    expect(claim).toMatchObject({
+      kind: "medical_expense",
+      status: "pending_owner",
+      reimbursementProvider: "mock",
+      payPaise: null,
+    });
+    const [photo] = claim.payload.billPhotos;
+    expect(photo).toMatchObject({ capturedAt: capture, receivedAt: expect.any(String) });
+    const imagePath = photo.url.slice("/api/v1".length);
+    await expectError(await api(imagePath, engineer), 404, "NOT_FOUND");
+    const fromOwner = await api(imagePath, owner);
+    expect(fromOwner.status).toBe(200);
+    expect(fromOwner.headers.get("cache-control")).toBe("private, no-store");
+    expect(Buffer.from(await fromOwner.arrayBuffer())).toEqual(image.bytes);
+    const decision = `/change-requests/${claim.id}/decision`;
+    await expectError(
+      await api(decision, owner, { accept: true, payPaise: 24_001, note: "Above the bill" }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const approve = () =>
+      api(decision, owner, { accept: true, payPaise: 12_345, note: "Partial reimbursement" });
+    const outcomes = await Promise.all([approve(), approve()]);
+    expect(outcomes.map((response) => response.status).sort()).toEqual([200, 409]);
+    const accepted = outcomes.find((response) => response.ok);
+    expect(await accepted?.json()).toMatchObject({ status: "accepted", payPaise: 12_345 });
+    const rejection = await api(path, contractor, form(new Date().toISOString()));
+    const rejectedClaim = await rejection.json();
+    expect(
+      (
+        await api(`/change-requests/${rejectedClaim.id}/decision`, owner, {
+          accept: false,
+          note: "Invalid duplicate claim",
+        })
+      ).status,
+    ).toBe(200);
+    const summary = SummaryResponse.parse(
+      await (await api(`/projects/${id}/summary`, owner)).json(),
+    );
+    expect(summary).toMatchObject({
+      spendSplit: { otherPaise: 12_345 },
+      spendByWeek: [{ weekStart: monday(today), otherPaise: 12_345 }],
+    });
+  });
+});
 
 describe("project financial summary", () => {
   it("uses effective records, exact material cost rounding, IST weeks and role-safe responses", async () => {
@@ -240,13 +334,22 @@ describe("project financial summary", () => {
     expect(attendanceResponse.status).toBe(201);
     const attendanceRecord = AttendanceResponse.parse(await attendanceResponse.json()).entries[0];
     if (!attendanceRecord) throw new Error("Missing created attendance");
-    const attendanceCorrection = await api(`/projects/${projectId}/adjustments`, contractor, {
-      targetTable: "attendance",
+    const attendanceCorrection = await api(`/projects/${projectId}/change-requests`, contractor, {
+      kind: "attendance_fix",
       targetId: attendanceRecord.id,
-      newValue: 2,
-      reason: "Verified the full-day signed register entry",
+      payload: { newValue: 2, reasonKind: "other", payFullDay: false },
+      note: "Verified the full-day signed register entry",
     });
     expect(attendanceCorrection.status).toBe(201);
+    const attendanceRequest = ChangeRequest.parse(await attendanceCorrection.json());
+    expect(
+      (
+        await api(`/change-requests/${attendanceRequest.id}/decision`, owner, {
+          accept: true,
+          note: "Approved verified attendance",
+        })
+      ).status,
+    ).toBe(200);
     const attendanceList = await api(
       `/projects/${projectId}/attendance?from=${today}&to=${today}`,
       owner,
@@ -782,11 +885,9 @@ describe("M6 proposals and checklist verification", () => {
       body: { email, password, name: "Second test engineer" },
     });
     const secondEngineer = await signIn(email);
-    const secondary = await api(`/projects/${project}/members`, contractor, {
-      email,
-      role: "engineer",
-    });
-    expect(secondary.status).toBe(201);
+    await getDatabase()
+      .db.insert(projectMembers)
+      .values({ projectId: project, userId: secondEngineer.userId, role: "engineer" });
     await expectError(await api(`${draftPath}/records`, secondEngineer, payload), 404, "NOT_FOUND");
     const save = await api(`${draftPath}/records`, engineer, payload);
     expect(save.status).toBe(201);
@@ -796,11 +897,7 @@ describe("M6 proposals and checklist verification", () => {
     if (!first) throw new Error("Checklist fixture missing");
     const path = `/checklist-items/${first.id}`;
     await expectError(await api(`${path}/start`, outsider, undefined, "POST"), 404, "NOT_FOUND");
-    await expectError(
-      await api(path, contractor, { status: "done" }, "PATCH"),
-      400,
-      "VALIDATION_ERROR",
-    );
+    await expectError(await api(path, contractor, { status: "done" }, "PATCH"), 404, "NOT_FOUND");
     expect((await api(`${path}/start`, contractor, undefined, "POST")).status).toBe(200);
     await expectError(await api(`${path}/start`, contractor, undefined, "POST"), 409, "CONFLICT");
     const photo = await imageFile();
@@ -876,34 +973,98 @@ describe("M6 proposals and checklist verification", () => {
       api(`${path}/review`, engineer, { decision: "accept", progressId: latest }),
     ]);
     expect(reviews.map((r) => r.status).sort()).toEqual([200, 409]);
-    const renamed = VerifiedChecklistItemResponse.parse(
-      await (
-        await api(
-          path,
-          engineer,
-          { task: "Inspect footing layout", reason: "Clarify the inspection scope" },
-          "PATCH",
-        )
-      ).json(),
+    const requestPath = `/projects/${project}/change-requests`;
+    const submitChange = async (input: unknown) => {
+      const result = await api(requestPath, engineer, input);
+      expect(result.status).toBe(201);
+      return `/change-requests/${ChangeRequest.parse(await result.json()).id}`;
+    };
+    const vote = (request: string, approve: boolean) =>
+      api(`${request}/vote`, contractor, {
+        approve,
+        note: approve ? "Reviewed by contractor" : "Refine request before approval",
+      });
+    const decide = (request: string) =>
+      api(`${request}/decision`, owner, {
+        accept: true,
+        note: "Owner approval recorded",
+      });
+    const readItem = async () => {
+      const rows = await (await api(draftPath, owner)).json();
+      return VerifiedChecklistItemResponse.parse(VerifiedChecklistResponse.parse(rows[0]).items[0]);
+    };
+    const rename = {
+      kind: "checklist_rename",
+      targetId: first.id,
+      payload: { task: "Inspect footing layout" },
+      note: "Clarify the inspection scope",
+    };
+    const renameRequest = await submitChange(rename);
+    const stale = await submitChange({ ...rename, payload: { task: "Stale proposed name" } });
+    await expectError(
+      await api(`${renameRequest}/vote`, outsider, { approve: true, note: "Out of project" }),
+      404,
+      "NOT_FOUND",
     );
+    await expectError(await decide(renameRequest), 409, "CONFLICT");
+    expect(ChangeRequest.parse(await (await vote(renameRequest, false)).json()).status).toBe(
+      "rejected_contractor",
+    );
+    const ownerQueue = await api(`${requestPath}?status=pending_owner`, owner);
+    expect(ChangeRequestsResponse.parse(await ownerQueue.json())).toEqual([]);
+    await expectError(
+      await api(`${renameRequest}/reopen`, owner, { note: "Try to reopen" }),
+      403,
+      "FORBIDDEN",
+    );
+    expect(
+      (await api(`${renameRequest}/reopen`, engineer, { note: "Resubmitted by the author" }))
+        .status,
+    ).toBe(200);
+    expect((await vote(renameRequest, true)).status).toBe(200);
+    expect((await vote(stale, true)).status).toBe(200);
+    const decisions = await Promise.all([decide(renameRequest), decide(renameRequest)]);
+    expect(decisions.map(({ status }) => status).sort()).toEqual([200, 409]);
+    const approved = ChangeRequest.parse(await decisions.find(({ ok }) => ok)?.json());
+    expect(approved.events.map(({ kind }) => kind)).toEqual([
+      "created",
+      "contractor_rejected",
+      "reopened",
+      "contractor_approved",
+      "owner_accepted",
+    ]);
+    await expect(
+      sql`update change_request_events set note = 'changed' where request_id = ${approved.id}`,
+    ).rejects.toMatchObject({ code: "55000" });
+    await expectError(await decide(stale), 409, "CONFLICT");
+    await expectError(
+      await api(path, engineer, { task: "Bypass", reason: "Should not be permitted" }, "PATCH"),
+      404,
+      "NOT_FOUND",
+    );
+    const renamed = await readItem();
     expect(renamed.history.at(-1)).toMatchObject({
       kind: "renamed",
       previous: first.task,
       next: "Inspect footing layout",
-      actorId: engineer.userId,
+      actorId: owner.userId,
     });
-    const added = await api(`/projects/${project}/checklist-items`, engineer, {
-      checklistId: record.id,
-      phase: "slab",
-      task: "Inspect slab work",
-      reason: "Add a second inspection point",
+    const added = await submitChange({
+      kind: "checklist_add",
+      payload: { checklistId: record.id, phase: "slab", task: "Inspect slab work" },
+      note: "Add a second inspection point",
     });
-    expect(added.status).toBe(201);
-    const removed = VerifiedChecklistItemResponse.parse(
-      await (
-        await api(path, engineer, { reason: "Retire the completed inspection" }, "DELETE")
-      ).json(),
-    );
+    expect((await vote(added, true)).status).toBe(200);
+    expect((await decide(added)).status).toBe(200);
+    const removal = await submitChange({
+      kind: "checklist_remove",
+      targetId: first.id,
+      payload: {},
+      note: "Retire the completed inspection",
+    });
+    expect((await vote(removal, true)).status).toBe(200);
+    expect((await decide(removal)).status).toBe(200);
+    const removed = await readItem();
     expect(removed.removedAt).toBeTruthy();
     expect(removed.verificationStatus).toBe("done");
     const records = (await (await api(draftPath, owner)).json()) as unknown[];

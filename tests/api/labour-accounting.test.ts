@@ -12,12 +12,14 @@ import {
   AttendanceRosterResponse,
 } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
+import { ChangeRequest } from "@/shared/schemas/change-requests";
 import { DeliveryResponse } from "@/shared/schemas/deliveries";
 import {
   WagePaymentListResponse,
   WagePaymentResponse,
   WageSheetResponse,
 } from "@/shared/schemas/wages";
+import { WorkerResponse, WorkersResponse } from "@/shared/schemas/workers";
 import { testDatabase } from "./database-fixture";
 
 const projectId = "demo-greenfield";
@@ -85,6 +87,29 @@ async function failure(response: Response, status: number, code: string) {
   expect(ErrorResponse.parse(await response.json()).error.code).toBe(code);
 }
 
+async function approveAttendance(
+  targetId: string,
+  newValue: number,
+  note: string,
+  payFullDay = false,
+) {
+  const created = await call(projectId, "change-requests", contractor, {
+    kind: "attendance_fix",
+    targetId,
+    note,
+    payload: { newValue, reasonKind: payFullDay ? "medical_emergency" : "other", payFullDay },
+  });
+  expect(created.status).toBe(201);
+  const request = ChangeRequest.parse(await created.json());
+  const decided = await app.request(`/api/v1/change-requests/${request.id}/decision`, {
+    method: "POST",
+    headers: { cookie: owner.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ accept: true, note: "Reviewed the site register" }),
+  });
+  expect(decided.status).toBe(200);
+  expect(ChangeRequest.parse(await decided.json()).status).toBe("accepted");
+}
+
 async function newWorker(actor = contractor, name = "Synthetic Labour", dailyRatePaise = 90_000) {
   const response = await call(projectId, "workers", actor, {
     name,
@@ -138,11 +163,65 @@ describe("attendance and wage accounting", () => {
     await expect(sql`insert into wage_payments
       (id, project_id, worker_id, amount_paise, kind, mode, paid_on, reference, note, created_by)
       values (${crypto.randomUUID()}, ${projectId}, ${worker.id}, 1000, 'wage', 'upi',
-        '2026-11-24', 'invalid', 'Synthetic payment', ${contractor.userId})`).rejects.toMatchObject({
-      code: "23514",
-      constraint_name: "wage_payment_reference_by_mode",
-    });
+        '2026-11-24', 'invalid', 'Synthetic payment', ${contractor.userId})`).rejects.toMatchObject(
+      {
+        code: "23514",
+        constraint_name: "wage_payment_reference_by_mode",
+      },
+    );
   });
+
+  it("deactivates a worker once, preserves historical wages and rejects new attendance", async () => {
+    const worker = await newWorker();
+    const recorded = await call(projectId, "attendance", contractor, {
+      workDate: "2026-11-24",
+      entries: [{ workerId: worker.id, halfDays: 1 }],
+    });
+    expect(recorded.status).toBe(201);
+    const path = `workers/${worker.id}/deactivate`;
+    const reason = "Worker's contract ended";
+    await failure(await call(projectId, path, owner, { reason }), 403, "FORBIDDEN");
+    await failure(await call(projectId, path, outsider, { reason }), 404, "NOT_FOUND");
+    await failure(
+      await call(projectId, path, contractor, { reason: "   no" }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const attempts = await Promise.all([
+      call(projectId, path, contractor, { reason }),
+      call(projectId, path, contractor, { reason }),
+    ]);
+    expect(attempts.map((response) => response.status).sort()).toEqual([200, 409]);
+    const [success] = attempts.filter((response) => response.ok);
+    const updated = WorkerResponse.parse(await success.json());
+    expect(updated).toMatchObject({
+      id: worker.id,
+      active: false,
+      removedReason: reason,
+      removedOn: expect.any(String),
+    });
+    const listing = await call(projectId, "workers", owner);
+    expect(WorkersResponse.parse(await listing.json()).find((row) => row.id === worker.id)).toEqual(
+      updated,
+    );
+    await failure(
+      await call(projectId, "attendance", contractor, {
+        workDate: "2026-11-25",
+        entries: [{ workerId: worker.id, halfDays: 2 }],
+      }),
+      409,
+      "CONFLICT",
+    );
+    const history = await call(projectId, `attendance?workerId=${worker.id}`, owner);
+    expect(AttendanceListResponse.parse(await history.json())).toMatchObject([
+      { ratePaise: worker.dailyRatePaise, halfDays: 1 },
+    ]);
+    const { sql } = getDatabase();
+    expect(
+      await sql`select id from audit_log where entity = 'worker' and action = 'updated' and entity_id = ${worker.id}`,
+    ).toHaveLength(1);
+  });
+
   it("shows the engineer effective dated attendance without financial fields", async () => {
     const worker = await newWorker(contractor, "Roster privacy fixture");
     const workDate = "2026-11-22";
@@ -154,13 +233,17 @@ describe("attendance and wage accounting", () => {
     const {
       entries: [entry],
     } = AttendanceResponse.parse(await result.json());
-    const corrected = await call(projectId, "adjustments", contractor, {
-      targetTable: "attendance",
-      targetId: entry.id,
-      newValue: 0,
-      reason: "Correct the site attendance register",
-    });
-    expect(corrected.status).toBe(201);
+    await failure(
+      await call(projectId, "adjustments", contractor, {
+        targetTable: "attendance",
+        targetId: entry.id,
+        newValue: 0,
+        reason: "Correct the site attendance register",
+      }),
+      403,
+      "FORBIDDEN",
+    );
+    await approveAttendance(entry.id, 0, "Correct the site attendance register");
     const path = `attendance/roster?workerId=${worker.id}&from=${workDate}&to=${workDate}`;
     await failure(await call(projectId, path), 401, "UNAUTHENTICATED");
     await failure(await call(projectId, path, outsider), 404, "NOT_FOUND");
@@ -446,6 +529,16 @@ describe("attendance and wage accounting", () => {
     ] as const;
     const responses = [];
     for (const correction of corrections) {
+      if (correction.targetTable === "attendance") {
+        await approveAttendance(correction.targetId, correction.newValue, correction.reason);
+        const response = await call(
+          projectId,
+          `adjustments?targetTable=attendance&targetId=${correction.targetId}`,
+          owner,
+        );
+        responses.push(AdjustmentListResponse.parse(await response.json())[0]);
+        continue;
+      }
       const response = await call(projectId, "adjustments", contractor, correction);
       expect(response.status).toBe(201);
       responses.push(AdjustmentResponse.parse(await response.json()));
@@ -503,6 +596,25 @@ describe("attendance and wage accounting", () => {
     expect(
       await db.select().from(adjustments).where(eq(adjustments.targetId, delivery.id)),
     ).toHaveLength(2);
+  });
+
+  it("pays an approved medical full day while retaining actual attendance", async () => {
+    const worker = await newWorker(contractor, "Medical entitlement fixture", 90_000);
+    const date = "2026-11-24";
+    const response = await call(projectId, "attendance", contractor, {
+      workDate: date,
+      entries: [{ workerId: worker.id, halfDays: 1 }],
+    });
+    const target = AttendanceResponse.parse(await response.json()).entries[0];
+    await approveAttendance(target.id, 1, "Worker left after an onsite emergency", true);
+    const actual = await call(projectId, `attendance?workerId=${worker.id}`, owner);
+    expect(AttendanceListResponse.parse(await actual.json())[0].effectiveHalfDays).toBe(1);
+    const wages = await call(projectId, `wage-sheet?from=${date}&to=${date}`, owner);
+    expect(
+      WageSheetResponse.parse(await wages.json()).workers.find(
+        ({ workerId }) => workerId === worker.id,
+      ),
+    ).toMatchObject({ halfDays: 1, accruedPaise: 90_000 });
   });
 
   it("rejects no-op, cross-project, unauthorized and concurrent stale corrections", async () => {
@@ -629,6 +741,20 @@ describe("attendance and wage accounting", () => {
       reason: "Reverse delivery after stock return",
     });
     expect(reverseDelivery.status).toBe(201);
+    const history = await call(projectId, `movements?materialId=${material.id}`, owner);
+    expect(history.status).toBe(200);
+    expect(await history.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "adjustment",
+          note: "Reverse the original consumption entry",
+        }),
+        expect.objectContaining({
+          type: "adjustment",
+          note: "Reverse delivery after stock return",
+        }),
+      ]),
+    );
     const { sql } = getDatabase();
     const [current] = await sql`select material.stock_qty::text as balance,
       coalesce(sum(movement.qty), 0)::numeric(14, 3)::text as total

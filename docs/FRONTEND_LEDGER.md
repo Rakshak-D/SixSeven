@@ -45,8 +45,141 @@ proposed method + path, fields, priority / blocking.
 | 17 | **Pre-approved orders, spending rules and a delegate.** The owner creates orders `{supplierId, materialId, qty, maxUnitPricePaise}`, sets rules `{perBillCapPaise, perWeekCapPaise}`, and may name one delegate (a family member, or the engineer up to a limit; never the contractor). Proposed: `POST /projects/:id/orders`, `PUT /projects/:id/payment-rules`, `PUT /projects/:id/delegate`. | Owner → orders and rules | High | Open |
 | 18 | **Mock payment release.** When the engineer verifies a delivery that matches an order (supplier, quantity, price cap) and fits the rules, the server creates a mock payment for an amount it calculates, with an idempotency key. Anything else waits in an owner pending list: `GET /projects/:id/payments?status=pending`, `POST /payments/approve {ids[]}` (approve all), `PUT /projects/:id/auto-pay {paused}`. Every auto-payment appears in activity. Responses say the provider is a mock. This changes the specification rule that contractors record payments; it needs technical-lead approval. | Owner → approvals, digest | High; changes a P0 rule | Open |
 | 19 | **Fraud flags** in the summary for owners: new supplier, bank change, a rate far above recent buys, a payment with no verified delivery, an entry with no engineer confirmation, repeated delays. Proposed `fraudFlags: [{kind, refType, refId, raisedOn}]` on `SummaryResponse` for owners only. | Owner dashboard | Medium | Open |
+| 20 | **Approval chain for engineer changes (append-only).** Replaces the direct apply in request 8.<br>• **What goes through it:** checklist add, rename and remove; attendance fixes; medical expenses (request 23). Nothing is changed in place; a change applies only when the owner accepts it.<br>• **Model:** `ChangeRequest {id, projectId, kind: checklist_add \| checklist_rename \| checklist_remove \| attendance_fix \| medical_expense, targetId?, payload, authorId, authorRole, status, events[]}`. `events[]` is append-only `{kind: created \| contractor_approved \| contractor_rejected \| reopened \| owner_accepted \| owner_rejected, byUserId, role, note, at}`.<br>• **States:** an engineer's change starts at `pending_contractor`. Contractor approve → `pending_owner`; contractor reject → `rejected_contractor`, which stays out of the owner's queue but readable. Only the author can reopen (back to `pending_contractor`). Owner accept → `accepted` (the change applies in the same transaction); owner reject → `rejected_owner`. Both owner outcomes are final, with no reopen. A contractor's own fix or medical expense starts at `pending_owner`.<br>• **Routes:** `POST /projects/:id/change-requests {kind, targetId?, payload, note}`, `GET /projects/:id/change-requests?status=` (any member), `POST /change-requests/:id/vote {approve, note}` (contractor), `POST /change-requests/:id/reopen {note}` (author), `POST /change-requests/:id/decision {accept, note, payPaise?}` (owner). Every note is required (`Note`). A wrong state → 409, a wrong role → 403.<br>• **Not included:** the engineer's accept or send-back of the contractor's proof (request 7) stays as it is. | Engineer Site edits, contractor votes, owner Approvals | High; changes request 8 and the checklist rules in `SPECIFICATION.md` | Open |
+| 21 | **Notes required everywhere.** Make these `Note` (required, not optional):<br>• `CreateDeliveryInput.note` and `CreateUsageInput.note`;<br>• the checklist review accept `note` (`checklist.ts`, today optional);<br>• the wage payment `note` (new, request 22);<br>• every decision: proposal decision, plus every vote, decision and reopen in request 20. | All forms | High | Open |
+| 22 | **Wage payments: required note; no reference for cash.** Builds on request 9 (in progress on `be/wage-payment-modes`). Contractors still record wage payments.<br>• `CreateWagePaymentInput` gains a required `note`.<br>• For `mode: cash`, refuse a non-empty `reference`; the note is the record of who received the cash and where. | Wages → record payment | Medium | Open |
+| 23 | **Medical emergencies.**<br>• **Attendance fix:** adjustments for `targetTable: attendance` gain `reasonKind: medical_emergency \| other` and `payFullDay: boolean` (only allowed with `medical_emergency`). `payFullDay` pays 2 half-days regardless of attendance.<br>• **Medical expense for an onsite accident:** `POST /projects/:id/medical-expenses` (multipart) `{workerId, billPaise, incidentOn, note}` plus 1–3 bill photos.<br>• **Chain and payment:** both go through request 20. When accepting, the owner sets `payPaise`, either the full bill or a partial amount up to the bill. The payment is a mock. It counts in the summary's `otherPaise`, and in `spendByWeek`. | Today → Fix, new Medical sheet, owner Approvals | High | Open |
+| 24 | **Invite by phone as well as email.** Builds on request 4 (in progress on `be/project-invitations`).<br>• `CreateProjectInvitationInput` takes `email` or `phone` (Indian mobile, normalised to +91).<br>• A signed-in user sees invitations matching either their email or a verified phone.<br>• Also needed: an invitation list for the engineer, `GET /projects/:id/invitations` with `status: pending \| accepted`. | Project setup → invite | Medium | Open |
+| 25 | **Supplier payments are owner-only, with autopay.** Extends requests 16–18; the spec change is approved (see the 2026-11-26 entry).<br>• **Contractors:** they cannot create, approve or read supplier payments or bank details.<br>• **Mandates:** each approved supplier can have `autopay {enabled, perBillCapPaise, perWeekCapPaise, paused}` (`PUT /suppliers/:id/autopay`, owner).<br>• **Release:** a mock payment releases only after the engineer verifies the delivery (request 13), for a server-calculated amount capped at the owner-approved order and the mandate caps. Everything else goes to the owner's pending list (request 18). | Owner → Money → Suppliers | High; changes a P0 rule | Open |
+| 26 | **Keep the fix reason on the stock line.** Today `src/server/services/adjustments.ts` writes the compensating movement with the fixed note "Compensating stock correction", so the reason the user typed is lost in stock history. Write the adjustment's reason (or `Fix: <reason>`) as the movement note, or return `adjustmentId` on the movement so the client can show the reason. | Logs → stock, Spends | Medium; reported bug | Open |
+| 27 | **Camera photos carry a capture time.** The app will take photos only from the live in-app camera, never the gallery. Each photo upload gains `capturedAt` (client time, stored and shown). The server refuses a `capturedAt` more than 10 minutes before the upload. This is not tamper-proof; it only makes old gallery photos harder to pass off. | Every photo upload | Low | Open |
+| 28 | **Name the capture-time field** for medical bill photos (PR #34 mentions capture timestamps without a field name). The UI sends `capturedAt` per `billPhotos` part, in order. | Medical expense | Medium; needed with the routes | Open |
 
 ## Entries
+
+### 2026-11-26 IST · Owner suppliers and autopay (MOCKED, demo data only)
+
+- **Branch:** `fe/supplier-autopay`, on top of `fe/project-invites` (PR #38).
+- **Status: MOCKED, and hidden on the live server.** No contract exists, so
+  `lib/supplier-payments.ts` holds frontend-only shapes and the release rules for the demo. **The
+  server must own these rules** (requests 16–18 and 25): replace the file's shapes with shared ones
+  and never let a browser decide a payment.
+- **Owner (Money):** suppliers with approval, per-supplier autopay with per-bill and per-week limits,
+  pause all, approved orders, a bank-account change that needs approval then a 24-hour hold with an
+  alert, waiting payments with the reason, and history. Home "Needs you" counts waiting payments.
+- **Engineer (Home):** "Deliveries to verify", with a required note and no prices.
+- **Contractor:** every supplier route answers 403 and no screen shows any of it.
+- **Release rule:** after verification, a payment leaves by itself only for an approved supplier with
+  a matching order, a rate within it, enough quantity left, autopay on and not paused, inside both
+  limits. The amount never exceeds the order. A held bill is judged again each time it is read, and
+  only the owner can then pay it.
+- **Not built:** bag-code scanning (requests 13 and 14), so verification is only the engineer's word;
+  the steel hold point (15), the delegate (17) and fraud flags (19). Do not describe this as fraud
+  prevention.
+- **Handoff to Codex:** `README.md` and `DISCLOSURES.md` must say the payment is a mock (AGENTS.md).
+- **Checks:** Biome, typecheck, `vitest run src` (96 pass). Playwright on mocks: approve supplier and
+  order, pay a held bill, bank change and alert, pause, autopay, add supplier, engineer verification,
+  contractor sees nothing; 390, 768 and 1440, no sideways scroll at 390 and 1440.
+
+### 2026-11-26 IST · Engineer attendance fix, starting a project, invites, team
+
+- **Branch:** `fe/project-invites`.
+- **Attendance fix (reported by Max):** it sent on demo data but looked broken. It now has a
+  "Fix attendance" button on the engineer's Home (`logs?tab=attendance`), the form opens on a mark
+  that differs from the current one, and a row with a waiting fix says so and hides Fix. On the live
+  server it still needs the change-request routes (backend PR #37).
+- **Team page** (`/projects/[id]/team`): names, roles and tap-to-call from the merged
+  `GET /projects/:id/members` (handoff from PR #28). Setting your own phone is not built.
+- **Start a project and invites: MOCKED, demo data only.** Hidden on the live server, which still
+  makes the creator the contractor. `lib/invitations.ts` is a temporary copy of the shapes in
+  backend PR #30; delete it and import from `shared/schemas/projects` when that merges. Then drop the
+  `mocksEnabled` gates in `project-list.tsx` and `team-page.tsx`.
+- **Not built:** phone invites and the engineer's list of sent invites (request 24); only this
+  visit's invites show. A new project has no note field because `CreateProjectInput` has none.
+- **Checks:** Biome, typecheck, `vitest run src` (87 pass). Playwright on mocks: attendance fix from
+  Home, start a project, invite, accept an invite, the empty project's engineer pages; no page errors.
+
+### 2026-11-26 IST · Approval chain and medical entries (MOCKED)
+
+- **Branch:** `fe/approval-chain`, built on the contract from PR #34
+  (`shared/schemas/change-requests.ts`). No frontend-only request or response types.
+- **Status: MOCKED.** The change-request and medical routes are not built on the server. On live data
+  (mocks off) these screens show the API's error, and engineer plan edits and attendance fixes cannot
+  be saved until the routes land. The direct `PATCH`/`DELETE`/`POST checklist-items` calls and the
+  direct attendance adjustment are no longer used by the UI.
+- **Screens:** engineer Site edits ask for a change (the task keeps its value until accepted);
+  engineer Logs has an Attendance tab from `/attendance/roster` with Fix; contractor votes on Today
+  and Site; the contractor's own attendance fix goes to the owner; the owner decides in Approvals,
+  with full or part payment for medical bills (labelled mock). Every step needs a note and shows in
+  a trail. Medical expense is on Site and in the contractor's Log sheet.
+- **Mocks:** `mocks/change-routes.ts` and `change-seed.ts`. Each demo project is one role, so the
+  seeds give every role something to act on.
+- **Question for backend (request 28):** the contract says bill photos come "with capture
+  timestamps" but names no field. The UI sends one `capturedAt` (ISO) per `billPhotos` part, in the
+  same order. Please confirm or name the field.
+- **Not covered:** owner proposals still take no decision note (`DecideProposalInput`, request 21).
+- **Checks:** Biome, typecheck, `vitest run src` (84 pass, including the chain's states, roles and
+  pay limits). Playwright on mocks: reopen, rename request, attendance medical fix, contractor vote,
+  medical bill with a stand-in camera stream, owner accept and part payment; 390, 768 and 1440,
+  light and dark, no sideways scroll.
+
+### 2026-11-26 IST · Fix reasons, required notes, payment proof, live camera
+
+- **Branch:** `fe/fixes-notes-camera`, stacked on `fe/approvals-payments` (PR #32).
+- **Bug fixed:** the reason typed for a stock fix was lost in stock history. The mock now writes
+  `Fix: <reason>` on the correction line, and spends show `Fixed: <reason>`. The live server still
+  writes a fixed sentence (request 26). Delivery notes now show in Logs, Today and spends.
+- **Required notes (form checks only until request 21):** delivery, usage, and both review
+  decisions. The engineer's review now has one note box used by Accept and Send back / Reject (the
+  button label was already edited in the working tree).
+- **Wage payments:** UPI needs a 12-digit ID and Bank needs 6 to 22 letters or digits. Cash hides
+  the reference and requires a note. **Until request 22, the cash note is sent as `reference`**,
+  because the schema has no note field. Please move those values when `note` lands.
+- **Also fixed:** the selected tab's label vanished while hovered or tapped (`ui/tabs.tsx`).
+- **Waiting on the contract:** the Cheque mode (`be/wage-payment-modes`) and a note on UPI and bank
+  payments (request 22). Proposal decision notes arrive with the approval chain (request 20).
+- **Camera:** `components/photos/camera-view.tsx`. A live viewfinder, back camera preferred, with the
+  time printed on the picture. The gallery file input is gone. A blocked or missing camera blocks
+  the upload with a plain message. It needs https or localhost, so `pnpm dev:lan` on a phone cannot
+  open the camera.
+- **Checks:** Biome, typecheck, `vitest run src`. Playwright on mocks: cash and UPI payment, camera
+  blocked and capture (with a stand-in video stream, not real camera hardware), photo upload, usage
+  note, stock fix reason in Logs, review note. Screenshots at 390 light, 768 dark and 1440.
+
+### 2026-11-26 IST · Lint fix for frontend files that arrived through main
+
+- **Why:** CI's Biome step failed on PR #32 because of two files already on `main` (the assistant
+  widget commit and the sign-in page).
+- **Changed:** `src/app/(auth)/sign-in/page.tsx` and `src/components/shell/ai-assistant-widget.tsx`,
+  with `biome check --write` only: formatting, import order and one quote style. No behaviour change.
+- **Checks:** Biome, typecheck and `vitest run src` (71 pass) are clean.
+
+### 2026-11-26 IST · Requests for Codex: approvals, autopay, medical, invites
+
+- **Branch:** `fe/approvals-payments`. This entry changes only this ledger; the UI follows in later PRs.
+- **Spec changes approved by Max on 2026-11-26** (technical-lead approval; Codex please fold them into
+  `SPECIFICATION.md`, `src/shared/` and `docs/API.md`):
+  1. The engineer creates a project and invites people (requests 4 and 24).
+  2. Supplier payments are owner-only, with owner-approved suppliers, an autopay mandate with caps,
+     and release after the engineer's verification. Contractors never start or see them (requests
+     16–18 and 25). Contractors still record **wage** payments.
+  3. Engineer checklist edits, attendance fixes and medical expenses need a contractor vote, then a
+     final owner decision. They are append-only (requests 20 and 23). This replaces the direct apply
+     in request 8.
+- **New requests:** 20–27 (table above). 22 and 24 build on `be/wage-payment-modes` and
+  `be/project-invitations`, which are not merged yet.
+- **Frontend plan:** these screens will be built on labelled mocks and stay **MOCKED** until the
+  contract lands:
+  - bug fix: the fix reason and delivery notes are shown;
+  - required notes;
+  - the payment form;
+  - a live-camera-only capture;
+  - the approval chain;
+  - medical expenses;
+  - engineer project setup and invites;
+  - owner suppliers and autopay.
+- **Needs from Codex first:** the `ChangeRequest` shape (request 20) and the wage payment schema (9
+  and 22). Until they are published, the mocks use a frontend-only type.
 
 ### 2026-11-26 IST · Sign-in, photo upload, task workflow, checklist edits
 

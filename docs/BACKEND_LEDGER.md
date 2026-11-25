@@ -5,7 +5,7 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 ## Entry — Request #22 wage notes and mode references
 
 - Branch: `be/wage-payment-modes`, PR #29. Published the existing `CreateWagePaymentInput` with required `note`, no cash reference and the mode-specific references. Exported `WagePaymentMode`. Historical reads accept null or absent notes and preserve original references.
-- Frontend handoff: `src/lib/spends.ts` must label `cheque`. Wage entry forms and mock fixtures must include a note and omit a cash reference. The UI should render a legacy note as absent. This remains a draft pending consumer readiness and migration sequencing.
+- Frontend handoff: `src/lib/spends.ts` must label `cheque`. Wage entry forms and mock fixtures must include a note and omit a cash reference. The UI should render a legacy note as absent. Reconciled on the medical baseline as `0013_wage_payment_contract`; fresh PostgreSQL migration, seed and 54 focused tests passed. Full typecheck still fails at src/components/wages/wages-page.tsx (missing note) and src/lib/spends.ts (missing cheque label). This remains a draft.
 
 ## Entry — Request #9 wage payment modes
 
@@ -13,6 +13,56 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Added cheque and mode-specific references on new wage and advance records. Clear validation errors return on `reference`. Preserved historical values by adding the PostgreSQL check as `NOT VALID`, which applies to new rows without scanning or rewriting old ones.
 - Frontend handoff: in `src/lib/spends.ts`, add `cheque: "Cheque"` to `modeLabel` to resolve TS7053. In `src/components/wages/wages-page.tsx`, offer cheque, make UPI/bank/cheque references required with mode-specific validation, and keep references as strings to preserve leading zeros.
 - Keep the PR in draft until the frontend consumer changes and full CI passes. Regenerate this unmerged migration if another migration is integrated first.
+
+## Entry — Medical claims and bill photo contract
+
+- Branch `be/medical-evidence`, requests #23 and #27. Medical bill submissions use one `capturedAt` part per `billPhotos` part in matching order. This confirms the frontend ledger's multipart convention. The author and authorized reviewers can fetch private bill images.
+- Migration `0012_medical_evidence` stores the claim and capture/receipt metadata. Approval inserts one mock expense in the owner decision transaction. Rejection and duplicate acceptance do not create another expense.
+- Local verification passed fresh migration, demo seed, and 13 PostgreSQL reporting and database tests. The medical test covers stale captures, cross-project access, private image bytes, amount bounds, concurrent approval and weekly reconciliation. This entry covers medical photos. Other upload routes have a separate rollout.
+
+## Entry — Request #4 engineer-led project setup
+
+- Timestamp: 2026-11-26 IST. Branch: `be/project-invitations`.
+- New project creators receive engineer membership. The engineer issues owner and contractor invitations with `POST /api/v1/projects/:id/invitations`. Signed-in users list and accept their own pending invitations through `GET /api/v1/invitations` and `POST /api/v1/invitations/:id/accept`. Acceptance and membership are atomic. Legacy contractor-created projects retain direct enrollment.
+- Migration `0007_project_invitations` adds the project/email uniqueness rule and acceptance metadata. Invitations are in-app records; receiving one does not provision an account or send email.
+- PostgreSQL migration, seed and the auth/projects and database suites passed, 16 tests. Tests include duplicate issuance and acceptance under concurrency, recipient isolation and role enforcement.
+- Frontend handoff: use the creator role from the create response. Add invitation list/accept to `src/app/projects/page.tsx` or its project-list component, and use the invitation endpoint for engineer enrollment instead of the contractor-only direct enrollment action in `src/components/shell/action-sheet.tsx`. Regenerate the unmerged migration after any earlier schema PR lands.
+
+## Entry — Request #6 expected deliveries and challan evidence
+
+- Timestamp: 2026-11-26 IST. Branch: `be/delivery-logistics`.
+- Added project scheduling and history, contractor acceptance through the existing stock transaction, rejection with reason and optional replacement date, and activity entries. Added protected single-photo attachment and retrieval for recorded deliveries. Both reuse the project's existing authorization; attachment storage reuses progress image validation and private file storage.
+- Migration `0007_delivery_logistics` adds schedules, evidence metadata and cross-project foreign keys. Regenerate the unmerged migration when an earlier schema PR lands.
+- Verification: isolated PostgreSQL 16 fresh migration and seed, scoped Biome, typecheck and all 132 Vitest tests passed. Checks cover concurrent acceptance, stock invariants, role and project access, rejected arrival history, image content and bytes, duplicate attachment cleanup and append-only triggers.
+- Frontend handoff: connect schedule queries and actions in `src/hooks/use-project-data.ts` and `src/components/today/today-page.tsx`. After recording a delivery, upload the selected photo as FormData field `photo` using the returned delivery ID. Report a photo failure separately from a successfully recorded delivery. The optional activity label for `expectedDelivery` belongs in `src/lib/activity.ts`.
+- Requests #13–19 remain planned. Current stock, approvals, checklists and evidence validate application records. There are no per-bag scan or use gates, steel hold-point enforcement, supplier bank workflow, pre-approved order rules, simulated payment release or fraud scorecards in this batch. Keep those contracts separate from real money movement and avoid claims of physical authenticity.
+
+## Entry — Request #12 project team contacts
+
+- Timestamp: 2026-11-26 IST. Branch: `be/team-contacts`.
+- Added member-scoped `GET /api/v1/projects/:id/members` and caller-only `PATCH /api/v1/me`. The latter sets or clears an Indian mobile number. Only the caller and project teammates can receive it. Auth responses still omit it.
+- Migration `0008_team_contacts` adds a nullable phone column and was regenerated after worker lifecycle `0007` merged.
+- Fresh PostgreSQL migration and seed, typecheck, scoped Biome, and the auth/projects and database suites passed (16 tests). The full lint job on main requires the frontend formatting handoff recorded in the live integration PR.
+- Frontend handoff: connect the Team panel query through `src/hooks/use-project-data.ts` with `ProjectTeamResponse`. Use `UpdateMyPhoneInput` for profile submission, and omit the call action if phone is absent.
+
+## Entry — Request #5 worker deactivation
+
+- Timestamp: 2026-11-26 IST. Branch: `be/worker-lifecycle`.
+- Contractor-only `POST /api/v1/projects/:id/workers/:workerId/deactivate`. Migration `0007_worker_lifecycle` stores the reason and timestamp. Worker lists return optional `removedReason` and `removedOn`. Existing inactive records may lack that metadata.
+- Worker and attendance writes serialize on the same row. The update and audit entry commit together. Existing wages and attendance remain available.
+- Verification: isolated PostgreSQL upgrade and focused labour/database suite passed, 17 tests. Covers concurrent deactivation, denied writes, post-deactivation attendance rejection, historical rate preservation and a single audit event.
+- Frontend handoff: add a worker deactivation action using `DeactivateWorkerInput` and invalidate the `[id, "workers"]` query in `src/hooks/use-project-data.ts`. Render optional removal metadata in the team UI when implemented. No frontend files changed.
+
+## Entry — Live integration restart
+
+- Timestamp: 2026-11-26 IST. Branch: `be/live-integration`, based on main `4bfc586`.
+- Recovered verified checklist type exports from the stopped recovery worktree. Its frontend changes and audit artifacts remain in that worktree. This batch carries no frontend implementation or migration changes.
+- Requests #7 and #8 already have server implementations. The checklist read now has accurate documentation and an OpenAPI regression for the verified response. Request #10 already has a PostgreSQL regression for weekly reconciliation and the engineer-safe projection.
+- The Better Auth bridge accepts the empty stream Next supplies for a bodyless logout. A regression reproduces that request shape. On the Windows launcher with isolated PostgreSQL 16, all three demo accounts passed sign-in, HttpOnly cookie, session lookup, scoped project discovery, logout and old-cookie denial over HTTP.
+- `start.sh --live` provides local Compose startup for Linux/macOS and shares the database identity and migration history check with Windows. Bash and Node syntax checks passed locally. Ubuntu startup is covered by a new CI job. Native macOS startup has not been exercised.
+- Frozen installation, Biome and typecheck passed. The first local backend run passed 129 tests and timed out in the baseline upgrade migration at five seconds. A rerun with a 20-second Docker Desktop test deadline passed all 130 tests across 17 files. The hosted Ubuntu launcher also passed.
+- Frontend CI handoff: run Biome formatting and import organization for `src/app/(auth)/sign-in/page.tsx`, and Biome formatting for `src/components/shell/ai-assistant-widget.tsx`. These main-branch errors stop the full CI job before PostgreSQL tests.
+- Next: engineer-safe attendance and worker lifecycle contracts, followed by project invitations, delivery scheduling and attachments, wage mode validation and team contacts. No frontend edit is required for the auth or checklist compatibility fixes.
 
 ## Entry — Request #11 engineer attendance roster
 

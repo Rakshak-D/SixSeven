@@ -36,15 +36,28 @@ All rows below have an available shared contract. The four project operations ar
 
 | Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
 |---|---|---|---|---|---|---|
-| P0 | POST /projects | Authenticated creator becomes contractor for this project | — | projects.CreateProjectInput | 201 projects.ProjectResponse | — |
+| P0 | POST /projects | Authenticated creator becomes engineer for this project | — | projects.CreateProjectInput | 201 projects.ProjectResponse | — |
 | P0 | GET /projects | Authenticated, own memberships only | — | — | 200 projects.ProjectsResponse | — |
 | P0 | GET /projects/:id | Members | — | — | 200 projects.ProjectResponse | — |
-| P0 | POST /projects/:id/members | Contractor | — | projects.AddProjectMemberInput | 201 projects.ProjectMemberResponse | CONFLICT if already a member. Unknown account gives 404. |
+| P0 | POST /projects/:id/members | Contractor on a legacy contractor-created project | — | projects.AddProjectMemberInput | 201 projects.ProjectMemberResponse | CONFLICT if already a member. Unknown account gives 404. |
+| P0 | POST /projects/:id/invitations | Engineer | — | projects.CreateProjectInvitationInput | 201 projects.ProjectInvitationResponse | 409 for an existing member or invitation |
+| P0 | GET /projects/:id/invitations | Engineer | projects.ProjectInvitationQuery | — | 200 projects.ProjectInvitationsResponse | — |
+| P0 | GET /invitations | Authenticated recipient | — | — | 200 projects.ProjectInvitationsResponse | — |
+| P0 | POST /invitations/:id/accept | Authenticated recipient | — | — | 200 projects.ProjectMemberResponse | 404 for another recipient's invitation, 409 if accepted or already a member |
+| P0 | GET /projects/:id/members | Members | — | — | 200 projects.ProjectTeamResponse | 404 for nonmembers |
+| P0 | PATCH /me | Authenticated caller | — | projects.UpdateMyPhoneInput | 200 projects.MyPhoneResponse | 400 for invalid numbers |
 | P0 | POST /projects/:id/materials | Contractor | — | materials.CreateMaterialInput | 201 materials.MaterialResponse | — |
 | P0 | GET /projects/:id/materials | Members | — | — | 200 materials.MaterialsResponse | — |
 | P0 | POST /projects/:id/workers | Contractor | — | workers.CreateWorkerInput | 201 workers.WorkerResponse | — |
 | P0 | GET /projects/:id/workers | Owner, contractor | — | — | 200 workers.WorkersResponse | — |
+| P0 | POST /projects/:id/workers/:workerId/deactivate | Contractor | workers.WorkerParams | workers.DeactivateWorkerInput | 200 workers.WorkerResponse | 409 CONFLICT for an inactive worker |
 | P0 | POST /projects/:id/deliveries | Contractor | — | deliveries.CreateDeliveryInput | 201 deliveries.DeliveryResponse | DUPLICATE_CHALLAN for the same supplier and challan in this project. CONFLICT if the resulting balance exceeds numeric(14,3). |
+| P0 | POST /projects/:id/expected-deliveries | Contractor, engineer | — | deliveries.CreateExpectedDeliveryInput | 201 deliveries.ExpectedDeliveryResponse | 404 for unknown project material |
+| P0 | GET /projects/:id/expected-deliveries | Members | deliveries.ExpectedDeliveriesQuery | — | 200 deliveries.ExpectedDeliveriesResponse | — |
+| P0 | POST /expected-deliveries/:id/accept | Contractor | — | deliveries.CreateDeliveryInput | 201 deliveries.DeliveryResponse | DUPLICATE_CHALLAN, CONFLICT if already decided or stock capacity exceeded |
+| P0 | POST /expected-deliveries/:id/reject | Contractor | — | deliveries.RejectExpectedDeliveryInput | 200 deliveries.ExpectedDeliveryResponse | CONFLICT if already decided |
+| P0 | POST /projects/:id/deliveries/:deliveryId/challan-photo | Contractor | — | multipart field `photo` | 201 deliveries.ChallanPhotoResponse | CONFLICT if attached, 413 if request too large |
+| P0 | GET /projects/:id/deliveries/:deliveryId/challan-photo | Members | — | — | 200 private JPEG, PNG or WebP | 404 if the photo is absent or inaccessible |
 | P0 | POST /projects/:id/usages | Contractor | — | usages.CreateUsageInput | 201 usages.UsageResponse | INSUFFICIENT_STOCK with materialId and current balance in `InsufficientStockErrorResponse` |
 | P0 | GET /projects/:id/stock | Members | — | — | 200 stock.StockResponse | — |
 | P0 | GET /projects/:id/movements | Members | stock.StockMovementsQuery | — | 200 stock.StockMovementsResponse, newest first | — |
@@ -66,14 +79,18 @@ All rows below have an available shared contract. The four project operations ar
 | P2 | POST /proposals/:id/decision | Owner | — | proposals.DecideProposalInput | 200 proposals.ProposalResponse | CONFLICT if already decided |
 | P2 | POST /projects/:id/checklists | Engineer | checklist.ChecklistDraftQuery | checklist.CreateChecklistDraftInput | 200 checklist.ChecklistDraftResponse | — |
 | P2 | POST /projects/:id/checklists/records | Engineer | — | checklist.SaveChecklistInput | 201 checklist.ChecklistResponse | CONFLICT if draft reference was already used |
-| P2 | GET /projects/:id/checklists | Members | — | — | 200 checklist.ChecklistsResponse | — |
+| P2 | GET /projects/:id/checklists | Members | — | — | 200 checklist.VerifiedChecklistsResponse | — |
 | P2 | PATCH /checklist-items/:id | Engineer | — | checklist.RenameChecklistItemInput | 200 checklist.VerifiedChecklistItemResponse | CONFLICT if removed, awaiting review, or unchanged |
 
 ## Operation details
 
-- A member invite links an existing account by email. No email delivery or invitation redemption flow. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server. Use the attendance roster for the engineer's dated log. It returns record ID, worker ID, worker name, work date and effective half-day units after corrections. It applies the same inclusive date and optional worker filters as the financial attendance read. The financial route still returns 403 for engineers.
+- Creating a project assigns the caller the engineer role for that project. The engineer creates owner or contractor invitations by email. Invitations are in-app records and can be accepted after signing in with the intended email. Acceptance consumes the invitation and grants membership in one transaction. Legacy contractor-created projects keep their existing memberships and direct enrollment route. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server. Use the attendance roster for the engineer's dated log. It returns record ID, worker ID, worker name, work date and effective half-day units after corrections. It applies the same inclusive date and optional worker filters as the financial attendance read. The financial route still returns 403 for engineers.
+- Engineers may supply exactly one of `email` or `phone` and filter the project invitation list by `pending` or `accepted`. Phone numbers normalize to `+91` and remain pending until verified-phone authentication is available. Self-entered team contact numbers confer no ownership proof. Phone invitations cannot be listed or redeemed by recipients in this release.
+- In `PATCH /me`, submit a 10-digit Indian mobile number beginning with 6–9, optionally prefixed with `+91`. The server stores and returns the canonical `+91` form. Send `{"phone":null}` to stop sharing. The team list includes user ID, role, name and phone when set. Phone numbers are only available to the account owner and members of the same project.
 - Attendance and payment list date filters are inclusive and apply to the original work or payment date. Adjustment list dates filter the correction's creation date in IST. The optional target type and target ID filters narrow correction history. Results are newest first with a stable tie-breaker. Attendance and payment list records contain both the original and effective values. Adjustment records carry the prior and replacement values, reason and session-derived actor ID.
 - Materials start at zero stock. Delivery and usage requests and responses use positive amounts. Usage is negative in movement history. Delivery supplier/challan matching is trimmed and case-insensitive within the project. The guarded stock update, signed movement and audit event commit together. The maximum balance is 99,999,999,999.999.
+- Expected delivery lists default to `pending`. Use `status=all`, `accepted` or `rejected` to read history. Acceptance uses the same material and the actual delivery quantity, cost, supplier and challan. Acceptance writes the delivery and audit in one transaction. Rejection records its reason, writes an activity event and leaves stock unchanged. A `newDate` after the original expected date creates a new pending schedule and leaves the rejected record in history.
+- Upload one challan photo to an existing delivery using a multipart `photo` field. Omit the manual Content-Type header when sending browser FormData. JPEG, PNG and WebP are accepted up to 5,000,000 bytes, with the same decoded image validation as progress photos. Photos are private and project-scoped. If an upload fails, the delivery stays recorded and the upload can be retried. Successful attachments cannot be replaced. A missing attachment returns 404. Photo bytes cannot be cached by shared clients.
 - Low stock means balance is less than or equal to the threshold. Movement history orders by occurrence date, creation time and ID, all descending. A movement filter for a missing or out-of-project material returns 404.
 - Corrections accept an absolute replacement magnitude for an original delivery/usage, new half-day units for attendance, or a replacement positive payment amount. A zero replacement stock quantity reverses that movement. The server preserves movement direction, applies exact thousandth deltas through the stock ledger, and derives prior value and actor from stored records and the session. Corrections are serialized per original record and ordered by a database identity sequence; adjustment history is returned newest first by that sequence. No-op corrections return 409 CONFLICT. Correction and audit records are append-only; the audit payload carries the corrected target type and ID. No client-supplied actor is accepted.
 - New wage payments accept `cash` (omit reference), `upi` (12 digits), `bank` (6–22 ASCII letters or digits), and `cheque` (6 digits). Every new payment requires a nonblank note. Send numeric references as text to preserve leading zeroes. Historical notes may be null. A missing or invalid required reference returns 400. Reads continue returning historical reference values as recorded.
@@ -127,3 +144,22 @@ All routes require a session. Item IDs resolve to their project before checking 
 Checklist reads and saves retain the legacy display status and add verificationStatus, removedAt and history to items. Clients use verificationStatus for todo, doing, waiting, done and sent_back. Filter removed items using removedAt. History links submission evidence to progress IDs in the project timeline. The live PATCH accepts rename input only. The legacy status-write schema remains exported for existing development fixtures.
 
 Checklist drafts return source template. An AI request satisfying the existing input contract receives the deterministic template with fallbackReason unavailable. This milestone selects no provider and requires no AI credentials. Proposal and checklist handlers are implemented in M6. A checklist can hold forty historical items, including soft removals. Drafts can be saved once, by their creating engineer. Proposals record one owner decision without changing budget or creating a payment.
+## Change requests
+
+The shared schemas and inferred types are available in `src/shared/schemas/change-requests.ts`. The JSON routes cover checklist and attendance changes. Medical expense requests use the multipart route below. Use a note of at least ten characters when submitting a checklist or attendance request. Frontend integration is tracked separately.
+
+| Method and path | Caller | Input | Success |
+| --- | --- | --- | --- |
+| POST /projects/:id/change-requests | Engineer for checklist edits and attendance fixes, contractor for attendance fixes | `CreateChangeRequestInput` | 201 `ChangeRequestResponse` |
+| GET /projects/:id/change-requests | Project members, subject to sensitive-record visibility | `ChangeRequestsQuery` with optional `status` | 200 `ChangeRequestsResponse` |
+| POST /change-requests/:id/vote | Contractor in the project | `VoteChangeRequestInput` | 200 `ChangeRequestResponse` |
+| POST /change-requests/:id/reopen | Original author | `ReopenChangeRequestInput` | 200 `ChangeRequestResponse` |
+| POST /change-requests/:id/decision | Owner in the project | `DecideChangeRequestInput` | 200 `ChangeRequestResponse` |
+| POST /projects/:id/medical-expenses | Engineer or contractor in the project | Multipart `MedicalExpenseFields` plus 1–3 `billPhotos` and one ISO `capturedAt` part per photo, in matching order | 201 `ChangeRequestResponse` |
+| GET /projects/:id/medical-expenses/:requestId/photos/:photoId | Author, contractor and owner in the project | Path parameters | 200 private JPEG, PNG or WebP bytes |
+
+All writes require a nonblank `note`. The server derives the actor and role from the session and membership. Errors use the existing envelope: 400 `VALIDATION_ERROR`, 401 `UNAUTHENTICATED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`, and 409 `CONFLICT` for invalid state, stale targets or duplicate decisions. Medical uploads also support 413 for oversized requests.
+
+Engineer requests start at `pending_contractor`. The contractor advances them to `pending_owner` or marks them `rejected_contractor`. Only the author can reopen a contractor-rejected request. Contractor-authored requests start at `pending_owner`. The owner accepts and applies the change in the same transaction or marks it `rejected_owner`. Owner outcomes are final. Rejected requests are excluded from the pending owner queue. Task proof and its engineer review remain separate.
+
+An attendance target ID references the attendance row. Actual half-days and paid entitlement are separate, and only a medical emergency allows a full-day pay override. Medical approval requires `payPaise` between 1 and the bill amount. Other decisions reject that field. Accepted medical requests identify `reimbursementProvider: "mock"`; no money moves. The expense is counted once on the incident date. Medical records and receipts are restricted to the author and the authorized contractor and owner reviewers. The server stores the capture and receipt times and allows up to ten minutes of age and 30 seconds of forward clock skew. A client timestamp does not authenticate camera provenance.

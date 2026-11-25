@@ -75,6 +75,170 @@ export const projectMembers = pgTable(
   ],
 );
 
+export const projectInvitations = pgTable(
+  "project_invitations",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    email: text(),
+    phone: text(),
+    role: projectRole().notNull(),
+    invitedBy: text("invited_by")
+      .notNull()
+      .references(() => user.id),
+    acceptedBy: text("accepted_by").references(() => user.id),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("project_invitation_email_unique").on(t.projectId, t.email),
+    unique("project_invitation_phone_unique").on(t.projectId, t.phone),
+    index("project_invitation_recipient_idx").on(t.email, t.acceptedAt, t.createdAt),
+    check(
+      "project_invitation_recipient_canonical",
+      sql`(${t.email} is not null and ${t.phone} is null and ${t.email} = lower(btrim(${t.email})) and char_length(${t.email}) between 3 and 254)
+        or (${t.phone} is not null and ${t.email} is null and ${t.phone} ~ '^[+]91[6-9][0-9]{9}$')`,
+    ),
+    check("project_invitation_role", sql`${t.role} in ('owner', 'contractor')`),
+    check(
+      "project_invitation_acceptance",
+      sql`(${t.acceptedBy} is null) = (${t.acceptedAt} is null) and (${t.phone} is null or ${t.acceptedAt} is null)`,
+    ),
+  ],
+);
+
+export const changeRequests = pgTable(
+  "change_requests",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    kind: text().notNull(),
+    targetId: text("target_id"),
+    targetVersion: text("target_version"),
+    payload: jsonb().$type<unknown>().notNull(),
+    authorId: text("author_id").notNull(),
+    authorRole: projectRole("author_role").notNull(),
+    status: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("change_request_project_pair").on(t.projectId, t.id),
+    foreignKey({
+      name: "change_request_author_member",
+      columns: [t.projectId, t.authorId],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    index("change_request_project_queue").on(t.projectId, t.status, t.createdAt),
+    index("change_request_target_lookup").on(t.projectId, t.kind, t.targetId, t.status),
+    check(
+      "change_request_kind",
+      sql`${t.kind} in ('checklist_add','checklist_rename','checklist_remove','attendance_fix','medical_expense')`,
+    ),
+    check(
+      "change_request_status",
+      sql`${t.status} in ('pending_contractor','pending_owner','rejected_contractor','accepted','rejected_owner')`,
+    ),
+    check("change_request_author_role", sql`${t.authorRole} in ('engineer','contractor')`),
+  ],
+);
+
+export const changeRequestEvents = pgTable(
+  "change_request_events",
+  {
+    sequence: bigint("sequence", { mode: "bigint" }).generatedAlwaysAsIdentity().primaryKey(),
+    projectId: text("project_id").notNull(),
+    requestId: text("request_id").notNull(),
+    kind: text().notNull(),
+    actorId: text("actor_id").notNull(),
+    actorRole: projectRole("actor_role").notNull(),
+    note: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "change_event_scoped_request",
+      columns: [t.projectId, t.requestId],
+      foreignColumns: [changeRequests.projectId, changeRequests.id],
+    }),
+    foreignKey({
+      name: "change_event_actor_member",
+      columns: [t.projectId, t.actorId],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    index("change_event_request_sequence").on(t.projectId, t.requestId, t.sequence),
+    uniqueIndex("change_event_final_once")
+      .on(t.requestId)
+      .where(sql`${t.kind} in ('owner_accepted','owner_rejected')`),
+    check(
+      "change_event_kind",
+      sql`${t.kind} in ('created','contractor_approved','contractor_rejected','reopened','owner_accepted','owner_rejected')`,
+    ),
+    check("change_event_nonblank_note", sql`char_length(btrim(${t.note})) between 1 and 2000`),
+  ],
+);
+
+export const medicalClaims = pgTable(
+  "medical_claims",
+  {
+    projectId: text("project_id").notNull(),
+    requestId: text("request_id").primaryKey(),
+    workerId: text("worker_id").notNull(),
+    billPaise: paise("bill_paise").notNull(),
+    incidentOn: date("incident_on").notNull(),
+    reimbursementPaise: paise("reimbursement_paise"),
+  },
+  (t) => [
+    foreignKey({
+      name: "medical_claim_request_scope",
+      columns: [t.projectId, t.requestId],
+      foreignColumns: [changeRequests.projectId, changeRequests.id],
+    }),
+    foreignKey({
+      name: "medical_claim_worker_scope",
+      columns: [t.projectId, t.workerId],
+      foreignColumns: [workers.projectId, workers.id],
+    }),
+    unique("medical_claim_project_pair").on(t.projectId, t.requestId),
+    check(
+      "medical_claim_bill_bound",
+      sql`${t.billPaise} between 1 and 9007199254740991 and
+      (${t.reimbursementPaise} is null or ${t.reimbursementPaise} between 1 and ${t.billPaise})`,
+    ),
+  ],
+);
+
+export const medicalBillPhotos = pgTable(
+  "medical_bill_photos",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    requestId: text("request_id").notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    mime: text().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "medical_photo_claim_scope",
+      columns: [t.projectId, t.requestId],
+      foreignColumns: [medicalClaims.projectId, medicalClaims.requestId],
+    }),
+    index("medical_photo_claim_idx").on(t.projectId, t.requestId),
+    check("medical_photo_size_bound", sql`${t.sizeBytes} between 1 and 5000000`),
+    check("medical_photo_mime", sql`${t.mime} in ('image/jpeg','image/png','image/webp')`),
+    check(
+      "medical_photo_capture_window",
+      sql`${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds'`,
+    ),
+  ],
+);
+
 export const materials = pgTable(
   "materials",
   {
@@ -116,10 +280,18 @@ export const workers = pgTable(
     category: text().notNull(),
     dailyRatePaise: paise("daily_rate_paise").notNull(),
     active: boolean().notNull().default(true),
+    removedReason: text("removed_reason"),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
     unique("workers_project_id_unique").on(t.projectId, t.id),
+    check(
+      "worker_removal_metadata",
+      sql`(${t.removedReason} is null and ${t.removedAt} is null)
+          or (not ${t.active} and ${t.removedReason} is not null and ${t.removedAt} is not null
+              and char_length(btrim(${t.removedReason})) between 5 and 2000)`,
+    ),
     check(
       "worker_daily_rate_range",
       sql`${t.dailyRatePaise} between 2 and 9007199254740991 and ${t.dailyRatePaise} % 2 = 0`,
@@ -264,6 +436,7 @@ export const stockMovements = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    unique("stock_movements_project_id_pair_unique").on(t.projectId, t.id),
     foreignKey({
       name: "stock_movement_project_material_fk",
       columns: [t.projectId, t.materialId],
@@ -285,6 +458,82 @@ export const stockMovements = pgTable(
         (${t.type} <> 'usage' or ${t.qty} < 0)
         and ${t.supplier} is null and ${t.challanNo} is null and ${t.unitCostPaise} is null)
     )`,
+    ),
+  ],
+);
+
+export const expectedDeliveries = pgTable(
+  "expected_deliveries",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    materialId: text("material_id").notNull(),
+    qty: quantity("qty").notNull(),
+    supplier: text().notNull(),
+    expectedOn: date("expected_on").notNull(),
+    note: text(),
+    status: text().$type<"pending" | "accepted" | "rejected">().notNull().default("pending"),
+    deliveryId: text("delivery_id").unique(),
+    rejectionReason: text("rejection_reason"),
+    rescheduledOn: date("rescheduled_on"),
+    decidedBy: text("decided_by").references(() => user.id),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "expected_deliveries_material_fk",
+      columns: [t.projectId, t.materialId],
+      foreignColumns: [materials.projectId, materials.id],
+    }),
+    foreignKey({
+      name: "expected_deliveries_movement_fk",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    index("expected_deliveries_project_status_day_idx").on(
+      t.projectId,
+      t.status,
+      t.expectedOn,
+      t.id,
+    ),
+    check("expected_delivery_qty_positive", sql`${t.qty} > 0`),
+    check(
+      "expected_delivery_state",
+      sql`
+      (${t.status} = 'pending' and ${t.deliveryId} is null and ${t.rejectionReason} is null and ${t.rescheduledOn} is null and ${t.decidedAt} is null and ${t.decidedBy} is null)
+      or (${t.status} = 'accepted' and ${t.deliveryId} is not null and ${t.rejectionReason} is null and ${t.rescheduledOn} is null and ${t.decidedAt} is not null and ${t.decidedBy} is not null)
+      or (${t.status} = 'rejected' and ${t.deliveryId} is null and ${t.rejectionReason} is not null and char_length(btrim(${t.rejectionReason})) between 10 and 2000 and ${t.decidedAt} is not null and ${t.decidedBy} is not null)
+    `,
+    ),
+  ],
+);
+
+export const deliveryChallanPhotos = pgTable(
+  "delivery_challan_photos",
+  {
+    projectId: text("project_id").notNull(),
+    deliveryId: text("delivery_id").primaryKey(),
+    storageKey: text("storage_key").notNull().unique(),
+    mime: text().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "delivery_challan_photo_movement_fk",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    check(
+      "delivery_challan_photo_media",
+      sql`${t.sizeBytes} between 1 and 5000000 and ${t.mime} in ('image/jpeg', 'image/png', 'image/webp')`,
     ),
   ],
 );

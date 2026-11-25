@@ -191,7 +191,10 @@ export async function buildWageSheet(
       const halfDays = parseInteger(row.halfDays, "attendance units");
       const rate = parseInteger(row.ratePaise, "attendance rate");
       current.halfDays += halfDays;
-      current.accrued += accruedPaise(halfDays, rate);
+      current.accrued += accruedPaise(
+        parseInteger(row.paidHalfDays, "paid attendance units"),
+        rate,
+      );
     }
     for (const row of paymentRows) {
       const current = totals.get(row.workerId);

@@ -1,6 +1,6 @@
 {
-  "id": "6df07c03-cde2-4845-b3fe-ca03b111b446",
-  "prevId": "e30e857f-9818-4cf5-9f13-7074861d12ad",
+  "id": "1d4a9fbb-9778-4159-a82a-c9779a064f94",
+  "prevId": "844b4f19-566c-48fd-b342-352e6e6bb3cc",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2009,12 +2009,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -2131,14 +2125,6 @@
         "wage_payment_amount_paise_valid": {
           "name": "wage_payment_amount_paise_valid",
           "value": "\"wage_payments\".\"amount_paise\" between 1 and 9007199254740991"
-        },
-        "wage_payment_reference_by_mode": {
-          "name": "wage_payment_reference_by_mode",
-          "value": "case \"wage_payments\".\"mode\"::text\n      when 'cash' then \"wage_payments\".\"reference\" is null\n      when 'upi' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[0-9]{12}$'\n      when 'bank' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[A-Za-z0-9]{6,22}$'\n      when 'cheque' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[0-9]{6}$'\n      else false end"
-        },
-        "wage_payment_note_required": {
-          "name": "wage_payment_note_required",
-          "value": "\"wage_payments\".\"note\" is not null and char_length(btrim(\"wage_payments\".\"note\")) between 1 and 2000"
         }
       },
       "isRLSEnabled": false
@@ -2184,6 +2170,18 @@
           "notNull": true,
           "default": true
         },
+        "removed_reason": {
+          "name": "removed_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2221,6 +2219,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "worker_removal_metadata": {
+          "name": "worker_removal_metadata",
+          "value": "(\"workers\".\"removed_reason\" is null and \"workers\".\"removed_at\" is null)\n          or (not \"workers\".\"active\" and \"workers\".\"removed_reason\" is not null and \"workers\".\"removed_at\" is not null\n              and char_length(btrim(\"workers\".\"removed_reason\")) between 5 and 2000)"
+        },
         "worker_daily_rate_range": {
           "name": "worker_daily_rate_range",
           "value": "\"workers\".\"daily_rate_paise\" between 2 and 9007199254740991 and \"workers\".\"daily_rate_paise\" % 2 = 0"
@@ -2511,6 +2513,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2539,7 +2547,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "user_indian_mobile": {
+          "name": "user_indian_mobile",
+          "value": "\"user\".\"phone\" is null or \"user\".\"phone\" ~ '^[+]91[6-9][0-9]{9}$'"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.verification": {
@@ -2700,8 +2713,7 @@
       "values": [
         "cash",
         "upi",
-        "bank",
-        "cheque"
+        "bank"
       ]
     }
   },

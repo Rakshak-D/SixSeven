@@ -1,6 +1,7 @@
 "use client";
 
 import { SlidersHorizontal } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { type ReactNode, useMemo, useState } from "react";
 import { SpendRow, WageDayRow } from "@/components/data/spend-row";
 import { SpendFilterChips, SpendFilterSheet } from "@/components/filters/spend-filter-sheet";
@@ -25,6 +26,7 @@ import {
   foldWagesByDay,
   type SpendFilter,
 } from "@/lib/spends";
+import { RosterLog } from "./roster-log";
 
 const PAGE_DAYS = 14;
 const fixTable = {
@@ -115,7 +117,9 @@ export function LogsPage() {
     return [...days].map(([date, d]) => ({ date, ...d }));
   }, [attendance.data]);
 
-  const tabs = money ? ["spends", "stock", "attendance", "fixes"] : ["stock"];
+  const tabs = money ? ["spends", "stock", "attendance", "fixes"] : ["stock", "attendance"];
+  // Home links straight to a tab with ?tab=.
+  const asked = useSearchParams().get("tab") ?? "";
 
   return (
     <div className="animate-rise">
@@ -127,11 +131,11 @@ export function LogsPage() {
         Every entry by date. Fixes never overwrite: the original stays, with the reason next to it.
       </p>
 
-      <Tabs defaultValue={tabs[0]} className="mt-6">
+      <Tabs defaultValue={tabs.includes(asked) ? asked : tabs[0]} className="mt-6">
         <TabsList className="max-w-full overflow-x-auto">
           {money ? <TabsTrigger value="spends">Spends</TabsTrigger> : null}
           <TabsTrigger value="stock">Stock</TabsTrigger>
-          {money ? <TabsTrigger value="attendance">Attendance</TabsTrigger> : null}
+          <TabsTrigger value="attendance">Attendance</TabsTrigger>
           {money ? <TabsTrigger value="fixes">Fixes</TabsTrigger> : null}
         </TabsList>
 
@@ -193,7 +197,9 @@ export function LogsPage() {
                       </span>
                       <span className="block truncate text-[15px] text-muted-foreground">
                         {m.type === "delivery"
-                          ? `${m.supplier} · challan ${m.challanNo}`
+                          ? [m.supplier, `challan ${m.challanNo}`, m.note]
+                              .filter(Boolean)
+                              .join(" · ")
                           : (m.note ?? formatTimeIst(m.createdAt))}
                       </span>
                     </span>
@@ -209,6 +215,12 @@ export function LogsPage() {
             />
           )}
         </TabsContent>
+
+        {money ? null : (
+          <TabsContent value="attendance">
+            <RosterLog projectId={id} />
+          </TabsContent>
+        )}
 
         {money ? (
           <TabsContent value="attendance">

@@ -1,41 +1,16 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Field, FormError, firstProblem, TextArea } from "@/components/forms";
+import { ProofPhoto } from "@/components/photos/proof-photo";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChecklists, useReviewChecklistItem, useTimeline } from "@/hooks/use-project-data";
 import { activeItems, latestSubmission, type VerifiedItem } from "@/lib/checklist";
 import { istDateOf } from "@/lib/dates";
 import { formatShortDate, formatTimeIst } from "@/lib/format";
-import { mocksEnabled } from "@/mocks";
 import type { ProgressResponse } from "@/shared/schemas/progress";
-
-/** A proof photo. If it cannot load (demo data has no image files), say so instead of a broken icon. */
-function Proof({ url }: { url: string }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border bg-secondary">
-      {failed ? (
-        <ImageOff
-          role="img"
-          aria-label={mocksEnabled ? "Demo photo, no image file" : "Photo not available"}
-          className="size-6 text-muted-foreground"
-        />
-      ) : (
-        // biome-ignore lint/performance/noImgElement: protected same-origin photo, sized by the box
-        <img
-          src={url}
-          alt="Proof of completed work"
-          className="size-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      )}
-    </span>
-  );
-}
 
 function ReviewCard({
   projectId,
@@ -48,11 +23,27 @@ function ReviewCard({
 }) {
   const review = useReviewChecklistItem(projectId);
   const submission = latestSubmission(item);
-  const [sending, setSending] = useState(false);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string>();
   if (!submission?.progressId) return null;
   const progressId = submission.progressId;
+
+  function decide(decision: "accept" | "send_back") {
+    const found = firstProblem([
+      [!note.trim(), "Add a note first."],
+      [
+        decision === "send_back" && note.trim().length < 10,
+        "Say what to fix, in at least 10 characters.",
+      ],
+    ]);
+    setProblem(found);
+    if (found) return;
+    const done = decision === "accept" ? "Accepted" : "Sent back";
+    review.mutate(
+      { itemId: item.id, decision, progressId, note },
+      { onSuccess: () => toast.success(`${done}: ${item.task}`) },
+    );
+  }
 
   return (
     <li className="rounded-3xl border bg-secondary p-4">
@@ -66,7 +57,7 @@ function ReviewCard({
           <p className="mt-3 text-[15px]">{proof.note}</p>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {proof.photos.map((photo) => (
-              <Proof key={photo.id} url={photo.url} />
+              <ProofPhoto key={photo.id} url={photo.url} alt="Proof of completed work" />
             ))}
           </div>
         </>
@@ -76,58 +67,23 @@ function ReviewCard({
         </p>
       )}
 
-      {sending ? (
-        <div className="mt-4 space-y-3">
-          <Field
-            label="What should the contractor fix?"
-            hint="At least 10 characters. They will read this."
-          >
-            {(id) => <TextArea id={id} value={note} onChange={setNote} />}
-          </Field>
-          <FormError error={problem ?? review.error} />
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => setSending(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={review.isPending}
-              onClick={() => {
-                const found = firstProblem([
-                  [note.trim().length < 10, "Say what to fix, in at least 10 characters."],
-                ]);
-                setProblem(found);
-                if (found) return;
-                review.mutate(
-                  { itemId: item.id, decision: "send_back", progressId, note },
-                  { onSuccess: () => toast.success(`Sent back: ${item.task}`) },
-                );
-              }}
-            >
-              Send back
-            </Button>
-          </div>
+      <div className="mt-4 space-y-3">
+        <Field
+          label="Your note"
+          hint="Required. The contractor reads it. To send back, say what to fix (10 characters or more)."
+        >
+          {(id) => <TextArea id={id} value={note} onChange={setNote} />}
+        </Field>
+        <FormError error={problem ?? review.error} />
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" disabled={review.isPending} onClick={() => decide("send_back")}>
+            Send back / Reject
+          </Button>
+          <Button disabled={review.isPending || !proof} onClick={() => decide("accept")}>
+            Accept
+          </Button>
         </div>
-      ) : (
-        <>
-          <FormError error={review.error} />
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => setSending(true)}>
-              Send back
-            </Button>
-            <Button
-              disabled={review.isPending || !proof}
-              onClick={() =>
-                review.mutate(
-                  { itemId: item.id, decision: "accept", progressId },
-                  { onSuccess: () => toast.success(`Accepted: ${item.task}`) },
-                )
-              }
-            >
-              Accept
-            </Button>
-          </div>
-        </>
-      )}
+      </div>
     </li>
   );
 }
