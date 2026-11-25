@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { Id, Label, Timestamp } from "./common";
+import { PhotoFile } from "./progress";
 
 export const ChecklistPhase = z.enum([
   "foundation",
@@ -25,3 +27,62 @@ export const ChecklistDraft = z.object({
     .max(40),
 });
 export type ChecklistDraft = z.infer<typeof ChecklistDraft>;
+
+export const ChecklistSource = z.enum(["template", "ai"]);
+export const ChecklistDraftQuery = z.strictObject({ source: ChecklistSource });
+export const CreateChecklistDraftInput = z.strictObject({
+  houseType: Label.optional(),
+  floors: z.int().min(1).max(100).optional(),
+  rooms: z.int().min(1).max(500).optional(),
+  plan: PhotoFile.optional(),
+});
+export const ChecklistDraftRequest = z
+  .strictObject({ query: ChecklistDraftQuery, body: CreateChecklistDraftInput })
+  .refine(
+    ({ query, body }) =>
+      query.source === "template" ||
+      !!body.plan ||
+      (body.houseType !== undefined && body.floors !== undefined && body.rooms !== undefined),
+    { path: ["body"], message: "Provide a plan or house type, floors and rooms for AI" },
+  );
+export const ChecklistDraftResponse = z.strictObject({
+  draftId: Id,
+  source: ChecklistSource,
+  fallbackReason: z.enum(["unavailable", "timeout", "invalidOutput"]).nullable(),
+  draft: ChecklistDraft,
+});
+const ApprovedItem = z.strictObject({
+  phase: ChecklistPhase,
+  task: z.string().trim().min(1).max(120),
+  materials: z.array(Label).max(5),
+});
+export const SaveChecklistInput = z.strictObject({
+  draftId: Id,
+  title: Label,
+  items: z.array(ApprovedItem).min(1).max(40),
+});
+export const UpdateChecklistItemInput = z.strictObject({
+  status: z.enum(["pending", "inProgress", "done"]),
+});
+export const ChecklistItemResponse = ApprovedItem.extend({
+  id: Id,
+  status: UpdateChecklistItemInput.shape.status,
+});
+export const ChecklistResponse = z.strictObject({
+  id: Id,
+  title: Label,
+  source: ChecklistSource,
+  createdAt: Timestamp,
+  items: z.array(ChecklistItemResponse).min(1).max(40),
+});
+export const ChecklistsResponse = z.array(ChecklistResponse);
+
+export type ChecklistDraftQuery = z.infer<typeof ChecklistDraftQuery>;
+export type CreateChecklistDraftInput = z.infer<typeof CreateChecklistDraftInput>;
+export type ChecklistDraftRequest = z.infer<typeof ChecklistDraftRequest>;
+export type ChecklistDraftResponse = z.infer<typeof ChecklistDraftResponse>;
+export type SaveChecklistInput = z.infer<typeof SaveChecklistInput>;
+export type UpdateChecklistItemInput = z.infer<typeof UpdateChecklistItemInput>;
+export type ChecklistItemResponse = z.infer<typeof ChecklistItemResponse>;
+export type ChecklistResponse = z.infer<typeof ChecklistResponse>;
+export type ChecklistsResponse = z.infer<typeof ChecklistsResponse>;

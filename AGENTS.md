@@ -12,13 +12,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Scope and authority
 
-M0 establishes repository coordination only. Do not implement business features until the technical lead supplies the complete problem statement, architecture, dependency constraints, and feature requirements, then authorizes the next milestone.
+The technical lead approved the repository baseline in M1. Use [docs/SPECIFICATION.md](docs/SPECIFICATION.md) for domain requirements and implement only the authorized milestone.
 
-The existing README describes a construction-site tracker and calls it hackathon problem 21. Those are scaffold claims, not the supplied official prompt. Preserve that history, but do not treat it as an accepted specification. Do not infer requirements from empty route files, placeholder schemas, prior plans, or external artifact links. An external link counts as read only after it is successfully accessed.
+The approved baseline comes from repository history. Consult the specification and API contract before implementation. An external link counts as read only after it is successfully accessed.
 
 ## Repository architecture currently present
 
-The scaffold uses one Next.js App Router application with Hono mounted at /api/v1, Drizzle and PostgreSQL, Better Auth dependencies, shared Zod schemas, and generated OpenAPI documentation. Keep this topology unless the technical lead's specification changes it. This describes the repository; it does not mean each subsystem or feature is implemented.
+The scaffold uses one Next.js App Router application with Hono mounted at /api/v1, Drizzle and PostgreSQL, Better Auth dependencies, shared Zod schemas, and generated OpenAPI documentation. Keep this approved topology unless the technical lead authorizes a change. This describes the repository; it does not mean each subsystem or feature is implemented.
 
 The repository is public. Treat every committed file as public. The current default branch is main. At M0 inspection, GitHub reported main as unprotected and no repository rulesets; the PR-only process below is therefore required.
 
@@ -90,7 +90,7 @@ Do not start Docker, create databases, or run migrations against an external or 
 
 For authorized backend work, validate external input, enforce authorization on the server, preserve database integrity, use consistent error handling, test critical success and failure cases, avoid logging secrets, and use transactions for related financial or stock mutations when required by the confirmed specification.
 
-The scaffold documents integer paise and append-only ledger ideas. Preserve them only as applicable to the supplied specification. Database append-only constraints are not cryptographic tamper evidence; never claim stronger guarantees than the implementation provides.
+Preserve integer paise and append-only ledgers as specified in docs/SPECIFICATION.md. Database append-only constraints are not cryptographic tamper evidence; never claim stronger guarantees than the implementation provides.
 
 Do not modify unrelated code to make a check pass. Do not disable lint, tests, security checks, or CI to manufacture a pass. If a check cannot run, record NOT_RUN with the exact reason. Skipping or disabling a broken check requires explicit technical-lead approval and a recorded limitation.
 

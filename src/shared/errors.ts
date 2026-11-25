@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Id, Qty } from "./schemas/common";
 
 /** Every error code the API can return. Add new codes here, never inline strings. */
 export const ErrorCode = {
@@ -22,3 +23,12 @@ export const ErrorResponse = z.object({
   }),
 });
 export type ErrorResponse = z.infer<typeof ErrorResponse>;
+
+export const InsufficientStockErrorResponse = z.strictObject({
+  error: z.strictObject({
+    code: z.literal(ErrorCode.INSUFFICIENT_STOCK),
+    message: z.string(),
+    details: z.strictObject({ materialId: Id, balance: Qty }),
+  }),
+});
+export type InsufficientStockErrorResponse = z.infer<typeof InsufficientStockErrorResponse>;

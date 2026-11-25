@@ -1,10 +1,10 @@
 # Slate: Every Detail is Accounted For
 
-The existing scaffold describes Slate as a construction-site progress and material tracker and labels it hackathon problem 21. The official problem statement is not in this repository yet. Treat that description, the route inventory, and product claims as provisional until the technical lead supplies the specification and the behavior is verified.
+Slate is a construction-site progress and material tracker. The approved repository baseline is documented in [docs/SPECIFICATION.md](docs/SPECIFICATION.md). [docs/API.md](docs/API.md) tracks contract availability and runtime readiness.
 
 ## Current architecture reference
 
-The scaffold contains one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth dependencies, shared Zod schemas, and OpenAPI generation. Confirm this stack against the forthcoming technical specification before expanding it.
+The scaffold contains one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth dependencies, shared Zod schemas, and OpenAPI generation. This is the approved stack for implementation.
 
 ## Run the scaffold
 

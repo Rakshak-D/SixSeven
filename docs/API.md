@@ -1,41 +1,102 @@
-# API contract and route inventory
+# Slate API contract
 
-Codex is the sole writer of this file. The endpoint list below is inherited from the repository scaffold. The full official problem statement has not yet been supplied, so proposed roles, errors, and workflows are provisional and are not a frozen contract.
+[Specification](SPECIFICATION.md) defines the approved domain rules. Schema names below are exports from `src/shared/schemas/<module>.ts` unless noted. Each domain path is relative to `/api/v1`. Contract availability, backend readiness and frontend integration are tracked separately. No new route is registered in M1. `GET /api/v1/doc` describes registered routes only.
 
-Contract availability, backend readiness, and frontend integration are independent statuses. A route name or mounted router does not mean the API is implemented. Before feature work, Codex publishes the approved method, path, authentication, authorization, request schema, response schema, and error behavior here and in the shared Zod/OpenAPI contract.
+## Conventions
 
-Status meanings:
-- Contract: AVAILABLE means the current source exposes a usable schema; PARTIAL means only some contract material exists; DRAFT means a route proposal without complete schemas.
-- Backend: IMPLEMENTED means a handler exists; verification is recorded separately. SCAFFOLD ONLY means an empty route module or placeholder.
-- Frontend: NOT STARTED, MOCKED (explicit development fixture), IMPLEMENTED, VERIFIED, or INTEGRATED. INTEGRATED requires a live backend route and exercised frontend flow.
+- Use JSON and same-origin session cookies unless the table specifies multipart or a binary response. An em dash means no input of that kind. `:id` uses `common.IdParams`. It is a project ID after `/projects/` and the resource ID after `/proposals/` or `/checklist-items/`. IDs are opaque strings. `PhotoParams` covers the two photo path parameters.
+- Money is safe integer paise. Quantities are JSON numbers with up to three fractional digits, in range for PostgreSQL numeric(14,3). Compute with exact database decimals or integer thousandths, not binary floating-point arithmetic. Calendar dates use YYYY-MM-DD and site dates use IST. Timestamps use UTC ISO 8601 with milliseconds.
+- Protected domain operations use `ErrorResponse` from `src/shared/errors.ts`. Shared failures are 400 `VALIDATION_ERROR` for invalid input, 401 `UNAUTHENTICATED` for no valid session, 403 `FORBIDDEN` for a member with insufficient permission, 404 `NOT_FOUND` for missing or out-of-scope resources, and 500 `INTERNAL` for unexpected errors. Check project membership before role restrictions. The table adds operation-specific 409 failures. Session checks and actor attribution are server-side.
+- Successful creates return 201. Lists return arrays and use an empty array for no results. Nullable response fields are explicit. Body and response schemas define required fields, allowed values and constraints.
 
-| Method + path | Authentication | Authorization in scaffold | Request schema | Response schema | Error behavior in scaffold | Contract | Backend readiness | Frontend integration |
-|---|---|---|---|---|---|---|---|---|
-| GET /health | Public | None | None | { ok: boolean, db: "up" or "down" } | A failed DB probe returns HTTP 200 with db=down; generic 404 for unknown routes | AVAILABLE (local route schema) | IMPLEMENTED; execution NOT_RUN in M0 | NOT STARTED |
-| GET /doc | Public | None | None | Generated OpenAPI 3.0 document | Generic 404 for unknown routes | PARTIAL (document generated from registered handlers) | IMPLEMENTED; execution NOT_RUN in M0 | NOT STARTED |
-| POST /projects | TBD | Proposed: contractor | TBD | TBD | Proposed 400 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects | TBD | Proposed: project members | None | TBD | Not specified | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects/:id | TBD | Proposed: project members | None | TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/members | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/materials | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/workers | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/deliveries | TBD | Proposed: contractor | TBD | TBD | Proposed 409 DUPLICATE_CHALLAN | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/usages | TBD | Proposed: contractor | TBD | TBD | Proposed 409 INSUFFICIENT_STOCK with balance | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/attendance | TBD | Proposed: contractor | Bulk date is a scaffold note; schema TBD | TBD | Proposed 400, 409 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects/:id/stock | TBD | Proposed: project members | None | Balance description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects/:id/movements | TBD | Proposed: project members | None | History description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/wage-payments | TBD | Proposed: contractor | TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/adjustments | TBD | Proposed: contractor | Target, new value, and reason are scaffold notes; schema TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects/:id/summary | TBD | Proposed: project members | None | Budget/spend description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects/:id/wage-sheet | TBD | Proposed: owner or contractor | from, to, format query note; schema TBD | TBD | Proposed 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/progress | TBD | Proposed: engineer or contractor | Multipart note/photo description; schema TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects/:id/timeline | TBD | Proposed: project members | None | Photos-by-day description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/proposals | TBD | Proposed: engineer or contractor | TBD | TBD | Proposed 400, 403 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /proposals/:id/decision | TBD | Proposed: owner | Approve/reject note; schema TBD | TBD | Proposed 403, 404, 409 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| GET /projects/:id/activity | TBD | Proposed: project members | None | Audit-log description only; schema TBD | Proposed 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| POST /projects/:id/checklists | TBD | Proposed: engineer | source query note; full request TBD | ChecklistDraft exists, direction and full response TBD | Proposed 400, 403 | PARTIAL (one shared draft schema) | SCAFFOLD ONLY (empty router) | NOT STARTED |
-| PATCH /checklist-items/:id | TBD | Proposed: engineer | Status-only note; schema TBD | TBD | Proposed 400, 403, 404 | DRAFT | SCAFFOLD ONLY (empty router) | NOT STARTED |
+## Public scaffold endpoints
 
-The non-public auth and authorization entries above are proposals copied from the scaffold API table. No auth middleware is present and both Drizzle schema files are currently empty; do not represent those policies as implemented. The existing frontend ledger reports that no UI feature or endpoint integration has started.
+| Method and path | Params, query, body | Response | Contract | Backend | Frontend |
+|---|---|---|---|---|---|
+| GET /health | — | 200 JSON `{ ok: boolean, db: "up" or "down" }`; a failed DB probe gives `db: "down"` | Available in route schema | Implemented | No integration in M1 |
+| GET /doc | — | 200 OpenAPI 3.0 JSON | Available for registered routes | Implemented | No integration in M1 |
 
-A frontend endpoint or schema request is recorded by Claude in docs/FRONTEND_LEDGER.md or a GitHub issue. Codex evaluates the request, updates this canonical file and shared schemas, and coordinates a contract-only merge before dependent implementation. Mocks must validate against the agreed shared schemas and be labeled as development fixtures.
+## Authentication (P0)
+
+These are native Better Auth 1.7.27 email/password route paths at the default `/api/auth` base, separate from Hono. There are no path or query inputs in Slate's email/password flow. The Next.js auth bridge is planned. Sign-in uses same-origin JSON and omits callbackURL. Slate's bridge must allowlist successful JSON using the shared schemas before sending it, retaining the native status and Set-Cookie headers. Native sign-in returns a token and native session can return a token, IP and user agent. Slate's public schema drops those fields and uses only the cookie for session transport. Use cookie-aware fetch with credentials included. Do not store tokens or passwords in browser storage.
+
+| Method and full path | Access | Body → success | Error behavior |
+|---|---|---|---|
+| POST /api/auth/sign-in/email | Public | `SignInInput` → 200 `SignInResponse` | 400 invalid email/input; 401 invalid credentials; 403 if an auth policy blocks login |
+| POST /api/auth/sign-out | Public and idempotent for missing session | No body or `SignOutInput` → 200 `SignOutResponse` | 403 on rejected origin; unexpected failures use native errors |
+| GET /api/auth/get-session | Public | — → 200 `SessionResponse`, null if absent or expired | Unexpected auth failures use native errors |
+
+Auth errors follow native Better Auth JSON (top-level `message` and optional `code`, parsed with `AuthErrorResponse`); same-origin and rate protections can reject requests before a handler. The cookie is signed, HTTP-only and secure over HTTPS. Sign-out clears it and attempts server-side invalidation. Session responses are private and not cached. Use GET /api/v1/projects after sign-in to discover memberships and the current user's role in each project. There is no global role claim.
+
+Local demo seed will create synthetic `DemoAccountEmail` entries (owner, contractor, engineer) with matching roles on the demo project. The reserved `.invalid` domain keeps the historical labels and satisfies email validation. Seed config supplies the password through local demo setup; demo login uses ordinary email sign-in. Contract: available. Backend: planned. Frontend: no integration in M1.
+
+## Domain operations
+
+All rows below have an available shared contract, planned backend (scaffold only), and no frontend integration delivered in M1. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer.
+
+| Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
+|---|---|---|---|---|---|---|
+| P0 | POST /projects | Authenticated creator becomes contractor for this project | — | projects.CreateProjectInput | 201 projects.ProjectResponse | — |
+| P0 | GET /projects | Authenticated, own memberships only | — | — | 200 projects.ProjectsResponse | — |
+| P0 | GET /projects/:id | Members | — | — | 200 projects.ProjectResponse | — |
+| P0 | POST /projects/:id/members | Contractor | — | projects.AddProjectMemberInput | 201 projects.ProjectMemberResponse | CONFLICT if already a member. Unknown account gives 404. |
+| P0 | POST /projects/:id/materials | Contractor | — | materials.CreateMaterialInput | 201 materials.MaterialResponse | — |
+| P0 | GET /projects/:id/materials | Members | — | — | 200 materials.MaterialsResponse | — |
+| P0 | POST /projects/:id/workers | Contractor | — | workers.CreateWorkerInput | 201 workers.WorkerResponse | — |
+| P0 | GET /projects/:id/workers | Owner, contractor | — | — | 200 workers.WorkersResponse | — |
+| P0 | POST /projects/:id/deliveries | Contractor | — | deliveries.CreateDeliveryInput | 201 deliveries.DeliveryResponse | DUPLICATE_CHALLAN for the same supplier and challan in this project |
+| P0 | POST /projects/:id/usages | Contractor | — | usages.CreateUsageInput | 201 usages.UsageResponse | INSUFFICIENT_STOCK with materialId and current balance in `InsufficientStockErrorResponse` |
+| P0 | GET /projects/:id/stock | Members | — | — | 200 stock.StockResponse | — |
+| P0 | GET /projects/:id/movements | Members | stock.StockMovementsQuery | — | 200 stock.StockMovementsResponse, newest first | — |
+| P0 | POST /projects/:id/attendance | Contractor | — | attendance.CreateAttendanceInput | 201 attendance.AttendanceResponse | CONFLICT for existing worker/date; entire batch rolls back |
+| P1 | POST /projects/:id/wage-payments | Contractor | — | wages.CreateWagePaymentInput | 201 wages.WagePaymentResponse | — |
+| P1 | POST /projects/:id/adjustments | Contractor | — | adjustments.CreateAdjustmentInput | 201 adjustments.AdjustmentResponse | INSUFFICIENT_STOCK for a compensating move that would overdraw |
+| P1 | GET /projects/:id/summary | Members | — | — | 200 summary.SummaryResponse | — |
+| P1 | GET /projects/:id/wage-sheet | Owner, contractor | wages.WageSheetQuery | — | 200 wages.WageSheetResponse, or CSV/PDF attachment | — |
+| P1 | POST /projects/:id/progress | Engineer, contractor | — | progress.CreateProgressInput (multipart) | 201 progress.ProgressResponse | — |
+| P1 | GET /projects/:id/timeline | Members | — | — | 200 progress.TimelineResponse, IST days newest first | — |
+| P1 | GET /projects/:id/photos/:photoId | Members | — | — | 200 protected image bytes with progress.PhotoMime content type | — |
+| P1 | GET /projects/:id/activity | Members | — | — | 200 activity.ActivityResponse, newest first | — |
+| P2 | POST /projects/:id/proposals | Engineer, contractor | — | proposals.CreateProposalInput | 201 proposals.ProposalResponse | — |
+| P2 | GET /projects/:id/proposals | Members | — | — | 200 proposals.ProposalsResponse, newest first | — |
+| P2 | POST /proposals/:id/decision | Owner | — | proposals.DecideProposalInput | 200 proposals.ProposalResponse | CONFLICT if already decided |
+| P2 | POST /projects/:id/checklists | Engineer | checklist.ChecklistDraftQuery | checklist.CreateChecklistDraftInput | 200 checklist.ChecklistDraftResponse | — |
+| P2 | POST /projects/:id/checklists/records | Engineer | — | checklist.SaveChecklistInput | 201 checklist.ChecklistResponse | CONFLICT if draft reference was already used |
+| P2 | GET /projects/:id/checklists | Members | — | — | 200 checklist.ChecklistsResponse | — |
+| P2 | PATCH /checklist-items/:id | Engineer | — | checklist.UpdateChecklistItemInput | 200 checklist.ChecklistItemResponse | — |
+
+## Operation details
+
+- A member invite links an existing account by email. No email delivery or invitation redemption flow. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server.
+- Delivery and usage requests take positive amounts. Usage is negative in movement history. Delivery supplier/challan matching is trimmed and case-insensitive within the project. The guarded stock update and movement insert share a transaction.
+- Corrections accept an absolute replacement magnitude for an original delivery/usage, new half-day units for attendance, or a replacement positive payment amount. A zero replacement stock quantity reverses that movement. The server preserves movement direction, applies only the delta versus the effective quantity, and derives prior value and actor from stored records and the session. Correction and audit records are append-only. No client-supplied actor is accepted.
+- The wage sheet uses inclusive IST dates for work and payments. JSON is default. CSV/PDF use `WageExportContentType` and Content-Disposition attachment. Escape formula-like CSV cells. The server returns authoritative accrued, paid wages, advances and signed due. A negative due is an overpayment. Engineer summaries omit the spend split entirely, and engineer activity omits payment-related events, including payment corrections.
+- Progress is multipart with `note`, optional `checklistItemId`, and 1–10 repeated `photos` file parts. JPEG, PNG and WebP only, max 5,000,000 bytes each. Verify declared MIME against content during implementation. Return metadata and a project-scoped URL, never a local path or storage key. The current JSON API client is suitable for JSON calls; multipart, downloads and auth require their respective transport.
+- Checklist generation accepts JSON house details, or multipart with optional `plan` image and the same scalar fields. Decode multipart numeric fields before schema validation. Template requests may send an empty JSON object. Validate combined query and body with `ChecklistDraftRequest`. AI accepts a plan or all of houseType, floors and rooms. The template is used when AI is unavailable, times out or returns invalid output. `source` reports the actual draft origin. Draft creation publishes no checklist records. An authenticated engineer edits and submits a separate save. The opaque draft reference must be bound to the project and engineer, with its source resolved server-side. No provider is configured in M1.
+
+## Validated examples
+
+CreateDeliveryInput
+```json
+{"materialId":"mat-cement","qty":60.125,"unitCostPaise":41500,"supplier":"Metro Building Supply","challanNo":"CH-1024","occurredOn":"2026-11-25"}
+```
+
+DeliveryResponse
+```json
+{"id":"mov-104","materialId":"mat-cement","qty":60.125,"unitCostPaise":41500,"supplier":"Metro Building Supply","challanNo":"CH-1024","occurredOn":"2026-11-25","note":null,"balance":84.625}
+```
+
+CreateAttendanceInput
+```json
+{"workDate":"2026-11-25","entries":[{"workerId":"worker-42","halfDays":1}]}
+```
+
+InsufficientStockErrorResponse
+```json
+{"error":{"code":"INSUFFICIENT_STOCK","message":"Only 12.500 bags available","details":{"materialId":"mat-cement","balance":12.5}}}
+```
+
+SummaryResponse
+```json
+{"role":"engineer","budgetPaise":250000000,"spendPaise":4180000,"burnRatePaisePerDay":209000,"materialVariance":[],"stockAlerts":[]}
+```

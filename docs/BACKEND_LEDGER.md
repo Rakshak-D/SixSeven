@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M1 shared API contracts
+
+- Timestamp: 2026-11-25 15:37:00+05:30
+- Milestone/task ID: M1
+- Branch: be/api-contracts
+- Scope: published P0–P2 browser-safe Zod schemas and inferred types using the approved historical baseline. See SPECIFICATION.md and API.md for domain rules and request/response details.
+- Files: src/shared/schemas, src/shared/errors.ts, API/specification and project ledgers, README and approved-baseline references in agent guides.
+- API or database changes: contract definitions only. No deployed auth or domain endpoints, database migrations, or provider configuration.
+- Verification: shared Vitest suite passed 28 tests across 2 files, including the API examples and role-sensitive shapes. Typecheck, production build, and a browser-targeted bundle of all public contract modules passed. Scoped Biome passed, and full Biome passed on a project-local Git index snapshot with LF checkout to avoid Windows CRLF conversion. The staged diff passed whitespace and scope checks.
+- Dependencies added: none.
+- Limitations: local database-dependent tests were not run. CI uses ephemeral PostgreSQL for the existing scaffold checks. API documentation tracks runtime readiness independently from contract availability.
+- Frontend implications: shared schema and auth requests are addressed at the contract level. Auth and multipart/binary routes have separate transport requirements from the JSON client.
+- Git reference: be/api-contracts, branched from main 9bc2244795d2c5aa464b918a250ce200fa091ee9 after PR #5 merged.
+- Next action: integrate the contract PR, then implement auth and membership in the next authorized milestone.
+
 ## Entry — M0 integration
 
 - Timestamp: 2026-11-25 15:12:14+05:30
