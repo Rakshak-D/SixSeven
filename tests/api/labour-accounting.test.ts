@@ -6,7 +6,11 @@ import { adjustments, attendance, stockMovements, wagePayments, workers } from "
 import { app } from "@/server/app";
 import { ErrorResponse } from "@/shared/errors";
 import { AdjustmentListResponse, AdjustmentResponse } from "@/shared/schemas/adjustments";
-import { AttendanceListResponse, AttendanceResponse } from "@/shared/schemas/attendance";
+import {
+  AttendanceListResponse,
+  AttendanceResponse,
+  AttendanceRosterResponse,
+} from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
 import { DeliveryResponse } from "@/shared/schemas/deliveries";
 import {
@@ -106,6 +110,40 @@ async function newMaterial(actor = contractor) {
 }
 
 describe("attendance and wage accounting", () => {
+  it("shows the engineer effective dated attendance without financial fields", async () => {
+    const worker = await newWorker(contractor, "Roster privacy fixture");
+    const workDate = "2026-11-22";
+    const result = await call(projectId, "attendance", contractor, {
+      workDate,
+      entries: [{ workerId: worker.id, halfDays: 2 }],
+    });
+    expect(result.status).toBe(201);
+    const {
+      entries: [entry],
+    } = AttendanceResponse.parse(await result.json());
+    const corrected = await call(projectId, "adjustments", contractor, {
+      targetTable: "attendance",
+      targetId: entry.id,
+      newValue: 0,
+      reason: "Correct the site attendance register",
+    });
+    expect(corrected.status).toBe(201);
+    const path = `attendance/roster?workerId=${worker.id}&from=${workDate}&to=${workDate}`;
+    await failure(await call(projectId, path), 401, "UNAUTHENTICATED");
+    await failure(await call(projectId, path, outsider), 404, "NOT_FOUND");
+    const roster = await call(projectId, path, engineer);
+    expect(roster.status).toBe(200);
+    expect(AttendanceRosterResponse.parse(await roster.json())).toEqual([
+      {
+        id: entry.id,
+        workerId: worker.id,
+        workerName: "Roster privacy fixture",
+        workDate,
+        effectiveHalfDays: 0,
+      },
+    ]);
+    await failure(await call(projectId, "attendance", engineer), 403, "FORBIDDEN");
+  });
   it("requires a session and hides labour records from engineers and nonmembers", async () => {
     const day = "2026-11-20";
     await failure(
