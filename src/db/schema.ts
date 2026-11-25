@@ -7,6 +7,7 @@ import {
   doublePrecision,
   foreignKey,
   index,
+  integer,
   jsonb,
   numeric,
   pgEnum,
@@ -26,6 +27,13 @@ export const projectRole = pgEnum("project_role", [
   Role.enum.engineer,
 ]);
 export const movementType = pgEnum("movement_type", ["delivery", "usage", "adjustment"]);
+export const wagePaymentKind = pgEnum("wage_payment_kind", ["wage", "advance"]);
+export const wagePaymentMode = pgEnum("wage_payment_mode", ["cash", "upi", "bank"]);
+export const adjustmentTarget = pgEnum("adjustment_target", [
+  "stock_movements",
+  "attendance",
+  "wage_payments",
+]);
 
 const quantity = (name: string) => numeric(name, { precision: 14, scale: 3 });
 const paise = (name: string) => bigint(name, { mode: "number" });
@@ -116,6 +124,110 @@ export const workers = pgTable(
       "worker_daily_rate_range",
       sql`${t.dailyRatePaise} between 2 and 9007199254740991 and ${t.dailyRatePaise} % 2 = 0`,
     ),
+  ],
+);
+
+export const attendance = pgTable(
+  "attendance",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    workerId: text("worker_id").notNull(),
+    workDate: date("work_date").notNull(),
+    halfDays: integer("half_days").notNull(),
+    ratePaise: paise("rate_paise").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "attendance_project_worker_fk",
+      columns: [t.projectId, t.workerId],
+      foreignColumns: [workers.projectId, workers.id],
+    }),
+    unique("attendance_project_worker_date_unique").on(t.projectId, t.workerId, t.workDate),
+    unique("attendance_project_id_unique").on(t.projectId, t.id),
+    index("attendance_project_day_idx").on(t.projectId, t.workDate, t.workerId),
+    check("attendance_half_days_valid", sql`${t.halfDays} in (0, 1, 2)`),
+    check(
+      "attendance_rate_paise_valid",
+      sql`${t.ratePaise} between 2 and 9007199254740991 and ${t.ratePaise} % 2 = 0`,
+    ),
+  ],
+);
+
+export const wagePayments = pgTable(
+  "wage_payments",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    workerId: text("worker_id").notNull(),
+    amountPaise: paise("amount_paise").notNull(),
+    kind: wagePaymentKind().notNull(),
+    mode: wagePaymentMode().notNull(),
+    paidOn: date("paid_on").notNull(),
+    reference: text(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "wage_payments_project_worker_fk",
+      columns: [t.projectId, t.workerId],
+      foreignColumns: [workers.projectId, workers.id],
+    }),
+    unique("wage_payments_project_id_unique").on(t.projectId, t.id),
+    index("wage_payments_project_day_idx").on(t.projectId, t.paidOn, t.workerId),
+    index("wage_payments_worker_day_idx").on(t.projectId, t.workerId, t.paidOn),
+    check("wage_payment_amount_paise_valid", sql`${t.amountPaise} between 1 and 9007199254740991`),
+  ],
+);
+
+export const adjustments = pgTable(
+  "adjustments",
+  {
+    id: text().primaryKey(),
+    sequenceNo: bigint("sequence_no", { mode: "bigint" }).generatedAlwaysAsIdentity().notNull(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    targetTable: adjustmentTarget("target_table").notNull(),
+    targetId: text("target_id").notNull(),
+    oldValue: numeric("old_value", { precision: 20, scale: 3 }).notNull(),
+    newValue: numeric("new_value", { precision: 20, scale: 3 }).notNull(),
+    reason: text().notNull(),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("adjustments_sequence_no_unique").on(t.sequenceNo),
+    index("adjustments_project_sequence_idx").on(t.projectId, t.sequenceNo),
+    index("adjustments_effective_target_idx").on(
+      t.projectId,
+      t.targetTable,
+      t.targetId,
+      t.sequenceNo,
+    ),
+    index("adjustments_project_time_idx").on(t.projectId, t.createdAt, t.sequenceNo),
+    check("adjustment_values_differ", sql`${t.oldValue} <> ${t.newValue}`),
+    check(
+      "adjustment_values_match_target",
+      sql`(
+        (${t.targetTable} = 'stock_movements' and ${t.oldValue} between 0 and 99999999999.999
+          and ${t.newValue} between 0 and 99999999999.999) or
+        (${t.targetTable} = 'attendance' and ${t.oldValue} in (0, 1, 2) and ${t.newValue} in (0, 1, 2)) or
+        (${t.targetTable} = 'wage_payments'
+          and ${t.oldValue} between 1 and 9007199254740991 and ${t.newValue} between 1 and 9007199254740991
+          and ${t.oldValue} = trunc(${t.oldValue}) and ${t.newValue} = trunc(${t.newValue}))
+      )`,
+    ),
+    check("adjustment_reason_valid", sql`length(btrim(${t.reason})) between 10 and 2000`),
   ],
 );
 
