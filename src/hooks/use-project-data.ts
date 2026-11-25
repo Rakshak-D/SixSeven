@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ZodType } from "zod";
 import { ApiClientError, api } from "@/lib/api/client";
+import type { ReviewInput } from "@/lib/checklist";
 import { ActivityResponse } from "@/shared/schemas/activity";
 import {
   AdjustmentListResponse,
@@ -12,7 +13,11 @@ import {
   AttendanceResponse,
   CreateAttendanceInput,
 } from "@/shared/schemas/attendance";
-import { ChecklistsResponse } from "@/shared/schemas/checklist";
+import {
+  ReviewChecklistItemInput,
+  VerifiedChecklistItemResponse,
+  VerifiedChecklistsResponse,
+} from "@/shared/schemas/checklist";
 import { CreateDeliveryInput, DeliveryResponse } from "@/shared/schemas/deliveries";
 import { MaterialsResponse } from "@/shared/schemas/materials";
 import { TimelineResponse } from "@/shared/schemas/progress";
@@ -121,7 +126,7 @@ export const useProposals = (id: string) =>
 export const useChecklists = (id: string) =>
   useQuery({
     queryKey: [id, "checklists"],
-    queryFn: () => api("GET", `${base(id)}/checklists`, { schema: ChecklistsResponse }),
+    queryFn: () => api("GET", `${base(id)}/checklists`, { schema: VerifiedChecklistsResponse }),
   });
 
 /** Owner approves or rejects a pending proposal; refreshes proposals and activity after. */
@@ -186,3 +191,28 @@ export const useCreateWagePayment = (id: string) =>
   useProjectPost(id, "/wage-payments", CreateWagePaymentInput, WagePaymentResponse);
 export const useCreateAdjustment = (id: string) =>
   useProjectPost(id, "/adjustments", CreateAdjustmentInput, AdjustmentResponse);
+
+/** Engineer accepts or sends back a task the contractor submitted. A send-back needs a reason. */
+export function useReviewChecklistItem(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, ...input }: ReviewInput & { itemId: string }) => {
+      const checked = ReviewChecklistItemInput.safeParse(input);
+      if (!checked.success) {
+        return Promise.reject(
+          new ApiClientError(
+            400,
+            "VALIDATION_ERROR",
+            checked.error.issues[0]?.message ?? "Check the form",
+            checked.error.issues,
+          ),
+        );
+      }
+      return api("POST", `/checklist-items/${encodeURIComponent(itemId)}/review`, {
+        body: checked.data,
+        schema: VerifiedChecklistItemResponse,
+      });
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
+  });
+}

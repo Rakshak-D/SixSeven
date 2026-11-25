@@ -228,3 +228,77 @@ describe("contractor writes", () => {
     ).toBe(409);
   });
 });
+
+describe("engineer review of checklist proof", () => {
+  type Item = {
+    id: string;
+    verificationStatus: string;
+    history: { kind: string; progressId: string | null }[];
+  };
+  const waitingItem = () => {
+    const lists = call("GET", "/projects/demo-hillside/checklists") as { items: Item[] }[];
+    return lists.flatMap((l) => l.items).find((i) => i.verificationStatus === "waiting") as Item;
+  };
+  const proofOf = (item: Item) =>
+    [...item.history].reverse().find((e) => e.kind === "submitted")?.progressId as string;
+
+  it("the engineer can accept a waiting task", () => {
+    const item = waitingItem();
+    expect(
+      status(() =>
+        call("POST", `/checklist-items/${item.id}/review`, {
+          decision: "accept",
+          progressId: proofOf(item),
+        }),
+      ),
+    ).toBe(200);
+  });
+
+  it("refuses a send-back without a reason, and proof that is not the latest", () => {
+    const lists = call("GET", "/projects/demo-hillside/checklists") as { items: Item[] }[];
+    const items = lists.flatMap((l) => l.items).filter((i) => i.verificationStatus === "waiting");
+    const item = items[0];
+    expect(item).toBeDefined();
+    expect(
+      status(() =>
+        call("POST", `/checklist-items/${item.id}/review`, {
+          decision: "send_back",
+          progressId: proofOf(item),
+          note: "short",
+        }),
+      ),
+    ).toBe(400);
+    expect(
+      status(() =>
+        call("POST", `/checklist-items/${item.id}/review`, {
+          decision: "accept",
+          progressId: "an-older-proof",
+        }),
+      ),
+    ).toBe(409);
+    const sent = call("POST", `/checklist-items/${item.id}/review`, {
+      decision: "send_back",
+      progressId: proofOf(item),
+      note: "Retake the photo with the whole wall in view",
+    }) as Item;
+    expect(sent.verificationStatus).toBe("sent_back");
+    expect(
+      status(() =>
+        call("POST", `/checklist-items/${item.id}/review`, {
+          decision: "accept",
+          progressId: proofOf(item),
+        }),
+      ),
+    ).toBe(409);
+  });
+
+  it("the contractor cannot review", () => {
+    const lists = call("GET", "/projects/demo-lakeview/checklists") as { items: Item[] }[];
+    const any = lists[0].items[0];
+    expect(
+      status(() =>
+        call("POST", `/checklist-items/${any.id}/review`, { decision: "accept", progressId: "x" }),
+      ),
+    ).toBe(403);
+  });
+});

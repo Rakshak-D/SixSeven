@@ -48,6 +48,32 @@ proposed method + path, fields, priority / blocking.
 
 ## Entries
 
+### 2026-11-26 IST · Engineer side: Home, Review, verified checklist shape
+
+- **Branch / commit:** `fe/contractor-screens` (PR #22).
+- **Found:** the live `GET /projects/:id/checklists` returns the M6 verified shape
+  (`verificationStatus`, `removedAt`, `history`). The shared `ChecklistsResponse` is strict and would
+  reject it, so the checklist reads now parse with `VerifiedChecklistsResponse`, and the demo mocks
+  produce that shape. The Site page shows the five states (not started, under way, waiting for check,
+  sent back, done) and hides soft-removed items. `src/lib/checklist.ts` derives the types because the
+  contract exports the schemas without types (request to Codex: export them).
+- **Done (MOCKED):**
+  - **Engineer Home:** plan progress, tasks waiting for the engineer, tasks sent back, materials
+    running low, recent activity. No money anywhere on it.
+  - **Review** (centre button, and from Home): each waiting task shows the contractor's note and
+    photos; Accept, or Send back with a reason of at least 10 characters. The mock refuses a send-back
+    without a reason, a proof that is not the latest submission (409), a repeat decision (409) and a
+    non-engineer (403), like the contract. Demo photos have no image files, so a tile says so.
+  - Activity lines for accepted and sent-back tasks.
+- **Tests:** lint, typecheck pass. `vitest run src`: 62 pass (new: accept, send-back refusals, role).
+  Playwright on the engineer demo project at 390 px light and 1440 px dark: Home, Site, Stock and Logs
+  have no overflow and no console errors; the review flow ran at 390 px (send back with a short reason
+  is refused in plain words, a valid send-back and an accept each remove the card).
+- **Not done:** the contractor side of M6 (start a task, submit completion with photos) needs multipart
+  in `api()`; checklist add, rename and remove (request 8 UI) are not built.
+- **Next:** multipart in `api()` (photo upload for deliveries, progress and task completion), then
+  login so the mocks can be switched off.
+
 ### 2026-11-26 IST · Contractor screens: Today, Stock, Wages
 
 - **Branch / commit:** `fe/contractor-screens`, with `main` merged in (M6: proposals, checklist

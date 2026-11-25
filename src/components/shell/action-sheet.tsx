@@ -2,6 +2,7 @@
 
 import { Camera, ClipboardList, PackageMinus, Truck } from "lucide-react";
 import Link from "next/link";
+import { ReviewList } from "@/components/engineer/review-list";
 import { ApprovalsList } from "@/components/owner/approvals-list";
 import { Sheet } from "@/components/sheet";
 import type { NavActionKind } from "./nav";
@@ -27,7 +28,7 @@ const copy: Record<NavActionKind, { title: string; description: string; empty: s
   review: {
     title: "Review",
     description: "Task proofs waiting for your check.",
-    empty: "The review list is not connected yet, so nothing is shown here.",
+    empty: "",
   },
 };
 
@@ -89,6 +90,8 @@ export function ActionSheet({
       ) : null}
       {kind === "approvals" ? (
         <ApprovalsList projectId={projectId} />
+      ) : kind === "review" ? (
+        <ReviewList projectId={projectId} />
       ) : kind === "log" ? null : (
         <p className="mt-4 rounded-2xl border border-dashed px-4 py-3 text-[15px] text-muted-foreground">
           {text.empty}

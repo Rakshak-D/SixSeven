@@ -5,6 +5,7 @@ import { ApprovalsList } from "@/components/owner/approvals-list";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChecklists, useProposals, useTimeline } from "@/hooks/use-project-data";
+import { activeItems } from "@/lib/checklist";
 import { todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise, formatTimeIst } from "@/lib/format";
 import { mocksEnabled } from "@/mocks";
@@ -21,11 +22,19 @@ const phaseLabel: Record<(typeof ChecklistPhase.options)[number], string> = {
   flooring: "Flooring",
   finishing: "Finishing",
 };
-const statusLabel = { done: "Done", inProgress: "Under way", pending: "Not started" } as const;
+const statusLabel = {
+  todo: "Not started",
+  doing: "Under way",
+  waiting: "Waiting for check",
+  sent_back: "Sent back",
+  done: "Done",
+} as const;
 const statusClass = {
+  todo: "bg-secondary text-muted-foreground",
+  doing: "bg-primary/15 text-primary",
+  waiting: "bg-warning/15 text-warning",
+  sent_back: "bg-destructive/15 text-destructive",
   done: "bg-success/15 text-success",
-  inProgress: "bg-primary/15 text-primary",
-  pending: "bg-secondary text-muted-foreground",
 } as const;
 
 function Section({
@@ -51,8 +60,8 @@ export function SitePage() {
   const checklists = useChecklists(project.id);
   const timeline = useTimeline(project.id);
   const proposals = useProposals(project.id);
-  const items = checklists.data?.flatMap((c) => c.items) ?? [];
-  const done = items.filter((i) => i.status === "done").length;
+  const items = activeItems(checklists.data);
+  const done = items.filter((i) => i.verificationStatus === "done").length;
 
   return (
     <div className="space-y-6">
@@ -82,7 +91,7 @@ export function SitePage() {
                 .map((phase) => ({ phase, list: items.filter((i) => i.phase === phase) }))
                 .filter((g) => g.list.length > 0)
                 .map(({ phase, list }) => {
-                  const phaseDone = list.filter((i) => i.status === "done").length;
+                  const phaseDone = list.filter((i) => i.verificationStatus === "done").length;
                   return (
                     <li key={phase}>
                       <div className="flex items-baseline justify-between gap-3">
@@ -106,13 +115,17 @@ export function SitePage() {
                             key={item.id}
                             className="flex min-h-11 items-center justify-between gap-3"
                           >
-                            <span className={item.status === "done" ? "text-muted-foreground" : ""}>
+                            <span
+                              className={
+                                item.verificationStatus === "done" ? "text-muted-foreground" : ""
+                              }
+                            >
                               {item.task}
                             </span>
                             <span
-                              className={`shrink-0 rounded-full px-3 py-1 font-semibold text-[13px] ${statusClass[item.status]}`}
+                              className={`shrink-0 rounded-full px-3 py-1 font-semibold text-[13px] ${statusClass[item.verificationStatus]}`}
                             >
-                              {statusLabel[item.status]}
+                              {statusLabel[item.verificationStatus]}
                             </span>
                           </li>
                         ))}
