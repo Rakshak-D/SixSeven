@@ -36,10 +36,14 @@ All rows below have an available shared contract. The four project operations ar
 
 | Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
 |---|---|---|---|---|---|---|
-| P0 | POST /projects | Authenticated creator becomes contractor for this project | — | projects.CreateProjectInput | 201 projects.ProjectResponse | — |
+| P0 | POST /projects | Authenticated creator becomes engineer for this project | — | projects.CreateProjectInput | 201 projects.ProjectResponse | — |
 | P0 | GET /projects | Authenticated, own memberships only | — | — | 200 projects.ProjectsResponse | — |
 | P0 | GET /projects/:id | Members | — | — | 200 projects.ProjectResponse | — |
-| P0 | POST /projects/:id/members | Contractor | — | projects.AddProjectMemberInput | 201 projects.ProjectMemberResponse | CONFLICT if already a member. Unknown account gives 404. |
+| P0 | POST /projects/:id/members | Contractor on a legacy contractor-created project | — | projects.AddProjectMemberInput | 201 projects.ProjectMemberResponse | CONFLICT if already a member. Unknown account gives 404. |
+| P0 | POST /projects/:id/invitations | Engineer | — | projects.CreateProjectInvitationInput | 201 projects.ProjectInvitationResponse | 409 for an existing member or invitation |
+| P0 | GET /projects/:id/invitations | Engineer | projects.ProjectInvitationQuery | — | 200 projects.ProjectInvitationsResponse | — |
+| P0 | GET /invitations | Authenticated recipient | — | — | 200 projects.ProjectInvitationsResponse | — |
+| P0 | POST /invitations/:id/accept | Authenticated recipient | — | — | 200 projects.ProjectMemberResponse | 404 for another recipient's invitation, 409 if accepted or already a member |
 | P0 | GET /projects/:id/members | Members | — | — | 200 projects.ProjectTeamResponse | 404 for nonmembers |
 | P0 | PATCH /me | Authenticated caller | — | projects.UpdateMyPhoneInput | 200 projects.MyPhoneResponse | 400 for invalid numbers |
 | P0 | POST /projects/:id/materials | Contractor | — | materials.CreateMaterialInput | 201 materials.MaterialResponse | — |
@@ -80,7 +84,8 @@ All rows below have an available shared contract. The four project operations ar
 
 ## Operation details
 
-- A member invite links an existing account by email. No email delivery or invitation redemption flow. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server. Use the attendance roster for the engineer's dated log. It returns record ID, worker ID, worker name, work date and effective half-day units after corrections. It applies the same inclusive date and optional worker filters as the financial attendance read. The financial route still returns 403 for engineers.
+- Creating a project assigns the caller the engineer role for that project. The engineer creates owner or contractor invitations by email. Invitations are in-app records and can be accepted after signing in with the intended email. Acceptance consumes the invitation and grants membership in one transaction. Legacy contractor-created projects keep their existing memberships and direct enrollment route. Worker list includes active status; attendance accepts only active workers. Duplicate worker IDs within the submitted attendance array are a 400. Rate snapshots come from the server. Use the attendance roster for the engineer's dated log. It returns record ID, worker ID, worker name, work date and effective half-day units after corrections. It applies the same inclusive date and optional worker filters as the financial attendance read. The financial route still returns 403 for engineers.
+- Engineers may supply exactly one of `email` or `phone` and filter the project invitation list by `pending` or `accepted`. Phone numbers normalize to `+91` and remain pending until verified-phone authentication is available. Self-entered team contact numbers confer no ownership proof. Phone invitations cannot be listed or redeemed by recipients in this release.
 - In `PATCH /me`, submit a 10-digit Indian mobile number beginning with 6–9, optionally prefixed with `+91`. The server stores and returns the canonical `+91` form. Send `{"phone":null}` to stop sharing. The team list includes user ID, role, name and phone when set. Phone numbers are only available to the account owner and members of the same project.
 - Attendance and payment list date filters are inclusive and apply to the original work or payment date. Adjustment list dates filter the correction's creation date in IST. The optional target type and target ID filters narrow correction history. Results are newest first with a stable tie-breaker. Attendance and payment list records contain both the original and effective values. Adjustment records carry the prior and replacement values, reason and session-derived actor ID.
 - Materials start at zero stock. Delivery and usage requests and responses use positive amounts. Usage is negative in movement history. Delivery supplier/challan matching is trimmed and case-insensitive within the project. The guarded stock update, signed movement and audit event commit together. The maximum balance is 99,999,999,999.999.

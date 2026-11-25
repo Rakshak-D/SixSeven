@@ -71,6 +71,13 @@
       "when": 1795649313220,
       "tag": "0009_delivery_logistics",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795649513996,
+      "tag": "0010_project_invitations",
+      "breakpoints": true
     }
   ]
 }

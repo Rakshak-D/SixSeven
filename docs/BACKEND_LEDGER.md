@@ -2,6 +2,14 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Request #4 engineer-led project setup
+
+- Timestamp: 2026-11-26 IST. Branch: `be/project-invitations`.
+- New project creators receive engineer membership. The engineer issues owner and contractor invitations with `POST /api/v1/projects/:id/invitations`. Signed-in users list and accept their own pending invitations through `GET /api/v1/invitations` and `POST /api/v1/invitations/:id/accept`. Acceptance and membership are atomic. Legacy contractor-created projects retain direct enrollment.
+- Migration `0007_project_invitations` adds the project/email uniqueness rule and acceptance metadata. Invitations are in-app records; receiving one does not provision an account or send email.
+- PostgreSQL migration, seed and the auth/projects and database suites passed, 16 tests. Tests include duplicate issuance and acceptance under concurrency, recipient isolation and role enforcement.
+- Frontend handoff: use the creator role from the create response. Add invitation list/accept to `src/app/projects/page.tsx` or its project-list component, and use the invitation endpoint for engineer enrollment instead of the contractor-only direct enrollment action in `src/components/shell/action-sheet.tsx`. Regenerate the unmerged migration after any earlier schema PR lands.
+
 ## Entry — Request #6 expected deliveries and challan evidence
 
 - Timestamp: 2026-11-26 IST. Branch: `be/delivery-logistics`.
