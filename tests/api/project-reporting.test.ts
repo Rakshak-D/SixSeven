@@ -803,11 +803,7 @@ describe("M6 proposals and checklist verification", () => {
     if (!first) throw new Error("Checklist fixture missing");
     const path = `/checklist-items/${first.id}`;
     await expectError(await api(`${path}/start`, outsider, undefined, "POST"), 404, "NOT_FOUND");
-    await expectError(
-      await api(path, contractor, { status: "done" }, "PATCH"),
-      400,
-      "VALIDATION_ERROR",
-    );
+    await expectError(await api(path, contractor, { status: "done" }, "PATCH"), 404, "NOT_FOUND");
     expect((await api(`${path}/start`, contractor, undefined, "POST")).status).toBe(200);
     await expectError(await api(`${path}/start`, contractor, undefined, "POST"), 409, "CONFLICT");
     const photo = await imageFile();
@@ -911,6 +907,11 @@ describe("M6 proposals and checklist verification", () => {
     };
     const renameRequest = await submitChange(rename);
     const stale = await submitChange({ ...rename, payload: { task: "Stale proposed name" } });
+    await expectError(
+      await api(`${renameRequest}/vote`, outsider, { approve: true, note: "Out of project" }),
+      404,
+      "NOT_FOUND",
+    );
     await expectError(await decide(renameRequest), 409, "CONFLICT");
     expect(ChangeRequest.parse(await (await vote(renameRequest, false)).json()).status).toBe(
       "rejected_contractor",
@@ -930,6 +931,17 @@ describe("M6 proposals and checklist verification", () => {
     expect((await vote(stale, true)).status).toBe(200);
     const decisions = await Promise.all([decide(renameRequest), decide(renameRequest)]);
     expect(decisions.map(({ status }) => status).sort()).toEqual([200, 409]);
+    const approved = ChangeRequest.parse(await decisions.find(({ ok }) => ok)?.json());
+    expect(approved.events.map(({ kind }) => kind)).toEqual([
+      "created",
+      "contractor_rejected",
+      "reopened",
+      "contractor_approved",
+      "owner_accepted",
+    ]);
+    await expect(
+      sql`update change_request_events set note = 'changed' where request_id = ${approved.id}`,
+    ).rejects.toMatchObject({ code: "55000" });
     await expectError(await decide(stale), 409, "CONFLICT");
     await expectError(
       await api(path, engineer, { task: "Bypass", reason: "Should not be permitted" }, "PATCH"),
