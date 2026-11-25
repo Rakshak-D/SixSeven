@@ -32,7 +32,7 @@ The development seed provisions synthetic `DemoAccountEmail` entries with corres
 
 ## Domain operations
 
-All rows below have an available shared contract. Project operations were implemented in M2. Materials, workers, deliveries, usages, stock and movement history were implemented in M3. These operations have PostgreSQL integration tests. The remaining operations are planned. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer. Frontend integration is tracked separately in the frontend ledger.
+All rows below have an available shared contract. The four project operations are verified in M2. The eight M3 operations for materials, workers, deliveries, usages, stock and movement history are verified by [PostgreSQL CI #19](https://github.com/Rakshak-D/SixSeven/actions/runs/45598875957). The remaining operations are planned. Each row assumes a valid session. Roles are scoped to the resource's project. “Members” means owner, contractor or engineer. Frontend integration is tracked separately in the frontend ledger.
 
 | Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
 |---|---|---|---|---|---|---|

@@ -10,7 +10,7 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Scope: eight published routes, role checks and exact PostgreSQL stock movements with transactional audit records. Greenfield Home seed now includes six idempotent deliveries and usages.
 - Files: inventory and stock services and routes, seed, PostgreSQL CI and API integration tests, and API/project documentation.
 - API or database changes: existing response schemas and migrations reused. Overflow returns 409 CONFLICT, low-stock comparison is inclusive, and history uses a stable newest-first sort.
-- Verification: 28 shared tests, typecheck and production build passed locally. PostgreSQL integration and concurrent request cases run in CI.
+- Verification: 28 shared tests, typecheck, production build and Biome on an LF snapshot passed locally. [PR #8 CI #19](https://github.com/Rakshak-D/SixSeven/actions/runs/45598875957) passed all 64 tests. Two blocked PostgreSQL connections were observed in each race. From 100 units, competing uses of 70 left 30, one usage and one usage audit. Competing identical challans left one movement and one audit. Audit failure rolled back stock and the movement. Both seed snapshots matched.
 - Dependencies added: none.
 - Limits: no authorized isolated local PostgreSQL instance was available. General adjustments are deferred.
 - Frontend implications: delivery and usage now return the committed balance; the stock and movement endpoints are backed by PostgreSQL.
