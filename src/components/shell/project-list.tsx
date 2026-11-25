@@ -3,6 +3,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SlateLockup, SlateTagline } from "@/components/brand/logo";
+import { Invitations, StartProject } from "@/components/team/start-project";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +28,18 @@ export function ProjectList() {
       </header>
       <SlateTagline className="mt-3" />
       <h1 className="mt-12 animate-rise text-5xl sm:text-6xl">Your projects</h1>
+      {/*
+        Demo data only for now: the live server still makes the creator the contractor and has no
+        invitation routes (backend PR #30).
+      */}
+      {mocksEnabled && projects.isSuccess ? (
+        <>
+          <div className="mt-6">
+            <StartProject />
+          </div>
+          <Invitations />
+        </>
+      ) : null}
 
       {projects.isPending ? (
         <output className="block mt-8 space-y-3">
@@ -48,7 +61,10 @@ export function ProjectList() {
           )}
         </p>
       ) : projects.data.length === 0 ? (
-        <p className="mt-8 text-ink-2">You aren&apos;t part of any project yet.</p>
+        <p className="mt-8 text-ink-2">
+          You aren&apos;t part of any project yet. The site engineer starts it and invites the owner
+          and the contractor; an invite for you shows here.
+        </p>
       ) : (
         <ul className="mt-8 space-y-3">
           {projects.data.map((p, i) => (

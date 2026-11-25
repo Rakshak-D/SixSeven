@@ -2,6 +2,7 @@
 
 import { Download } from "lucide-react";
 import { useState } from "react";
+import { SupplierPayments } from "@/components/payments/supplier-payments";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -156,7 +157,7 @@ export function MoneyPage() {
               </ul>
             ) : null}
             <p className="mt-6 text-[15px] text-muted-foreground">
-              "Other" stays at zero: there is no way to record other expenses yet.
+              "Other" is medical expenses you have paid. Nothing else can be recorded there yet.
             </p>
           </section>
 
@@ -171,6 +172,11 @@ export function MoneyPage() {
           </section>
         </div>
       )}
+
+      {/* Owner only, and demo data only until the server has supplier payments. */}
+      {project.role === "owner" && mocksEnabled ? (
+        <SupplierPayments projectId={project.id} />
+      ) : null}
 
       <section className="animate-rise rounded-[1.75rem] border bg-card p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
