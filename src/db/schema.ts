@@ -338,9 +338,14 @@ export const progressUpdates = pgTable(
       foreignColumns: [projectMembers.projectId, projectMembers.userId],
     }),
     unique("progress_updates_project_id_unique").on(t.projectId, t.id),
+    unique("progress_updates_item_evidence_unique").on(t.projectId, t.checklistItemId, t.id),
     index("progress_updates_project_time_idx").on(t.projectId, t.createdAt, t.id),
     check("progress_note_valid", sql`length(btrim(${t.note})) between 1 and 2000`),
-    check("progress_checklist_pending_m6", sql`${t.checklistItemId} is null`),
+    foreignKey({
+      name: "progress_checklist_project_fk",
+      columns: [t.projectId, t.checklistItemId],
+      foreignColumns: [checklistItems.projectId, checklistItems.id],
+    }),
   ],
 );
 
@@ -370,5 +375,181 @@ export const progressPhotos = pgTable(
       "progress_photo_storage_key_valid",
       sql`${t.storageKey} ~ '^[a-f0-9-]{36}\\.(jpg|png|webp)$'`,
     ),
+  ],
+);
+
+export const proposalStatus = pgEnum("proposal_status", ["pending", "approved", "rejected"]);
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    title: text().notNull(),
+    description: text().notNull(),
+    costImpactPaise: paise("cost_impact_paise").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: createdAt(),
+    status: proposalStatus().notNull().default("pending"),
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.projectId, t.createdBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+      name: "proposal_creator_fk",
+    }),
+    foreignKey({
+      columns: [t.projectId, t.decidedBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+      name: "proposal_decider_fk",
+    }),
+    check(
+      "proposal_decision_shape",
+      sql`(${t.status} = 'pending' and ${t.decidedBy} is null and ${t.decidedAt} is null) or (${t.status} <> 'pending' and ${t.decidedBy} is not null and ${t.decidedAt} is not null)`,
+    ),
+    check(
+      "proposal_safe_cost",
+      sql`${t.costImpactPaise} between -9007199254740991 and 9007199254740991`,
+    ),
+    index("proposal_project_time_idx").on(t.projectId, t.createdAt, t.id),
+  ],
+);
+
+export const checklistDrafts = pgTable(
+  "checklist_drafts",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.projectId, t.createdBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+      name: "checklist_draft_actor_fk",
+    }),
+    unique("checklist_draft_binding").on(t.projectId, t.id, t.createdBy),
+  ],
+);
+
+export const checklistRecords = pgTable(
+  "checklist_records",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    draftId: text("draft_id").notNull().unique(),
+    createdBy: text("created_by").notNull(),
+    title: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.projectId, t.draftId, t.createdBy],
+      foreignColumns: [checklistDrafts.projectId, checklistDrafts.id, checklistDrafts.createdBy],
+      name: "checklist_record_draft_fk",
+    }),
+    unique("checklist_record_project_id").on(t.projectId, t.id),
+  ],
+);
+
+export const checklistPhase = pgEnum("checklist_phase", [
+  "foundation",
+  "plinth",
+  "walls",
+  "slab",
+  "plumbing",
+  "electrical",
+  "plaster",
+  "flooring",
+  "finishing",
+]);
+export const checklistState = pgEnum("checklist_state", [
+  "todo",
+  "doing",
+  "waiting",
+  "done",
+  "sent_back",
+]);
+export const checklistItems = pgTable(
+  "checklist_items",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    checklistId: text("checklist_id").notNull(),
+    phase: checklistPhase().notNull(),
+    task: text().notNull(),
+    materials: text().array().notNull(),
+    position: integer().notNull(),
+    state: checklistState().notNull().default("todo"),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.projectId, t.checklistId],
+      foreignColumns: [checklistRecords.projectId, checklistRecords.id],
+      name: "checklist_item_record_fk",
+    }),
+    unique("checklist_item_project_id").on(t.projectId, t.id),
+    unique("checklist_item_position").on(t.checklistId, t.position),
+    check("checklist_item_task_valid", sql`length(btrim(${t.task})) between 1 and 120`),
+    check("checklist_item_position_valid", sql`${t.position} between 0 and 39`),
+  ],
+);
+
+export const checklistEventKind = pgEnum("checklist_event_kind", [
+  "started",
+  "submitted",
+  "accepted",
+  "sent_back",
+  "added",
+  "renamed",
+  "removed",
+]);
+export const checklistEvents = pgTable(
+  "checklist_events",
+  {
+    id: text().primaryKey(),
+    sequence: integer().generatedAlwaysAsIdentity().notNull().unique(),
+    projectId: text("project_id").notNull(),
+    itemId: text("item_id").notNull(),
+    actorId: text("actor_id").notNull(),
+    kind: checklistEventKind().notNull(),
+    note: text(),
+    previous: text(),
+    next: text(),
+    progressId: text("progress_id").unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.projectId, t.actorId],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+      name: "checklist_event_actor_fk",
+    }),
+    foreignKey({
+      columns: [t.projectId, t.itemId],
+      foreignColumns: [checklistItems.projectId, checklistItems.id],
+      name: "checklist_event_item_fk",
+    }),
+    foreignKey({
+      columns: [t.projectId, t.itemId, t.progressId],
+      foreignColumns: [
+        progressUpdates.projectId,
+        progressUpdates.checklistItemId,
+        progressUpdates.id,
+      ],
+      name: "checklist_event_progress_fk",
+    }),
+    check(
+      "checklist_event_evidence",
+      sql`(${t.kind} = 'submitted') = (${t.progressId} is not null)`,
+    ),
+    check(
+      "checklist_event_reason",
+      sql`${t.kind} not in ('added', 'renamed', 'removed', 'sent_back') or ( ${t.note} is not null and length(btrim(${t.note})) >= 10 )`,
+    ),
+    index("checklist_event_item_seq").on(t.projectId, t.itemId, t.sequence),
   ],
 );

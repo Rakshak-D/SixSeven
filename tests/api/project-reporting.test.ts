@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 import { POST as authPost } from "@/app/api/auth/[...auth]/route";
 import { getDatabase } from "@/db/client";
-import { auditLog, expenses, progressPhotos, progressUpdates } from "@/db/schema";
+import { auditLog, checklistEvents, expenses, progressPhotos, progressUpdates } from "@/db/schema";
 import { app } from "@/server/app";
 import {
   ensurePhotoStorage,
@@ -16,9 +16,15 @@ import { loadEffectiveAttendance } from "@/server/services/wage-calculations";
 import { ErrorResponse } from "@/shared/errors";
 import { AttendanceListResponse, AttendanceResponse } from "@/shared/schemas/attendance";
 import { DemoAccountEmail, SignInResponse } from "@/shared/schemas/auth";
+import {
+  ChecklistDraftResponse,
+  VerifiedChecklistItemResponse,
+  VerifiedChecklistResponse,
+} from "@/shared/schemas/checklist";
 import { DeliveryResponse } from "@/shared/schemas/deliveries";
 import { ProgressResponse, TimelineResponse } from "@/shared/schemas/progress";
 import { ProjectMemberResponse, ProjectResponse } from "@/shared/schemas/projects";
+import { ProposalResponse } from "@/shared/schemas/proposals";
 import { SummaryResponse } from "@/shared/schemas/summary";
 import { UsageResponse } from "@/shared/schemas/usages";
 import { WagePaymentResponse } from "@/shared/schemas/wages";
@@ -559,13 +565,13 @@ describe("progress photo storage and project timeline", () => {
     );
 
     const unavailableChecklist = new FormData();
-    unavailableChecklist.append("note", "Checklist runtime is intentionally not implemented.");
+    unavailableChecklist.append("note", "An unknown checklist item must not be attached.");
     unavailableChecklist.append("checklistItemId", crypto.randomUUID().replaceAll("-", ""));
     unavailableChecklist.append("photos", firstFile);
     await expectError(
       await api(`/projects/${projectId}/progress`, contractor, unavailableChecklist),
-      400,
-      "VALIDATION_ERROR",
+      404,
+      "NOT_FOUND",
     );
     await expectError(await api(`/projects/${projectId}/progress`, owner, form), 403, "FORBIDDEN");
     await expectError(
@@ -702,5 +708,193 @@ describe("progress photo storage and project timeline", () => {
       await sql`drop trigger if exists slate_test_reporting_audit_failure on audit_log`;
       await sql`drop function if exists slate_test_reporting_audit_failure()`;
     }
+  });
+});
+
+describe("M6 proposals and checklist verification", () => {
+  it("lets only an owner decide once and records only the winning decision", async () => {
+    const project = await newProject(dateString(new Date()));
+    const path = `/projects/${project}/proposals`;
+    const created = await api(path, engineer, {
+      title: "Extend drain",
+      description: "Add a drain before flooring.",
+      costImpactPaise: 1234,
+    });
+    expect(created.status).toBe(201);
+    const proposal = ProposalResponse.parse(await created.json());
+    const decision = `/proposals/${proposal.id}/decision`;
+    await expectError(await api(decision, contractor, { decision: "approve" }), 403, "FORBIDDEN");
+    await expectError(await api(decision, outsider, { decision: "approve" }), 404, "NOT_FOUND");
+    const results = await Promise.all([
+      api(decision, owner, { decision: "approve" }),
+      api(decision, owner, { decision: "reject" }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const listed = (await (await api(path, contractor)).json()) as unknown[];
+    expect(ProposalResponse.parse(listed[0]).status).not.toBe("pending");
+    const events = await getDatabase()
+      .db.select()
+      .from(auditLog)
+      .where(eq(auditLog.entityId, proposal.id));
+    expect(events).toHaveLength(2);
+    expect(events.filter((event) => event.actorId === owner.userId)).toHaveLength(1);
+    const projectAfter = ProjectResponse.parse(
+      await (await api(`/projects/${project}`, owner)).json(),
+    );
+    expect(projectAfter.budgetPaise).toBe(25_000_000);
+  });
+
+  it("binds drafts, submissions and reviews and preserves modification history", async () => {
+    const project = await newProject(dateString(new Date()));
+    const draftPath = `/projects/${project}/checklists`;
+    const draft = ChecklistDraftResponse.parse(
+      await (await api(`${draftPath}?source=template`, engineer, {})).json(),
+    );
+    expect(draft.draft.items).toHaveLength(9);
+    const payload = {
+      draftId: draft.draftId,
+      title: "Reviewed site checks",
+      items: draft.draft.items.slice(0, 2),
+    };
+    const other = await newProject(dateString(new Date()));
+    await expectError(
+      await api(`/projects/${other}/checklists/records`, engineer, payload),
+      404,
+      "NOT_FOUND",
+    );
+    const save = await api(`${draftPath}/records`, engineer, payload);
+    expect(save.status).toBe(201);
+    const record = VerifiedChecklistResponse.parse(await save.json());
+    await expectError(await api(`${draftPath}/records`, engineer, payload), 409, "CONFLICT");
+    const [first] = record.items;
+    if (!first) throw new Error("Checklist fixture missing");
+    const path = `/checklist-items/${first.id}`;
+    await expectError(await api(`${path}/start`, outsider, undefined, "POST"), 404, "NOT_FOUND");
+    await expectError(
+      await api(path, contractor, { status: "done" }, "PATCH"),
+      400,
+      "VALIDATION_ERROR",
+    );
+    expect((await api(`${path}/start`, contractor, undefined, "POST")).status).toBe(200);
+    await expectError(await api(`${path}/start`, contractor, undefined, "POST"), 409, "CONFLICT");
+    const photo = await imageFile();
+    const evidence = () => {
+      const form = new FormData();
+      form.set("note", "Synthetic evidence of the finished work.");
+      form.append("photos", photo.file);
+      return form;
+    };
+    const invalid = new FormData();
+    invalid.set("note", "Photo proof missing");
+    await expectError(
+      await api(`${path}/completion`, contractor, invalid),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const { sql } = getDatabase();
+    const { root } = await ensurePhotoStorage();
+    const filesBefore = await readdir(root);
+    await sql`create function slate_test_checklist_failure() returns trigger language plpgsql as $$
+      begin if new.kind = 'submitted' then raise exception 'controlled checklist event failure'; end if; return new; end; $$`;
+    try {
+      await sql`create trigger slate_test_checklist_failure before insert on checklist_events
+        for each row execute function slate_test_checklist_failure()`;
+      await expectError(await api(`${path}/completion`, contractor, evidence()), 500, "INTERNAL");
+      expect(await readdir(root)).toEqual(filesBefore);
+      expect(
+        TimelineResponse.parse(await (await api(`/projects/${project}/timeline`, owner)).json()),
+      ).toEqual([]);
+    } finally {
+      await sql`drop trigger if exists slate_test_checklist_failure on checklist_events`;
+      await sql`drop function if exists slate_test_checklist_failure()`;
+    }
+    const completions = await Promise.all([
+      api(`${path}/completion`, contractor, evidence()),
+      api(`${path}/completion`, contractor, evidence()),
+    ]);
+    expect(completions.map((r) => r.status).sort()).toEqual([200, 409]);
+    const success = completions.find((r) => r.ok);
+    const submitted = VerifiedChecklistItemResponse.parse(await success?.json());
+    const progressId = submitted.history.find((event) => event.kind === "submitted")?.progressId;
+    expect(submitted.verificationStatus).toBe("waiting");
+    await expectError(
+      await api(`${path}/review`, contractor, { decision: "accept", progressId }),
+      403,
+      "FORBIDDEN",
+    );
+    await expectError(
+      await api(`${path}/review`, owner, { decision: "accept", progressId }),
+      403,
+      "FORBIDDEN",
+    );
+    const rejected = await api(`${path}/review`, engineer, {
+      decision: "send_back",
+      note: "Please show the entire footing.",
+      progressId,
+    });
+    expect(VerifiedChecklistItemResponse.parse(await rejected.json()).verificationStatus).toBe(
+      "sent_back",
+    );
+    const resubmitted = VerifiedChecklistItemResponse.parse(
+      await (await api(`${path}/completion`, contractor, evidence())).json(),
+    );
+    const latest = resubmitted.history.at(-1)?.progressId;
+    expect(latest).not.toBe(progressId);
+    await expectError(
+      await api(`${path}/review`, engineer, { decision: "accept", progressId }),
+      409,
+      "CONFLICT",
+    );
+    const reviews = await Promise.all([
+      api(`${path}/review`, engineer, { decision: "accept", progressId: latest }),
+      api(`${path}/review`, engineer, { decision: "accept", progressId: latest }),
+    ]);
+    expect(reviews.map((r) => r.status).sort()).toEqual([200, 409]);
+    const renamed = VerifiedChecklistItemResponse.parse(
+      await (
+        await api(
+          path,
+          engineer,
+          { task: "Inspect footing layout", reason: "Clarify the inspection scope" },
+          "PATCH",
+        )
+      ).json(),
+    );
+    expect(renamed.history.at(-1)).toMatchObject({
+      kind: "renamed",
+      previous: first.task,
+      next: "Inspect footing layout",
+      actorId: engineer.userId,
+    });
+    const added = await api(`/projects/${project}/checklist-items`, engineer, {
+      checklistId: record.id,
+      phase: "slab",
+      task: "Inspect slab work",
+      reason: "Add a second inspection point",
+    });
+    expect(added.status).toBe(201);
+    const removed = VerifiedChecklistItemResponse.parse(
+      await (
+        await api(path, engineer, { reason: "Retire the completed inspection" }, "DELETE")
+      ).json(),
+    );
+    expect(removed.removedAt).toBeTruthy();
+    expect(removed.verificationStatus).toBe("done");
+    const records = (await (await api(draftPath, owner)).json()) as unknown[];
+    expect(VerifiedChecklistResponse.parse(records[0]).items[0]?.history).toEqual(removed.history);
+    const timeline = TimelineResponse.parse(
+      await (await api(`/projects/${project}/timeline`, owner)).json(),
+    );
+    const updates = timeline.flatMap((day) => day.updates);
+    expect(updates.map((update) => update.id).sort()).toEqual([progressId, latest].sort());
+    const photoId = updates[0]?.photos[0]?.id;
+    const image = await api(`/projects/${project}/photos/${photoId}`, owner);
+    expect(Buffer.from(await image.arrayBuffer())).toEqual(photo.bytes);
+    await expectError(await api(`/projects/${other}/photos/${photoId}`, owner), 404, "NOT_FOUND");
+    const events = await getDatabase()
+      .db.select()
+      .from(checklistEvents)
+      .where(eq(checklistEvents.itemId, first.id));
+    expect(events).toHaveLength(7);
   });
 });

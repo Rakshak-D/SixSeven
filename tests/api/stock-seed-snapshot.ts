@@ -25,6 +25,14 @@ async function snapshot() {
       from progress_updates where project_id = 'demo-greenfield' order by id`;
     const photos = await sql`select id, progress_id, mime, size_bytes, taken_on, storage_key
       from progress_photos where project_id = 'demo-greenfield' order by id`;
+    const proposals =
+      await sql`select * from proposals where project_id = 'demo-greenfield' order by id`;
+    const drafts =
+      await sql`select * from checklist_drafts where project_id = 'demo-greenfield' order by id`;
+    const checklists =
+      await sql`select * from checklist_records where project_id = 'demo-greenfield' order by id`;
+    const checklistItems =
+      await sql`select * from checklist_items where project_id = 'demo-greenfield' order by id`;
     const workspaceRoot = resolve(process.cwd());
     const storageRoot = resolve(workspaceRoot, process.env.UPLOAD_DIR ?? ".cache/uploads");
     const localPath = relative(workspaceRoot, storageRoot);
@@ -50,6 +58,10 @@ async function snapshot() {
         progress,
         photos,
         storedFiles,
+        proposals,
+        drafts,
+        checklists,
+        checklistItems,
       }),
     );
   } finally {
