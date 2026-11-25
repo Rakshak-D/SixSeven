@@ -391,7 +391,7 @@ describe("project financial summary", () => {
       activityRows.filter(
         ({ entity, action }) => entity === "adjustment" && action === "corrected",
       ),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     const ownerActivity = (await (
       await api(`/projects/${projectId}/activity`, owner)
     ).json()) as Array<{
@@ -405,7 +405,7 @@ describe("project financial summary", () => {
       ownerActivity.filter(
         ({ entity, action }) => entity === "adjustment" && action === "corrected",
       ),
-    ).toHaveLength(5);
+    ).toHaveLength(6);
   });
 
   it("returns a conflict instead of overflowing safe aggregate paise", async () => {
