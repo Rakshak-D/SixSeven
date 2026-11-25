@@ -22,17 +22,18 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 | M1 — shared API contracts | INTEGRATED | PR #6 merged and main CI #14 passed. |
 | M2 — auth and project access | INTEGRATED | PR #7 merged and main CI #18 passed all 45 tests. |
 | M3 — material, worker and stock operations | VERIFIED | PR #8 PostgreSQL CI passed all 64 tests, including concurrent ledger writes and repeated demo seeding. |
+| M4 — attendance, wage accounting and corrections | IN_PROGRESS | Labour APIs, exact wage reports, append-only migrations, PostgreSQL verification and integration required before merge. |
 | Demo readiness | PLANNED | Requires implemented paths plus isolated test data and an exercised journey. |
 
 ## Priorities
 
-- P0: implement auth, project membership and core site operations after contract integration.
-- P1: financial reporting, progress and audit operations.
+- P0: complete attendance and project-scoped operational records.
+- P1: labour accounting, corrections, financial reporting, progress and audit operations.
 - P2: proposals and reviewed checklist drafts.
 
 ## Status snapshot
 
-- Overall: M3 adds the material and worker APIs plus transactional deliveries, usage, stock balances and movement history.
+- Overall: M4 is implementing attendance, wage payments, correction history, exact wage calculations and downloadable wage sheets on top of the verified M3 stock ledger.
 - Frontend: FRONTEND_LEDGER.md already has Claude's initialization and backend requests; Codex leaves it unchanged.
 
 ## Integration checkpoints
@@ -46,7 +47,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 ## Blockers
 
 - Event start/end time and confirmed schedule not supplied.
-- Remaining domain workflows require API handlers and their corresponding service and database checks.
+- M4 PostgreSQL integration and CI verification remain pending on `be/labour-accounting`.
 - GitHub reports main as unprotected. Repository rulesets were empty at M0 inspection; do not change settings without approval. Enforce PR-only behavior in agent instructions.
 - No project-local database was started or verified in M0.
 
@@ -69,4 +70,4 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 
 ## Next authorized milestone
 
-Recommended next scope is attendance with daily-rate snapshots and append-only corrections, including compensating stock movements through the existing ledger service.
+After M4 is merged and main CI is verified, the next scope is the owner budget summary, progress/photo storage and project activity visibility.

@@ -46,3 +46,21 @@ Maintained by Codex. Amend decisions only when new evidence or an approved speci
 - Rejected alternatives: leave persistent project data in Docker-managed named volumes or install package tools globally.
 - Trade-off: local DB data is tied to the checkout and is not shared; Docker Engine image/container state remains outside the repository.
 - Impact on Claude: shared local-development instructions now describe workspace-local data paths; no Docker process or database was started by M0.
+
+## D-006 — Sequence append-only labour corrections
+
+- Context: corrections can arrive concurrently for the same attendance, payment, delivery or usage, and timestamps or UUID order do not identify the latest effective value reliably.
+- Decision: serialize each correction on its original row with `FOR UPDATE` and order the immutable correction records by a database identity sequence. A trigger also rejects correction targets outside the supplied project and compensating stock movements as correction targets.
+- Reason: the second concurrent correction must calculate from the first committed effective value, while the original record remains unchanged.
+- Rejected alternatives: timestamps, random IDs, or updating an effective-value cache on original ledger rows.
+- Trade-off: all corrections to one original record serialize; unrelated records remain concurrent.
+- Impact on Claude: read contracts return original and effective values and a stable newest-first correction history without exposing internal sequence numbers.
+
+## D-007 — Keep wage calculations in checked integer arithmetic
+
+- Context: attendance, payments and their corrections must produce stable paise totals, including overpayment balances and reports during concurrent writes.
+- Decision: calculate from a repeatable-read PostgreSQL snapshot with checked `BigInt`; reject totals outside JavaScript's safe-integer JSON range. CSV stores paise as integer values and PDF prints `INR` amounts using the same calculated response.
+- Reason: avoid binary floating-point money arithmetic and inconsistent totals across JSON and exports.
+- Rejected alternatives: floating-point totals, export-specific calculations, or adding an external PDF dependency.
+- Trade-off: a report whose exact totals exceed the published JSON integer range returns a conflict instead of truncating.
+- Impact on Claude: all report formats derive from the same worker and project totals; PDF uses an ASCII currency label for reliable rendering.

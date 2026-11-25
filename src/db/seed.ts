@@ -1,13 +1,26 @@
 import { and, eq, sql as expression } from "drizzle-orm";
 import { createAuth } from "@/server/auth";
+import { recordAudit } from "@/server/services/audit";
 import { appendStockMovement } from "@/server/services/stock-ledger";
+import { CreateAdjustmentInput } from "@/shared/schemas/adjustments";
+import { CreateAttendanceInput } from "@/shared/schemas/attendance";
 import { DemoAccountEmail } from "@/shared/schemas/auth";
 import { CreateDeliveryInput } from "@/shared/schemas/deliveries";
 import { CreateUsageInput } from "@/shared/schemas/usages";
+import { CreateWagePaymentInput } from "@/shared/schemas/wages";
 import { account, user } from "./auth-schema";
 import { getDatabase } from "./client";
 import { disposableDatabase } from "./config";
-import { materials, projectMembers, projects, stockMovements, workers } from "./schema";
+import {
+  adjustments,
+  attendance,
+  materials,
+  projectMembers,
+  projects,
+  stockMovements,
+  wagePayments,
+  workers,
+} from "./schema";
 
 const identities = {
   owner: { email: DemoAccountEmail.owner, name: "Demo Owner" },
@@ -257,6 +270,257 @@ async function seed() {
           },
         ])
         .onConflictDoNothing();
+
+      const demoAttendance = [
+        {
+          id: "demo-attendance-mason-full",
+          workerId: "demo-mason",
+          workDate: "2026-11-20",
+          halfDays: 2,
+          ratePaise: 90_000,
+        },
+        {
+          id: "demo-attendance-mason-half",
+          workerId: "demo-mason",
+          workDate: "2026-11-21",
+          halfDays: 1,
+          ratePaise: 90_000,
+        },
+        {
+          id: "demo-attendance-helper-absent",
+          workerId: "demo-helper",
+          workDate: "2026-11-21",
+          halfDays: 0,
+          ratePaise: 60_000,
+        },
+      ] as const;
+      for (const fixture of demoAttendance) {
+        const [existing] = await tx.select().from(attendance).where(eq(attendance.id, fixture.id));
+        if (existing) {
+          if (
+            existing.projectId !== projectId ||
+            existing.workerId !== fixture.workerId ||
+            existing.workDate !== fixture.workDate ||
+            existing.halfDays !== fixture.halfDays ||
+            existing.ratePaise !== fixture.ratePaise
+          )
+            throw new Error("A reserved demo attendance ID is already in use");
+          continue;
+        }
+        const input = CreateAttendanceInput.parse({
+          workDate: fixture.workDate,
+          entries: [{ workerId: fixture.workerId, halfDays: fixture.halfDays }],
+        });
+        const [entry] = input.entries;
+        const [worker] = await tx
+          .select({ dailyRatePaise: workers.dailyRatePaise })
+          .from(workers)
+          .where(and(eq(workers.projectId, projectId), eq(workers.id, entry.workerId)));
+        if (!worker || worker.dailyRatePaise !== fixture.ratePaise)
+          throw new Error("Reserved demo worker daily rate changed");
+        await tx.insert(attendance).values({
+          id: fixture.id,
+          projectId,
+          workerId: entry.workerId,
+          workDate: input.workDate,
+          halfDays: entry.halfDays,
+          ratePaise: worker.dailyRatePaise,
+          createdBy: contractor,
+        });
+        await recordAudit(tx, {
+          projectId,
+          actorId: contractor,
+          action: "created",
+          entity: "attendance",
+          entityId: fixture.id,
+        });
+      }
+
+      const demoPayments = [
+        {
+          id: "demo-wage-payment-mason",
+          input: {
+            workerId: "demo-mason",
+            amountPaise: 90_000,
+            kind: "wage",
+            mode: "bank",
+            paidOn: "2026-11-22",
+            reference: "DEMO-WAGE-001",
+          },
+        },
+        {
+          id: "demo-wage-advance-mason",
+          input: {
+            workerId: "demo-mason",
+            amountPaise: 20_000,
+            kind: "advance",
+            mode: "cash",
+            paidOn: "2026-11-23",
+          },
+        },
+      ] as const;
+      for (const fixture of demoPayments) {
+        const input = CreateWagePaymentInput.parse(fixture.input);
+        const [existing] = await tx
+          .select()
+          .from(wagePayments)
+          .where(eq(wagePayments.id, fixture.id));
+        if (existing) {
+          if (
+            existing.projectId !== projectId ||
+            existing.workerId !== input.workerId ||
+            existing.amountPaise !== input.amountPaise ||
+            existing.kind !== input.kind ||
+            existing.mode !== input.mode ||
+            existing.paidOn !== input.paidOn
+          )
+            throw new Error("A reserved demo wage payment ID is already in use");
+          continue;
+        }
+        await tx.insert(wagePayments).values({
+          id: fixture.id,
+          projectId,
+          ...input,
+          reference: input.reference ?? null,
+          createdBy: contractor,
+        });
+        await recordAudit(tx, {
+          projectId,
+          actorId: contractor,
+          action: "created",
+          entity: "wagePayment",
+          entityId: fixture.id,
+        });
+      }
+
+      const attendanceCorrection = CreateAdjustmentInput.parse({
+        targetTable: "attendance",
+        targetId: "demo-attendance-mason-half",
+        newValue: 2,
+        reason: "Verified signed attendance register",
+      });
+      const [attendanceCorrectionRow] = await tx
+        .select()
+        .from(adjustments)
+        .where(eq(adjustments.id, "demo-correction-attendance-mason"));
+      if (!attendanceCorrectionRow) {
+        const existingTargetCorrection = await tx
+          .select({ id: adjustments.id })
+          .from(adjustments)
+          .where(
+            and(
+              eq(adjustments.projectId, projectId),
+              eq(adjustments.targetTable, attendanceCorrection.targetTable),
+              eq(adjustments.targetId, attendanceCorrection.targetId),
+            ),
+          );
+        if (existingTargetCorrection.length > 0)
+          throw new Error("Reserved demo attendance already has an unrelated correction");
+        await tx.insert(adjustments).values({
+          id: "demo-correction-attendance-mason",
+          projectId,
+          targetTable: attendanceCorrection.targetTable,
+          targetId: attendanceCorrection.targetId,
+          oldValue: "1",
+          newValue: String(attendanceCorrection.newValue),
+          reason: attendanceCorrection.reason,
+          actorId: contractor,
+        });
+        await recordAudit(tx, {
+          projectId,
+          actorId: contractor,
+          action: "corrected",
+          entity: "adjustment",
+          entityId: "demo-correction-attendance-mason",
+          payload: {
+            targetTable: attendanceCorrection.targetTable,
+            targetId: attendanceCorrection.targetId,
+          },
+        });
+      } else if (
+        attendanceCorrectionRow.targetId !== attendanceCorrection.targetId ||
+        attendanceCorrectionRow.targetTable !== attendanceCorrection.targetTable ||
+        attendanceCorrectionRow.oldValue !== "1.000" ||
+        attendanceCorrectionRow.newValue !== "2.000"
+      ) {
+        throw new Error("Reserved demo attendance correction ID is already in use");
+      }
+
+      const stockCorrectionInput = CreateAdjustmentInput.parse({
+        targetTable: "stock_movements",
+        targetId: "demo-stock-cement-in",
+        newValue: 118,
+        reason: "Corrected the cement delivery quantity",
+      });
+      const [stockCorrectionRow] = await tx
+        .select()
+        .from(adjustments)
+        .where(eq(adjustments.id, "demo-correction-stock-cement"));
+      const [compensationMovement] = await tx
+        .select({ id: stockMovements.id })
+        .from(stockMovements)
+        .where(eq(stockMovements.id, "demo-stock-cement-correction"));
+      if (Boolean(stockCorrectionRow) !== Boolean(compensationMovement))
+        throw new Error("Reserved demo stock correction is incomplete");
+      if (!stockCorrectionRow && !compensationMovement) {
+        const existingTargetCorrection = await tx
+          .select({ id: adjustments.id })
+          .from(adjustments)
+          .where(
+            and(
+              eq(adjustments.projectId, projectId),
+              eq(adjustments.targetTable, stockCorrectionInput.targetTable),
+              eq(adjustments.targetId, stockCorrectionInput.targetId),
+            ),
+          );
+        if (existingTargetCorrection.length > 0)
+          throw new Error("Reserved demo delivery already has an unrelated correction");
+        await appendStockMovement(
+          tx,
+          { userId: contractor },
+          projectId,
+          {
+            type: "adjustment",
+            materialId: "demo-cement",
+            occurredOn: "2026-11-19",
+            note: "Compensating stock correction",
+            quantityMilli: BigInt(-2_000),
+          },
+          "demo-stock-cement-correction",
+          {
+            targetTable: stockCorrectionInput.targetTable,
+            targetId: stockCorrectionInput.targetId,
+          },
+        );
+        await tx.insert(adjustments).values({
+          id: "demo-correction-stock-cement",
+          projectId,
+          targetTable: stockCorrectionInput.targetTable,
+          targetId: stockCorrectionInput.targetId,
+          oldValue: "120.000",
+          newValue: "118.000",
+          reason: stockCorrectionInput.reason,
+          actorId: contractor,
+        });
+        await recordAudit(tx, {
+          projectId,
+          actorId: contractor,
+          action: "corrected",
+          entity: "adjustment",
+          entityId: "demo-correction-stock-cement",
+          payload: {
+            targetTable: stockCorrectionInput.targetTable,
+            targetId: stockCorrectionInput.targetId,
+          },
+        });
+      } else if (
+        stockCorrectionRow?.targetId !== stockCorrectionInput.targetId ||
+        stockCorrectionRow.targetTable !== stockCorrectionInput.targetTable ||
+        stockCorrectionRow.oldValue !== "120.000" ||
+        stockCorrectionRow.newValue !== "118.000"
+      ) {
+        throw new Error("Reserved demo stock correction ID is already in use");
+      }
     });
     console.log("Demo records are ready");
   } finally {

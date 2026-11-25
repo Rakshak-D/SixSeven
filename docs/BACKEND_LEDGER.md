@@ -2,6 +2,21 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — M4 labour accounting implementation
+
+- Timestamp: 2026-11-25 17:04:10+05:30
+- Milestone/task ID: M4
+- Branch: be/labour-accounting
+- Scope: attendance and wage-payment records, effective correction history, exact wage sheets in JSON/CSV/PDF, and synthetic idempotent labour fixtures.
+- Files affected: new Drizzle migration and labour tables; attendance, payment, correction and wage-report services/routes; stock-ledger exact signed-milli support; API/database tests; seed snapshot; API, project and decision documentation.
+- API or database changes: migration 0003 adds attendance, wage_payments and adjustments, project-scoped worker FKs, value constraints, indexed identity ordering, target validation, and append-only update/delete/truncate guards. Added the three read endpoints and wage-sheet JSON/CSV/PDF implementation using existing contracts.
+- Verification commands and outcomes: `corepack pnpm exec biome check --line-ending=crlf --javascript-formatter-line-ending=crlf --json-formatter-line-ending=crlf <M4 files>` — PASS; `corepack pnpm typecheck` — PASS; `corepack pnpm exec vitest run tests/api/labour-openapi.test.ts src/shared` — PASS, 31 tests in 4 files; `corepack pnpm build` — PASS. The focused OpenAPI test first failed on missing routes and passed after registration. PostgreSQL migration, integration tests and full CI are pending; no local PostgreSQL service was started.
+- Dependencies added: none.
+- Known limitations: real PostgreSQL behavior, migration upgrade, concurrent requests, audit rollback, repeated seed and the full suite remain unverified until hosted PostgreSQL CI completes.
+- Frontend implications: no frontend implementation, API client or frontend ledger changed. Existing merged shared contracts are implemented by the new backend handlers; engineer access to worker-level labour reports is denied.
+- Commit or PR reference: pending.
+- Next action: review the exact diff, commit and push the implementation, open its PR, and use PostgreSQL CI to resolve any migration or integration failures before merge.
+
 ## Entry — M3 material and stock operations
 
 - Timestamp: 2026-11-25 16:20:28+05:30

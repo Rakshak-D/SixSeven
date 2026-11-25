@@ -29,21 +29,16 @@ app.route("/", workers);
 app.route("/", deliveries);
 app.route("/", usages);
 app.route("/", stock);
-
-for (const router of [
-  health,
-  attendance,
-  wagePayments,
-  adjustments,
-  summary,
-  wageSheet,
-  progress,
-  proposals,
-  activity,
-  checklists,
-]) {
-  app.route("/", router);
-}
+app.route("/", health);
+app.route("/", attendance);
+app.route("/", wagePayments);
+app.route("/", adjustments);
+app.route("/", summary);
+app.route("/", wageSheet);
+app.route("/", progress);
+app.route("/", proposals);
+app.route("/", activity);
+app.route("/", checklists);
 
 app.doc("/doc", {
   openapi: "3.0.0",
