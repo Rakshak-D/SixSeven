@@ -11,11 +11,12 @@ import {
   CreateChecklistDraftInput,
   ReviewChecklistItemInput,
   SaveChecklistInput,
+  SteelProofPhotos,
   VerifiedChecklistItemResponse,
   VerifiedChecklistResponse,
   VerifiedChecklistsResponse,
 } from "@/shared/schemas/checklist";
-import { IdParams, Note } from "@/shared/schemas/common";
+import { Id, IdParams, Note } from "@/shared/schemas/common";
 import { CaptureTimestampParts, PhotoFile } from "@/shared/schemas/progress";
 import { json, projectAuth, projectBody, projectErrors } from "../lib/project-route";
 import { createRouter } from "../lib/router";
@@ -32,6 +33,7 @@ import {
 } from "../services/checklists";
 import { validateImageUpload } from "../services/photo-storage";
 import { requireProjectAccess } from "../services/projects";
+import { getSteelProofPhoto, listSteelProof, uploadSteelProof } from "../services/steel-proof";
 
 const database = () => getDatabase().db;
 const binaryFile = PhotoFile.openapi({ type: "string", format: "binary" });
@@ -40,6 +42,14 @@ const completionInput = z.strictObject({
   photos: z.union([binaryFile, z.array(binaryFile).min(1).max(10)]),
   capturedAt: CaptureTimestampParts,
 });
+const steelCaptureTimestamp = z.iso.datetime({ offset: true });
+const steelProofInput = z.strictObject({
+  progressId: Id,
+  note: Note,
+  photos: z.union([binaryFile, z.array(binaryFile).min(1).max(3)]),
+  capturedAt: z.union([steelCaptureTimestamp, z.array(steelCaptureTimestamp).min(1).max(3)]),
+});
+const binary = z.string().openapi({ format: "binary" });
 const draftForm = CreateChecklistDraftInput.extend({
   plan: binaryFile.optional(),
   floors: z.coerce.number().int().min(1).max(100).optional(),
@@ -70,6 +80,12 @@ const completionAccess = createMiddleware<AuthEnv>(async (c, next) => {
   const params = IdParams.safeParse(c.req.param());
   if (!params.success) throw invalid("Invalid checklist item ID");
   await accessItem(database(), c.get("actor"), params.data.id, "contractor");
+  await next();
+});
+const steelAccess = createMiddleware<AuthEnv>(async (c, next) => {
+  const params = IdParams.safeParse(c.req.param());
+  if (!params.success) throw invalid("Invalid checklist item ID");
+  await accessItem(database(), c.get("actor"), params.data.id, "engineer");
   await next();
 });
 const errors = {
@@ -213,4 +229,73 @@ export const checklists = createRouter<AuthEnv>()
         await reviewItem(database(), c.get("actor"), c.req.valid("param").id, c.req.valid("json")),
         200,
       ),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/checklist-items/{id}/steel-proof",
+      middleware: [requireActor, steelAccess, limit(15_100_000)],
+      request: {
+        params: IdParams,
+        body: { required: true, content: { "multipart/form-data": { schema: steelProofInput } } },
+      },
+      responses: {
+        201: { description: "Protected steel evidence recorded", content: json(SteelProofPhotos) },
+        ...errors,
+        ...oversized,
+      },
+    }),
+    async (c) => {
+      const { photos, capturedAt, ...fields } = c.req.valid("form");
+      return c.json(
+        await uploadSteelProof(database(), c.get("actor"), c.req.valid("param").id, {
+          ...fields,
+          photos: [photos].flat(),
+          capturedAt: [capturedAt].flat(),
+        }),
+        201,
+      );
+    },
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/checklist-items/{id}/steel-proof",
+      middleware: projectAuth,
+      request: { params: IdParams },
+      responses: {
+        200: { description: "Steel evidence metadata", content: json(SteelProofPhotos) },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(await listSteelProof(database(), c.get("actor"), c.req.valid("param").id), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/checklist-items/{id}/steel-proof/{photoId}",
+      middleware: projectAuth,
+      request: { params: z.strictObject({ id: Id, photoId: Id }) },
+      responses: {
+        200: {
+          description: "Protected steel image",
+          content: {
+            "image/jpeg": { schema: binary },
+            "image/png": { schema: binary },
+            "image/webp": { schema: binary },
+          },
+        },
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { id, photoId } = c.req.valid("param");
+      const photo = await getSteelProofPhoto(database(), c.get("actor"), id, photoId);
+      return c.body(Uint8Array.from(photo.bytes), 200, {
+        "Content-Type": photo.mime,
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      });
+    },
   );

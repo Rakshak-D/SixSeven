@@ -1,7 +1,13 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Db, Transaction } from "@/db/client";
-import { checklistDrafts, checklistEvents, checklistItems, checklistRecords } from "@/db/schema";
+import {
+  checklistDrafts,
+  checklistEvents,
+  checklistItems,
+  checklistRecords,
+  checklistSteelPhotos,
+} from "@/db/schema";
 import { generateAiChecklist } from "@/server/ai/checklist";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
@@ -83,6 +89,7 @@ function serializeItem(item: Item, history: (typeof checklistEvents.$inferSelect
     materials,
     status,
     verificationStatus: state,
+    ...(item.requiresSteelProof && { requiresSteelProof: true }),
     removedAt: removedAt?.toISOString() ?? null,
     history: history.map(({ id, kind, actorId, createdAt, note, previous, next, progressId }) => ({
       id,
@@ -327,6 +334,25 @@ export function reviewItem(
     if (submission?.progressId !== input.progressId)
       throw conflict("Review must identify the current submission");
     const accepted = input.decision === "accept";
+    if (accepted && locked.requiresSteelProof) {
+      const [steel] = await tx
+        .select({ id: checklistSteelPhotos.id })
+        .from(checklistSteelPhotos)
+        .where(
+          and(
+            eq(checklistSteelPhotos.projectId, locked.projectId),
+            eq(checklistSteelPhotos.itemId, id),
+            eq(checklistSteelPhotos.progressId, input.progressId),
+          ),
+        )
+        .limit(1);
+      if (!steel)
+        throw new ApiError(
+          409,
+          ErrorCode.STEEL_PROOF_REQUIRED,
+          "Upload engineer steel-marking evidence for the current submission",
+        );
+    }
     return transition(tx, actor, locked, ["waiting"], accepted ? "done" : "sent_back", {
       kind: accepted ? "accepted" : "sent_back",
       note: input.note,
@@ -356,7 +382,7 @@ export async function applyChecklistAdd(
     .limit(1);
   const position = (last?.position ?? -1) + 1;
   if (position >= 40) throw conflict("Checklist already has forty historical items");
-  const { phase, task, materials, reason } = input;
+  const { phase, task, materials, reason, requiresSteelProof } = input;
   const [item] = await tx
     .insert(checklistItems)
     .values({
@@ -367,6 +393,7 @@ export async function applyChecklistAdd(
       phase,
       task,
       materials,
+      requiresSteelProof,
     })
     .returning();
   if (!item) throw new Error("Checklist item insert did not return a row");

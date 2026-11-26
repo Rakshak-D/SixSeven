@@ -63,6 +63,8 @@ AGENTS.md is canonical. Root and nested CLAUDE.md files reference the correspond
 
 AI SDK packages remain available for deferred provider work.
 
+Supplier payments and medical reimbursements use a mock provider. Use synthetic account data when demonstrating these workflows. No funds move.
+
 ## Dependency licenses
 
 The following is the inherited declared dependency/license inventory. Codex maintains it with any future approved dependency change; licenses have not been independently re-audited in M0.

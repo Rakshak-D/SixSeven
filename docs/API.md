@@ -143,6 +143,16 @@ All routes require a session. Item IDs resolve to their project before checking 
 Checklist reads and saves retain the legacy display status and add verificationStatus, removedAt and history to items. Clients use verificationStatus for todo, doing, waiting, done and sent_back. Filter removed items using removedAt. History links submission evidence to progress IDs in the project timeline. The live PATCH accepts rename input only. The legacy status-write schema remains exported for existing development fixtures.
 
 Checklist drafts return source template. An AI request satisfying the existing input contract receives the deterministic template with fallbackReason unavailable. This milestone selects no provider and requires no AI credentials. Proposal and checklist handlers are implemented in M6. A checklist can hold forty historical items, including soft removals. Drafts can be saved once, by their creating engineer. Proposals record one owner decision without changing budget or creating a payment.
+## Delivery verification and bag usage
+
+| Operation | Role | Input | Success |
+| --- | --- | --- | --- |
+| GET /projects/:id/deliveries-to-verify | Engineer | Project ID | 200 `DeliveryVerificationQueue`, without prices |
+| POST /projects/:id/deliveries/:deliveryId/verify | Engineer | `VerifyDeliveryInput` | 200 `DeliveryVerificationResponse` |
+| POST /deliveries/:id/bag-codes | Engineer | `RegisterBagCodesInput` | 200 `DeliveryVerificationResponse` |
+
+Set `tracksBags: true` when creating a material to require whole-bag deliveries and one registered code per used bag. Existing materials and bulk quantities retain their original quantity workflows. Supply `bagCodes` on a tracked usage. Codes are trimmed and case-sensitive, unique within a project. A 409 with `BAG_CODE_UNKNOWN`, `BAG_CODE_USED`, or `BAG_CODE_WRONG_MATERIAL` identifies the failed constraint. Wrong counts and duplicate codes in one input return 400. Codes and usage movements commit together. A tracked or verified movement cannot be corrected using a quantity-only stock adjustment. A delivery recorded by accepting an expected arrival enters the same verification queue. Members can access the delivery's existing protected challan photo where present. Verification attests to the engineer's record of issued identifiers. It does not establish the physical material's authenticity.
+
 ## Change requests
 
 The shared schemas and inferred types are available in `src/shared/schemas/change-requests.ts`. The JSON routes cover checklist and attendance changes. Medical expense requests use the multipart route below. Use a note of at least ten characters when submitting a checklist or attendance request. Frontend integration is tracked separately.
@@ -162,3 +172,38 @@ All writes require a nonblank `note`. The server derives the actor and role from
 Engineer requests start at `pending_contractor`. The contractor advances them to `pending_owner` or marks them `rejected_contractor`. Only the author can reopen a contractor-rejected request. Contractor-authored requests start at `pending_owner`. The owner accepts and applies the change in the same transaction or marks it `rejected_owner`. Owner outcomes are final. Rejected requests are excluded from the pending owner queue. Task proof and its engineer review remain separate.
 
 An attendance target ID references the attendance row. Actual half-days and paid entitlement are separate, and only a medical emergency allows a full-day pay override. Medical approval requires `payPaise` between 1 and the bill amount. Other decisions reject that field. Accepted medical requests identify `reimbursementProvider: "mock"`; no money moves. The expense is counted once on the incident date. Medical records and receipts are restricted to the author and the authorized contractor and owner reviewers. The server stores the capture and receipt times and allows up to ten minutes of age and 30 seconds of forward clock skew. A client timestamp does not authenticate camera provenance.
+
+## Steel-marking evidence
+
+Checklist creation and approved checklist additions may set `requiresSteelProof: true`. The existing review operation returns 409 `STEEL_PROOF_REQUIRED` if an engineer accepts a flagged item without evidence attached to the current contractor submission. Send-back remains available. A resubmission gets a new progress ID and requires a new set of evidence.
+
+| Operation | Role | Request and response |
+|---|---|---|
+| POST /checklist-items/:id/steel-proof | Engineer | Multipart `progressId`, `note`, one to three `photos` and exactly one ISO `capturedAt` per image in order. Returns 201 `SteelProofPhotos`. |
+| GET /checklist-items/:id/steel-proof | Members | Returns 200 `SteelProofPhotos`, including the progress ID for each photo. |
+| GET /checklist-items/:id/steel-proof/:photoId | Members | Protected JPEG, PNG or WebP with private, no-store caching. |
+
+Maximum 5,000,000 bytes per image. Captures more than ten minutes old or more than 30 seconds in the future are rejected. An item can have one upload per submission. Previous evidence remains readable. The server records receipt independently of the client timestamp. The upload records visual evidence and its submitting engineer. It cannot authenticate steel quality.
+
+## Supplier orders and mock payments
+
+All operations in this section require owner membership in the resource's project. Cross-project resources return 404. Shared contracts are in `supplier-payments.ts`. The backend is implemented. The frontend still requires live API wiring.
+
+| Operation | Body or query | Response |
+|---|---|---|
+| GET /projects/:id/suppliers | None | 200 `SuppliersResponse` |
+| POST /projects/:id/suppliers | `CreateSupplierInput` | 201 `SupplierWriteResponse` |
+| POST /suppliers/:id/approve | `SupplierNoteInput` | 200 `SupplierWriteResponse` |
+| POST /suppliers/:id/bank-change | `ChangeSupplierBankInput` | 200 `SupplierWriteResponse` |
+| POST /suppliers/:id/bank-change/approve | `SupplierNoteInput` | 200 `SupplierWriteResponse` |
+| PUT /suppliers/:id/autopay | `SetSupplierAutopayInput` | 200 `SupplierWriteResponse` |
+| PUT /projects/:id/autopay | `PauseSupplierPaymentsInput` | 200 `SupplierWriteResponse` |
+| POST /projects/:id/orders | `CreateSupplierOrderInput` | 201 `SupplierWriteResponse` |
+| GET /projects/:id/supplier-payments | `SupplierPaymentsQuery` | 200 `SupplierPaymentsOverview` |
+| GET /projects/:id/payments | `SupplierPaymentsQuery` | 200 `SupplierPaymentsResponse` |
+| POST /supplier-payments/:id/decision | `DecideSupplierPaymentInput` | 200 `SupplierWriteResponse` |
+| POST /payments/approve | `ApproveSupplierPaymentsInput` | 200 `SupplierWriteResponse` |
+
+Use synthetic bank identifiers. The backend stores masked bank data only. A change needs explicit owner confirmation and a 24-hour cooldown. Pending and cooling-down changes hold release. Both release paths require a verified delivery covered in full by a single approved supplier order for the same material. Enabled mandates enforce per-bill and cumulative Monday-to-Sunday IST limits. Pause disables automatic releases while preserving deliberate owner decisions within applicable caps. Conflict (409) covers ineligible or already-decided requests. Batch approval is atomic. The amount uses exact quantity × price with half-up rounding to whole paise. The receipt's `provider` is always `mock`.
+
+The owner summary may include `fraudFlags` with the detected condition, description and source ID. Rules are deterministic signals for owner review and are not proof of fraud.

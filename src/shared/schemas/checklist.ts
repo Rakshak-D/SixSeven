@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Id, Label, Timestamp } from "./common";
-import { PhotoFile } from "./progress";
+import { PhotoFile, PhotoResponse } from "./progress";
 
 export const ChecklistPhase = z.enum([
   "foundation",
@@ -55,6 +55,7 @@ const ApprovedItem = z.strictObject({
   phase: ChecklistPhase,
   task: z.string().trim().min(1).max(120),
   materials: z.array(Label).max(5),
+  requiresSteelProof: z.boolean().optional(),
 });
 export const SaveChecklistInput = z.strictObject({
   draftId: Id,
@@ -135,3 +136,11 @@ export const VerifiedChecklistsResponse = z.array(VerifiedChecklistResponse);
 export type VerifiedChecklistItemResponse = z.infer<typeof VerifiedChecklistItemResponse>;
 export type VerifiedChecklistResponse = z.infer<typeof VerifiedChecklistResponse>;
 export type VerifiedChecklistsResponse = z.infer<typeof VerifiedChecklistsResponse>;
+export const SteelProofPhoto = PhotoResponse.extend({
+  progressId: Id,
+  capturedAt: Timestamp,
+  receivedAt: Timestamp,
+});
+export const SteelProofPhotos = z.array(SteelProofPhoto);
+export type SteelProofPhoto = z.infer<typeof SteelProofPhoto>;
+export type SteelProofPhotos = z.infer<typeof SteelProofPhotos>;

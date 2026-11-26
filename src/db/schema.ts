@@ -243,6 +243,7 @@ export const materials = pgTable(
   "materials",
   {
     id: text().primaryKey(),
+    tracksBags: boolean("tracks_bags").notNull().default(false),
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id),
@@ -444,6 +445,187 @@ export const stockMovements = pgTable(
         (${t.type} <> 'usage' or ${t.qty} < 0)
         and ${t.supplier} is null and ${t.challanNo} is null and ${t.unitCostPaise} is null)
     )`,
+    ),
+  ],
+);
+
+export const deliveryVerifications = pgTable(
+  "delivery_verifications",
+  {
+    projectId: text("project_id").notNull(),
+    deliveryId: text("delivery_id").primaryKey(),
+    verifiedBy: text("verified_by").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().defaultNow(),
+    note: text().notNull(),
+    bagCodeCount: integer("bag_code_count").notNull(),
+    verifiedQty: quantity("verified_qty").notNull(),
+  },
+  (t) => [
+    unique("delivery_verification_scope").on(t.projectId, t.deliveryId),
+    foreignKey({
+      name: "delivery_verification_movement",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    foreignKey({
+      name: "delivery_verification_actor",
+      columns: [t.projectId, t.verifiedBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    check("delivery_verification_count", sql`${t.bagCodeCount} between 0 and 5000`),
+    check(
+      "delivery_verification_qty",
+      sql`${t.verifiedQty} > 0 and (${t.bagCodeCount} = 0 or ${t.bagCodeCount} = ${t.verifiedQty})`,
+    ),
+  ],
+);
+
+export const materialBagCodes = pgTable(
+  "material_bag_codes",
+  {
+    projectId: text("project_id").notNull(),
+    code: text().notNull(),
+    deliveryId: text("delivery_id").notNull(),
+    materialId: text("material_id").notNull(),
+    consumedBy: text("consumed_by"),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.code] }),
+    foreignKey({
+      name: "bag_code_delivery_scope",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [deliveryVerifications.projectId, deliveryVerifications.deliveryId],
+    }),
+    foreignKey({
+      name: "bag_code_material_scope",
+      columns: [t.projectId, t.materialId],
+      foreignColumns: [materials.projectId, materials.id],
+    }),
+    foreignKey({
+      name: "bag_code_usage_scope",
+      columns: [t.projectId, t.consumedBy],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    check("bag_code_consumption_pair", sql`(${t.consumedBy} is null) = (${t.consumedAt} is null)`),
+  ],
+);
+
+export const supplierProjectRules = pgTable("supplier_project_rules", {
+  projectId: text("project_id")
+    .primaryKey()
+    .references(() => projects.id),
+  paused: boolean().notNull().default(false),
+});
+
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    name: text().notNull(),
+    gstin: text().notNull(),
+    accountLast4: text("account_last4").notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    pendingLast4: text("pending_last4"),
+    bankRequestedAt: timestamp("bank_requested_at", { withTimezone: true }),
+    bankEffectiveAt: timestamp("bank_effective_at", { withTimezone: true }),
+    autopayEnabled: boolean("autopay_enabled").notNull().default(false),
+    autopayPaused: boolean("autopay_paused").notNull().default(false),
+    perBillCapPaise: paise("per_bill_cap_paise").notNull().default(0),
+    perWeekCapPaise: paise("per_week_cap_paise").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("supplier_project_pair").on(t.projectId, t.id),
+    unique("supplier_project_gstin").on(t.projectId, t.gstin),
+    uniqueIndex("supplier_project_name").on(t.projectId, sql`lower(btrim(${t.name}))`),
+    check(
+      "supplier_account_mask",
+      sql`${t.accountLast4} ~ '^[0-9]{4}$' and (${t.pendingLast4} is null or ${t.pendingLast4} ~ '^[0-9]{4}$')`,
+    ),
+    check(
+      "supplier_valid_caps",
+      sql`${t.perBillCapPaise} between 0 and 9007199254740991 and ${t.perWeekCapPaise} between 0 and 9007199254740991 and
+    (not ${t.autopayEnabled} or (${t.perBillCapPaise} > 0 and ${t.perWeekCapPaise} >= ${t.perBillCapPaise}))`,
+    ),
+  ],
+);
+
+export const supplierOrders = pgTable(
+  "supplier_orders",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    supplierId: text("supplier_id").notNull(),
+    materialId: text("material_id").notNull(),
+    qty: quantity("qty").notNull(),
+    remainingQty: quantity("remaining_qty").notNull(),
+    maxUnitPricePaise: paise("max_unit_price_paise").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("supplier_order_scope").on(t.projectId, t.id),
+    foreignKey({
+      name: "supplier_order_supplier_scope",
+      columns: [t.projectId, t.supplierId],
+      foreignColumns: [suppliers.projectId, suppliers.id],
+    }),
+    foreignKey({
+      name: "supplier_order_material_scope",
+      columns: [t.projectId, t.materialId],
+      foreignColumns: [materials.projectId, materials.id],
+    }),
+    index("supplier_order_match").on(t.projectId, t.supplierId, t.materialId, t.createdAt),
+    check(
+      "supplier_order_limits",
+      sql`${t.qty} > 0 and ${t.remainingQty} between 0 and ${t.qty} and ${t.maxUnitPricePaise} between 1 and 9007199254740991`,
+    ),
+  ],
+);
+
+export const supplierPayments = pgTable(
+  "supplier_payments",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    deliveryId: text("delivery_id").notNull().unique(),
+    supplierId: text("supplier_id"),
+    orderId: text("order_id"),
+    status: text().$type<"pending" | "paid" | "declined">().notNull().default("pending"),
+    amountPaise: paise("amount_paise").notNull().default(0),
+    paidBy: text("paid_by").$type<"autopay" | "owner">(),
+    decisionNote: text("decision_note"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "supplier_payment_verified_delivery",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [deliveryVerifications.projectId, deliveryVerifications.deliveryId],
+    }),
+    foreignKey({
+      name: "supplier_payment_supplier_scope",
+      columns: [t.projectId, t.supplierId],
+      foreignColumns: [suppliers.projectId, suppliers.id],
+    }),
+    foreignKey({
+      name: "supplier_payment_order_scope",
+      columns: [t.projectId, t.orderId],
+      foreignColumns: [supplierOrders.projectId, supplierOrders.id],
+    }),
+    index("supplier_payment_weekly_spend").on(t.projectId, t.supplierId, t.status, t.decidedAt),
+    check(
+      "supplier_payment_state",
+      sql`
+    (${t.status} = 'pending' and ${t.amountPaise} = 0 and ${t.decidedAt} is null and ${t.paidBy} is null)
+    or (${t.status} = 'paid' and ${t.amountPaise} between 1 and 9007199254740991 and ${t.decidedAt} is not null and
+      ${t.paidBy} is not null and ${t.paidBy} in ('autopay','owner') and ${t.supplierId} is not null and ${t.orderId} is not null)
+    or (${t.status} = 'declined' and ${t.amountPaise} = 0 and ${t.decidedAt} is not null and ${t.paidBy} is null)
+  `,
     ),
   ],
 );
@@ -751,6 +933,7 @@ export const checklistItems = pgTable(
     position: integer().notNull(),
     state: checklistState().notNull().default("todo"),
     removedAt: timestamp("removed_at", { withTimezone: true }),
+    requiresSteelProof: boolean("requires_steel_proof").notNull().default(false),
   },
   (t) => [
     foreignKey({
@@ -762,6 +945,47 @@ export const checklistItems = pgTable(
     unique("checklist_item_position").on(t.checklistId, t.position),
     check("checklist_item_task_valid", sql`length(btrim(${t.task})) between 1 and 120`),
     check("checklist_item_position_valid", sql`${t.position} between 0 and 39`),
+  ],
+);
+
+export const checklistSteelPhotos = pgTable(
+  "checklist_steel_photos",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    itemId: text("item_id").notNull(),
+    progressId: text("progress_id").notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    mime: text().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    createdBy: text("created_by").notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "steel_photo_proof_scope",
+      columns: [t.projectId, t.itemId, t.progressId],
+      foreignColumns: [
+        progressUpdates.projectId,
+        progressUpdates.checklistItemId,
+        progressUpdates.id,
+      ],
+    }),
+    foreignKey({
+      name: "steel_photo_actor_scope",
+      columns: [t.projectId, t.createdBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    index("steel_photo_item_proof").on(t.projectId, t.itemId, t.progressId),
+    check(
+      "steel_photo_capture_window",
+      sql`${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds'`,
+    ),
+    check(
+      "steel_photo_media",
+      sql`${t.sizeBytes} between 1 and 5000000 and ${t.mime} in ('image/jpeg','image/png','image/webp')`,
+    ),
   ],
 );
 

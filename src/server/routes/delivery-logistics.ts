@@ -12,16 +12,21 @@ import {
   CreateDeliveryInput,
   CreateExpectedDeliveryInput,
   DeliveryResponse,
+  DeliveryVerificationQueue,
+  DeliveryVerificationResponse,
   ExpectedDeliveriesQuery,
   ExpectedDeliveriesResponse,
   ExpectedDeliveryResponse,
+  RegisterBagCodesInput,
   RejectExpectedDeliveryInput,
+  VerifyDeliveryInput,
 } from "@/shared/schemas/deliveries";
 import { MaxPhotoBytes } from "@/shared/schemas/progress";
 import { json, projectAuth, projectBody, projectErrors } from "../lib/project-route";
 import { createRouter } from "../lib/router";
 import type { AuthEnv } from "../middleware/auth";
 import { ApiError } from "../middleware/errors";
+import { listVerificationQueue, verifyDelivery } from "../services/bag-verification";
 import { attachChallanPhoto, getChallanPhoto } from "../services/challan-photos";
 import {
   acceptExpectedDelivery,
@@ -219,5 +224,88 @@ export const deliveryLogistics = createRouter<AuthEnv>()
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
       });
+    },
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/projects/{id}/deliveries-to-verify",
+      tags: ["deliveries"],
+      middleware: projectAuth,
+      request: { params: IdParams },
+      responses: {
+        200: {
+          description: "Engineer verification queue, without prices",
+          content: json(DeliveryVerificationQueue),
+        },
+        ...projectErrors,
+      },
+    }),
+    async (c) =>
+      c.json(
+        await listVerificationQueue(getDatabase().db, c.get("actor"), c.req.valid("param").id),
+        200,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/projects/{id}/deliveries/{deliveryId}/verify",
+      tags: ["deliveries"],
+      middleware: projectAuth,
+      request: { ...projectBody(VerifyDeliveryInput), params: ChallanPhotoParams },
+      responses: {
+        200: {
+          description: "Engineer verified delivery",
+          content: json(DeliveryVerificationResponse),
+        },
+        ...projectErrors,
+        409: conflict,
+      },
+    }),
+    async (c) => {
+      const { id, deliveryId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      return c.json(
+        await verifyDelivery(
+          getDatabase().db,
+          c.get("actor"),
+          deliveryId,
+          input.note,
+          input.codes ?? [],
+          id,
+        ),
+        200,
+      );
+    },
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/deliveries/{id}/bag-codes",
+      tags: ["deliveries"],
+      middleware: projectAuth,
+      request: projectBody(RegisterBagCodesInput),
+      responses: {
+        200: {
+          description: "Bag codes registered by engineer",
+          content: json(DeliveryVerificationResponse),
+        },
+        ...projectErrors,
+        409: conflict,
+      },
+    }),
+    async (c) => {
+      const input = c.req.valid("json");
+      return c.json(
+        await verifyDelivery(
+          getDatabase().db,
+          c.get("actor"),
+          c.req.valid("param").id,
+          input.note ?? "Engineer registered delivered bag codes",
+          input.codes,
+        ),
+        200,
+      );
     },
   );
