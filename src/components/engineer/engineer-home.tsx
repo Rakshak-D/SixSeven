@@ -5,7 +5,6 @@ import { useState } from "react";
 import { VerifyDeliveries } from "@/components/payments/verify-deliveries";
 import { Sheet } from "@/components/sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
-import { ExpectedDeliveries } from "@/components/today/expected-deliveries";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -142,7 +141,6 @@ export function EngineerHome() {
         </section>
       </div>
 
-      <ExpectedDeliveries projectId={id} canDecide={false} />
       <VerifyDeliveries projectId={id} />
 
       <section className={card} aria-label="Recent activity">

@@ -1,57 +1,53 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Phone } from "lucide-react";
 import { useState } from "react";
-import { Field, FormError, NativeSelect, SavedNotice } from "@/components/forms";
+import { Field, FormError, firstProblem, NativeSelect, SavedNotice } from "@/components/forms";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInvite, useSentInvitations, useTeam } from "@/hooks/use-team";
-import { api } from "@/lib/api/client";
-import {
-  CreateProjectInvitationInput,
-  MyPhoneResponse,
-  UpdateMyPhoneInput,
-} from "@/shared/schemas/projects";
 
 const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 const card = "rounded-[1.75rem] border bg-card p-5 sm:p-6";
 
 function InviteForm({ projectId }: { projectId: string }) {
   const invite = useInvite(projectId);
-  const [contact, setContact] = useState("");
-  const sent = useSentInvitations(projectId);
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState<"owner" | "contractor">("owner");
   const [problem, setProblem] = useState<string>();
+  const sent = useSentInvitations(projectId);
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    const candidate = contact.includes("@") ? { email: contact, role } : { phone: contact, role };
-    const parsed = CreateProjectInvitationInput.safeParse(candidate);
-    setProblem(parsed.success ? undefined : "Enter a valid email or Indian mobile number.");
-    if (parsed.success && !invite.isPending) {
-      invite.mutate(parsed.data, { onSuccess: () => setContact("") });
-    }
+    const found = firstProblem([[!email.includes("@"), "Enter their email address."]]);
+    setProblem(found);
+    if (found) return;
+    invite.mutate(
+      { email, role },
+      {
+        onSuccess: () => setEmail(""),
+      },
+    );
   }
 
   return (
     <section className={card} aria-label="Invite someone">
       <h2 className="text-3xl">Invite someone</h2>
       <p className="mt-1 text-[15px] text-muted-foreground">
-        Email invitees sign in and accept. Tell them about the invitation directly. Phone redemption
-        requires verified ownership and is currently unavailable.
+        They sign in with this email and accept. Slate does not send an email; tell them yourself.
       </p>
       <form onSubmit={submit} noValidate className="mt-4 space-y-4">
-        <Field label="Their email or mobile number">
+        <Field label="Their email">
           {(id) => (
             <Input
               id={id}
-              type="text"
+              type="email"
               autoComplete="off"
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           )}
         </Field>
@@ -77,68 +73,11 @@ function InviteForm({ projectId }: { projectId: string }) {
               <span className="min-w-0 truncate">
                 {"email" in i ? i.email : i.phone} · {roleLabel[i.role]}
               </span>
-              <Badge variant="outline">{i.status === "accepted" ? "Accepted" : "Pending"}</Badge>
+              <Badge variant="outline">{i.status === "accepted" ? "Accepted" : "Waiting"}</Badge>
             </li>
           ))}
         </ul>
       ) : null}
-    </section>
-  );
-}
-
-function MyPhone() {
-  const client = useQueryClient();
-  const [phone, setPhone] = useState("");
-  const save = useMutation({
-    mutationFn: (phone: string | null) =>
-      api("PATCH", "/me", {
-        body: UpdateMyPhoneInput.parse({ phone }),
-        schema: MyPhoneResponse,
-      }),
-    onSuccess: (result) => {
-      setPhone(result.phone ?? "");
-      return client.invalidateQueries({ predicate: ({ queryKey }) => queryKey[1] === "team" });
-    },
-  });
-  return (
-    <section className={card} aria-label="My phone number">
-      <h2 className="text-3xl">My phone number</h2>
-      <p className="text-sm text-muted-foreground">
-        Shared with your project teams. This does not verify phone ownership.
-      </p>
-      <form
-        className="mt-3 space-y-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!save.isPending) save.mutate(phone);
-        }}
-      >
-        <Field label="Indian mobile number">
-          {(id) => (
-            <Input
-              id={id}
-              type="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-            />
-          )}
-        </Field>
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={!phone.trim() || save.isPending}>
-            Save contact number
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={save.isPending}
-            onClick={() => save.mutate(null)}
-          >
-            Remove contact number
-          </Button>
-        </div>
-        <FormError error={save.error} />
-        {save.isSuccess ? <SavedNotice>Contact updated.</SavedNotice> : null}
-      </form>
     </section>
   );
 }
@@ -188,7 +127,6 @@ export function TeamPage() {
             </ul>
           )}
         </section>
-        <MyPhone />
         {project.role === "engineer" ? <InviteForm projectId={project.id} /> : null}
       </div>
     </div>
