@@ -19,6 +19,7 @@ import { describeActivity } from "@/lib/activity";
 import { activeItems } from "@/lib/checklist";
 import { daysBetween, istDateOf, todayIst } from "@/lib/dates";
 import { formatIsoDate, formatQty, formatShortDate, formatTimeIst } from "@/lib/format";
+import { ProjectSetup } from "./project-setup";
 import { ReviewList } from "./review-list";
 
 const eyebrow = "font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]";
@@ -141,6 +142,7 @@ export function EngineerHome() {
         </section>
       </div>
 
+      <ProjectSetup projectId={id} />
       <VerifyDeliveries projectId={id} />
 
       <section className={card} aria-label="Recent activity">
