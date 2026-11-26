@@ -6,6 +6,7 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
 - Branch: `be/wage-payment-modes`, PR #29. Published the existing `CreateWagePaymentInput` with required `note`, no cash reference and the mode-specific references. Exported `WagePaymentMode`. Historical reads accept null or absent notes and preserve original references.
 - Frontend handoff: `src/lib/spends.ts` must label `cheque`. Wage entry forms and mock fixtures must include a note and omit a cash reference. The UI should render a legacy note as absent. Reconciled on the medical baseline as `0013_wage_payment_contract`; fresh PostgreSQL migration, seed and 54 focused tests passed. Full typecheck still fails at src/components/wages/wages-page.tsx (missing note) and src/lib/spends.ts (missing cheque label). This remains a draft.
+- Regenerated the unpublished migration as `0016_wage_payment_contract` after the steel migration. Fresh migrations, seed and all 29 PostgreSQL labour, reporting and migration tests passed, including a baseline upgrade.
 
 ## Entry — Request #9 wage payment modes
 
