@@ -17,7 +17,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      // The theme script only matters in the server HTML, before first paint. On the client React
+      // warns about any executable script it renders, so mark it as data there.
+      scriptProps={{ type: typeof window === "undefined" ? "text/javascript" : "application/json" }}
+    >
       <QueryClientProvider client={queryClient}>
         {children}
         <Toaster richColors position="top-center" />

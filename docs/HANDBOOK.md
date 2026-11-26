@@ -3,11 +3,44 @@
 Everything needed to run, inspect, demo and share Slate, plus every API input and output. No secrets
 live here: real values stay in your ignored `.env`.
 
-## 1. Run it
+## 1. Tech stack and why
+
+One TypeScript codebase: the screens, the API and the database code live in one Next.js app, and one
+set of Zod schemas describes every request and response on both sides.
+
+```mermaid
+flowchart LR
+  Browser[Role screens: React + TanStack Query] -->|session cookie| Auth[Better Auth /api/auth]
+  Browser -->|JSON checked by shared Zod| API[Hono /api/v1]
+  API --> Guards[Session + project role]
+  Guards --> DB[(PostgreSQL via Drizzle)]
+  Guards --> Files[Private photo storage]
+  Guards --> AI[Groq via AI SDK]
+```
+
+| Layer | What we use | Why |
+|---|---|---|
+| App framework | Next.js 16.4 (App Router), React 19.3 | One app and one deploy serves both the screens and the API. Each role's pages are plain folders under `src/app/projects/[id]`. |
+| API | Hono 4 mounted at `/api/v1`, `@hono/zod-openapi` | A small, fast router with middleware for sign-in and project-role checks. Routes are declared with Zod, which validates input and publishes the OpenAPI document at `/api/v1/doc` (this handbook's endpoint list comes from it). |
+| Contract | Zod 4 in `src/shared/schemas` | The browser and server import the same schemas. The frontend parses every response with them, so a mismatch fails loudly instead of showing wrong numbers. |
+| Database | PostgreSQL 16 in Docker | Transactions and row locks keep stock, wages and payments consistent when two people save at once. Money is integer paise; ledgers are append-only and corrected by adjustments. |
+| Data access | Drizzle ORM 0.45, drizzle-kit, `postgres` driver | Typed queries that stay close to SQL, reviewable SQL migrations in `src/db/migrations`, and Drizzle Studio to browse the data. |
+| Sign-in | Better Auth 1.7 | Email and password with an httpOnly session cookie, stored in the same database. Open sign-up is off; only invited emails can create accounts. |
+| Server data in the UI | TanStack Query 5 | Caches each project's data, refreshes it after every save and every 10 s, so one person's change reaches everyone's open screen. |
+| UI | Tailwind CSS 4, shadcn on Radix UI, lucide icons, sonner toasts, next-themes | Accessible building blocks (sheets, dialogs, focus handling) styled with our own light and dark tokens. Type is Newsreader for headings and Geist for text. |
+| Charts | Recharts 3 | The stock and spend area charts. |
+| AI | Vercel AI SDK 7 with Groq (`openai/gpt-oss-120b`) | One API for several providers (Groq, Gemini, NVIDIA, any OpenAI-compatible endpoint), switched by `.env`. Groq answers in about a second. |
+| Revit import | fflate | An .xlsx is a zip of XML files, so a tiny unzip library reads it in the browser; no large spreadsheet package. |
+| Files | sharp, pdfkit | sharp checks and decodes uploaded photos on the server; pdfkit renders the wage sheet PDF. |
+| Quality | TypeScript 5, Biome 2, Vitest 5, Playwright | Types across the stack; Biome lints and formats in one fast tool; Vitest runs unit tests and API tests against a throwaway database; Playwright drives real browsers. |
+| Tooling | pnpm 12 via Corepack, Node 22 or newer, tsx | Pinned package manager and a strict lockfile, so every laptop installs the same versions. tsx runs TypeScript scripts such as the seed. |
+| Running and sharing | Docker Compose, cloudflared | One command starts PostgreSQL. A Cloudflare quick tunnel shares a running copy with other laptops without deploying or opening ports. |
+
+## 2. Run it
 
 ```bash
 corepack pnpm install --frozen-lockfile
-cp .env.example .env            # then fill in the values (section 2)
+cp .env.example .env            # then fill in the values (section 3)
 docker compose up -d db         # local PostgreSQL (container slate-db-1)
 SLATE_MIGRATION_DATABASE=slate_demo pnpm db:migrate
 pnpm db:seed                    # demo accounts and the Greenfield Home project
@@ -22,12 +55,12 @@ pnpm dev                        # http://localhost:3000
 | `pnpm db:migrate` | Apply `src/db/migrations` (needs `SLATE_MIGRATION_DATABASE` = the database name in `DATABASE_URL`) |
 | `pnpm db:generate` | New migration from `src/db/schema.ts` changes |
 | `pnpm db:seed` | Demo data (idempotent) |
-| `pnpm db:studio` | Drizzle Studio (section 4) |
-| `./share.sh` | Share over a Cloudflare tunnel (section 6) |
+| `pnpm db:studio` | Drizzle Studio (section 5) |
+| `./share.sh` | Share over a Cloudflare tunnel (section 7) |
 
 API tests (`tests/api`) need `SLATE_TEST_DATABASE=1` and a loopback database named `slate_test…`; CI provides one.
 
-## 2. Settings (`.env`)
+## 3. Settings (`.env`)
 
 | Variable | What |
 |---|---|
@@ -39,9 +72,9 @@ API tests (`tests/api`) need `SLATE_TEST_DATABASE=1` and a loopback database nam
 | `SLATE_DEMO_SEED`, `SLATE_DEMO_PASSWORD` | Seed switch and the demo accounts' password |
 | `UPLOAD_DIR` | Private folder for uploaded photos |
 | `NEXT_PUBLIC_USE_MOCKS` | `0` = live database, `1` = in-browser demo data (dev only) |
-| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL` | Ask Slate and AI checklists (section 5) |
+| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL` | Ask Slate and AI checklists (section 6) |
 
-## 3. Accounts, roles and screens
+## 4. Accounts, roles and screens
 
 Demo accounts: `owner@demo.invalid`, `contractor@demo.invalid`, `engineer@demo.invalid`; password is
 `SLATE_DEMO_PASSWORD`. New people join by invitation: the engineer invites an email on **Team**, the
@@ -59,7 +92,7 @@ Walkthroughs for both demos (seeded project, new project) are in [DEMO.md](DEMO.
 columns A–F; rows without a category (titles, subtotals) are skipped. One material per category and
 unit. The `.rvt` file itself is not read.
 
-## 4. Database
+## 5. Database
 
 - **Drizzle Studio:** `pnpm db:studio`, then open <https://local.drizzle.studio>. It reads `DATABASE_URL`
   from `.env`; browse and edit every table. Close it with Ctrl+C.
@@ -70,7 +103,7 @@ unit. The `.rvt` file itself is not read.
 - Money is integer **paise**; quantities have at most 3 decimals; dates are IST `YYYY-MM-DD`.
 - Ledgers are append-only: fix a wrong entry with an adjustment (`POST /projects/{id}/adjustments`), never an edit.
 
-## 5. AI (Ask Slate, checklists)
+## 6. AI (Ask Slate, checklists)
 
 `.env`: `AI_PROVIDER=groq`, `AI_MODEL=openai/gpt-oss-120b`, `AI_API_KEY=<your Groq key>`. Without
 `AI_MODEL` or the key, Ask Slate replies `{ "source": "offline" }` and checklists use the template.
@@ -83,7 +116,7 @@ curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $AI_API_
 Limits: 10 questions per user per minute, 20 s timeout, 1500 output tokens. Answers are not
 engineering sign-off; check any quantity it gives.
 
-## 6. Share with other laptops (Cloudflare tunnel)
+## 7. Share with other laptops (Cloudflare tunnel)
 
 ```bash
 ./share.sh            # add --build after code changes
@@ -101,10 +134,10 @@ curl -L -o ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/re
 chmod +x ~/.local/bin/cloudflared
 ```
 
-To run Slate *on* another laptop instead, clone the repo there and follow section 1 with its own
+To run Slate *on* another laptop instead, clone the repo there and follow section 2 with its own
 `.env` and database.
 
-## 7. API conventions
+## 8. API conventions
 
 - Base: `/api/v1`. Auth: Better Auth at `/api/auth` (`POST /api/auth/sign-in/email` with
   `{ email, password }`, `POST /api/auth/sign-out`). Sessions are an httpOnly cookie; send an `Origin`
@@ -125,7 +158,7 @@ curl -c jar -H "origin: $B" -H 'content-type: application/json' \
 curl -b jar $B/api/v1/projects
 ```
 
-## 8. Every endpoint: inputs and outputs
+## 9. Every endpoint: inputs and outputs
 
 #### `POST /invitations/signup`
 - **Body** (JSON): { email: string, name: string, password: string }
