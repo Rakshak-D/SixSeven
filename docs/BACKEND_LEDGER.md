@@ -8,6 +8,7 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Frontend handoff: add a nonblank decision note to the proposal flow in `src/components/owner/approvals-list.tsx` and submit it through `src/hooks/use-project-data.ts`. Verify that all delivery, usage and checklist review submissions and fixtures send notes. Keep the rollout in draft until the proposal consumer is ready.
 
 - The hosted check found six legacy fixtures missing newly required notes in `src/mocks/routes.test.ts`. Frontend must update proposal, stock and checklist-review requests and test fixtures before this draft can merge.
+- Verified the refreshed backend contract on disposable PostgreSQL. Fresh migrations, seed and all 44 auth, stock and reporting API tests passed. The frontend fixture and proposal rollout blockers above still apply.
 
 ## Entry — Engineer steel-marking hold point
 
