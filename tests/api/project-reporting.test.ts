@@ -604,11 +604,15 @@ describe("progress photo storage and project timeline", () => {
     const form = new FormData();
     form.append("note", "Engineer verified the synthetic foundation evidence.");
     form.append("photos", firstFile);
+    form.append("capturedAt", new Date().toISOString());
     form.append("photos", secondFile);
+    form.append("capturedAt", new Date().toISOString());
     const createdResponse = await api(`/projects/${projectId}/progress`, engineer, form);
     expect(createdResponse.status).toBe(201);
     const created = ProgressResponse.parse(await createdResponse.json());
     expect(created.photos).toHaveLength(2);
+    expect(created.photos.map((photo) => photo.capturedAt)).toEqual(form.getAll("capturedAt"));
+    expect(created.photos.every((photo) => photo.receivedAt)).toBe(true);
     expect(JSON.stringify(created)).not.toMatch(/storageKey|\.cache|C:\\\\|filePath/i);
 
     const photoResponse = await api(
@@ -645,6 +649,7 @@ describe("progress photo storage and project timeline", () => {
       "photos",
       new File([new Uint8Array(pngBytes)], "dishonest.jpg", { type: "image/jpeg" }),
     );
+    mismatch.append("capturedAt", new Date().toISOString());
     await expectError(
       await api(`/projects/${projectId}/progress`, contractor, mismatch),
       400,
@@ -654,6 +659,7 @@ describe("progress photo storage and project timeline", () => {
     const malformed = new FormData();
     malformed.append("note", "Invalid image bytes must not be stored.");
     malformed.append("photos", new File(["not an image"], "not-image.png", { type: "image/png" }));
+    malformed.append("capturedAt", new Date().toISOString());
     await expectError(
       await api(`/projects/${projectId}/progress`, contractor, malformed),
       400,
@@ -666,6 +672,7 @@ describe("progress photo storage and project timeline", () => {
       "photos",
       new File([new Uint8Array(5_000_001)], "large.png", { type: "image/png" }),
     );
+    oversized.append("capturedAt", new Date().toISOString());
     await expectError(
       await api(`/projects/${projectId}/progress`, contractor, oversized),
       400,
@@ -676,6 +683,7 @@ describe("progress photo storage and project timeline", () => {
     unavailableChecklist.append("note", "An unknown checklist item must not be attached.");
     unavailableChecklist.append("checklistItemId", crypto.randomUUID().replaceAll("-", ""));
     unavailableChecklist.append("photos", firstFile);
+    unavailableChecklist.append("capturedAt", new Date().toISOString());
     await expectError(
       await api(`/projects/${projectId}/progress`, contractor, unavailableChecklist),
       404,
@@ -691,6 +699,19 @@ describe("progress photo storage and project timeline", () => {
       await api(`/projects/${projectId}/progress`, undefined, form),
       401,
       "UNAUTHENTICATED",
+    );
+    form.delete("capturedAt");
+    form.append("capturedAt", new Date().toISOString());
+    await expectError(
+      await api(`/projects/${projectId}/progress`, engineer, form),
+      400,
+      "VALIDATION_ERROR",
+    );
+    form.append("capturedAt", new Date(Date.now() + 60_000).toISOString());
+    await expectError(
+      await api(`/projects/${projectId}/progress`, engineer, form),
+      400,
+      "VALIDATION_ERROR",
     );
 
     const { db } = getDatabase();
@@ -792,8 +813,10 @@ describe("progress photo storage and project timeline", () => {
         for each row execute function slate_test_reporting_audit_failure()`;
       const form = new FormData();
       form.append("note", "The two-file transaction will be rolled back.");
-      for (const file of [await imageFile("png"), await imageFile("webp")])
+      for (const file of [await imageFile("png"), await imageFile("webp")]) {
         form.append("photos", file.file);
+        form.append("capturedAt", new Date().toISOString());
+      }
       await expectError(
         await api(`/projects/${projectId}/progress`, contractor, form),
         500,
@@ -873,6 +896,7 @@ describe("M6 proposals and checklist verification", () => {
     const completion = new FormData();
     completion.set("note", "Synthetic completion evidence.");
     completion.set("photos", image.file);
+    completion.set("capturedAt", new Date().toISOString());
     const submitted = VerifiedChecklistItemResponse.parse(
       await (await api(`${path}/completion`, contractor, completion)).json(),
     );
@@ -956,6 +980,7 @@ describe("M6 proposals and checklist verification", () => {
       const form = new FormData();
       form.set("note", "Synthetic evidence of the finished work.");
       form.append("photos", photo.file);
+      form.append("capturedAt", new Date().toISOString());
       return form;
     };
     const invalid = new FormData();

@@ -573,6 +573,7 @@ describe("stock ledger", () => {
     ) => {
       const form = new FormData();
       form.set("photo", new File([bytes], "challan.png", { type: "image/png" }));
+      form.set("capturedAt", new Date().toISOString());
       return app.request(`/api/v1/projects/${projectId}/${resource}`, {
         method: "POST",
         headers: { cookie: actor.cookie },
@@ -586,6 +587,8 @@ describe("stock ledger", () => {
     const uploaded = await upload(Uint8Array.from(png), contractor);
     expect(uploaded.status).toBe(201);
     const photo = ChallanPhotoResponse.parse(await uploaded.json());
+    expect(photo.capturedAt).toEqual(expect.any(String));
+    expect(photo.receivedAt).toEqual(expect.any(String));
     expect(photo).toMatchObject({
       deliveryId: stored.id,
       mime: "image/png",

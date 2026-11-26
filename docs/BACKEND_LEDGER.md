@@ -2,6 +2,13 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Photo capture timestamps (#27)
+
+- Branch `be/photo-capture-times`. New progress, checklist completion and challan uploads require an ISO `capturedAt` per image. It must be no more than ten minutes before receipt or 30 seconds ahead. Migration `0013_photo_capture_times` preserves existing metadata and constrains the new capture/receipt pairs in PostgreSQL. Medical uses the same timestamp validator.
+- Frontend handoff: send ordered `capturedAt` parts in both uploads in `src/hooks/use-project-data.ts` and single `capturedAt` with challan FormData. Use the camera capture time. Keep this PR in draft until the active clients send the required parts. Client timestamps cannot authenticate a camera.
+- Existing disposable PostgreSQL upgraded successfully. Biome, typecheck and 151 local tests passed before the final main sync. Full CI is required before integration.
+- Regenerated the unpublished migration as `0016_photo_capture_times` after the steel migration. Fresh migrations, seed and all 37 PostgreSQL stock, reporting and migration tests passed, including a baseline upgrade.
+
 ## Entry — Request #22 wage notes and mode references
 
 - Branch: `be/wage-payment-modes`, PR #29. Published the existing `CreateWagePaymentInput` with required `note`, no cash reference and the mode-specific references. Exported `WagePaymentMode`. Historical reads accept null or absent notes and preserve original references.
