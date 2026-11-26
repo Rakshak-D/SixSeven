@@ -32,3 +32,7 @@ Maintained by Codex. Update this file when tools, external services, dependencie
 ## Supplier payment simulation
 
 The supplier workflow uses synthetic account details and a mock payment provider. No payment gateway, bank API, real payment credentials or money movement are involved.
+
+## Final release AI configuration
+
+Ask Slate uses the existing optional Gemini, Groq, NVIDIA or explicitly configured HTTPS compatible provider. Select a model before enabling provider calls. Prototype mode uses labelled fixed samples. Live mode without provider settings reports offline. The separate rectangular concrete estimator uses local formulas and no provider. No live provider call was verified in this release checkpoint.

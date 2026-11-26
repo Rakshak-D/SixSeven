@@ -4,19 +4,22 @@
  * from the answer; components render these blocks as text.
  */
 
-export type ChatTurn = { role: "user" | "assistant"; content: string };
+import {
+  type AssistantMessage,
+  MAX_CHAT_MESSAGE_CHARS,
+  MAX_CHAT_MESSAGES,
+} from "@/shared/schemas/assistant";
 
-/** Limits of `POST /projects/:id/ai/chat`: 50 messages of 4000 characters. */
-export const MAX_MESSAGE_CHARS = 4000;
-const MAX_HISTORY = 20;
+export type ChatTurn = AssistantMessage;
+export const MAX_MESSAGE_CHARS = MAX_CHAT_MESSAGE_CHARS;
 
-/** The newest turns that fit the route's limits, so a long chat never starts failing. */
 export function historyToSend(turns: ChatTurn[]): ChatTurn[] {
-  const recent = turns.slice(-MAX_HISTORY);
-  const start = recent.findIndex((t) => t.role === "user");
-  return recent
-    .slice(Math.max(start, 0))
-    .map(({ role, content }) => ({ role, content: content.slice(0, MAX_MESSAGE_CHARS) }));
+  const recent = turns.slice(-MAX_CHAT_MESSAGES);
+  const start = recent.findIndex((turn) => turn.role === "user");
+  return recent.slice(Math.max(start, 0)).map(({ role, content }) => ({
+    role,
+    content: content.slice(0, MAX_MESSAGE_CHARS),
+  }));
 }
 
 export type Block =

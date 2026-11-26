@@ -60,6 +60,17 @@ jobs:
           diff -u .cache/m3-seed-first.json .cache/m3-seed-second.json
       - name: Tests (Vitest)
         run: pnpm test
+      - name: Production build
+        env:
+          NEXT_PUBLIC_USE_MOCKS: "0"
+        run: pnpm build
+      - name: Live browser smoke
+        env:
+          NEXT_PUBLIC_USE_MOCKS: "0"
+          PLAYWRIGHT_BROWSERS_PATH: .cache/playwright
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:e2e --workers=1
   live-launcher:
     runs-on: ubuntu-latest
     timeout-minutes: 10

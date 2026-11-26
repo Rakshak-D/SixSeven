@@ -2,58 +2,50 @@
 
 import { Phone } from "lucide-react";
 import { useState } from "react";
-import { Field, FormError, firstProblem, NativeSelect, SavedNotice } from "@/components/forms";
+import { Field, FormError, NativeSelect, SavedNotice } from "@/components/forms";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useInvite, useTeam } from "@/hooks/use-team";
-import type { ProjectInvitationResponse } from "@/lib/invitations";
-import { mocksEnabled } from "@/mocks";
+import { useInvite, useSentInvitations, useTeam } from "@/hooks/use-team";
+import { CreateProjectInvitationInput } from "@/shared/schemas/projects";
 
 const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 const card = "rounded-[1.75rem] border bg-card p-5 sm:p-6";
 
 function InviteForm({ projectId }: { projectId: string }) {
   const invite = useInvite(projectId);
-  const [email, setEmail] = useState("");
+  const [contact, setContact] = useState("");
+  const sent = useSentInvitations(projectId);
   const [role, setRole] = useState<"owner" | "contractor">("owner");
   const [problem, setProblem] = useState<string>();
-  // The invitation list route does not exist yet, so only this visit's invites are known.
-  const [sent, setSent] = useState<ProjectInvitationResponse[]>([]);
-
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    const found = firstProblem([[!email.includes("@"), "Enter their email address."]]);
-    setProblem(found);
-    if (found) return;
-    invite.mutate(
-      { email, role },
-      {
-        onSuccess: (made) => {
-          setSent((list) => [made, ...list]);
-          setEmail("");
-        },
-      },
-    );
+    const candidate = contact.includes("@") ? { email: contact, role } : { phone: contact, role };
+    const parsed = CreateProjectInvitationInput.safeParse(candidate);
+    setProblem(parsed.success ? undefined : "Enter a valid email or Indian mobile number.");
+    if (parsed.success && !invite.isPending) {
+      invite.mutate(parsed.data, { onSuccess: () => setContact("") });
+    }
   }
 
   return (
     <section className={card} aria-label="Invite someone">
       <h2 className="text-3xl">Invite someone</h2>
       <p className="mt-1 text-[15px] text-muted-foreground">
-        They sign in with this email and accept. Slate does not send an email; tell them yourself.
+        Email invitees sign in and accept. Tell them about the invitation directly. Phone redemption
+        requires verified ownership and is currently unavailable.
       </p>
       <form onSubmit={submit} noValidate className="mt-4 space-y-4">
-        <Field label="Their email">
+        <Field label="Their email or mobile number">
           {(id) => (
             <Input
               id={id}
-              type="email"
+              type="text"
               autoComplete="off"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={contact}
+              onChange={(e) => setContact(e.target.value)}
             />
           )}
         </Field>
@@ -71,14 +63,15 @@ function InviteForm({ projectId }: { projectId: string }) {
           {invite.isPending ? "Inviting…" : "Invite"}
         </Button>
       </form>
-      {sent.length ? (
+      <FormError error={sent.error} />
+      {sent.data?.length ? (
         <ul className="mt-4 divide-y">
-          {sent.map((i) => (
+          {sent.data.map((i) => (
             <li key={i.id} className="flex items-center justify-between gap-3 py-3">
               <span className="min-w-0 truncate">
-                {i.email} · {roleLabel[i.role]}
+                {"email" in i ? i.email : i.phone} · {roleLabel[i.role]}
               </span>
-              <Badge variant="outline">Waiting</Badge>
+              <Badge variant="outline">{i.status === "accepted" ? "Accepted" : "Pending"}</Badge>
             </li>
           ))}
         </ul>
@@ -132,16 +125,7 @@ export function TeamPage() {
             </ul>
           )}
         </section>
-        {project.role === "engineer" ? (
-          // Invites are not on the live server yet (backend PR #30).
-          mocksEnabled ? (
-            <InviteForm projectId={project.id} />
-          ) : (
-            <p className={`${card} text-muted-foreground`}>
-              Invites are not connected to the live server yet.
-            </p>
-          )
-        ) : null}
+        {project.role === "engineer" ? <InviteForm projectId={project.id} /> : null}
       </div>
     </div>
   );

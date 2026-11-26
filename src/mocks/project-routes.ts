@@ -3,14 +3,13 @@
  * list. The demo user is invited to one project, so accepting can be tried. Another person cannot be
  * signed in on demo data, so invites you send stay waiting.
  */
-import {
-  CreateProjectInvitationInput,
-  ProjectInvitationResponse,
-  ProjectInvitationsResponse,
-} from "@/lib/invitations";
 import type { Role } from "@/shared/schemas/common";
 import {
   CreateProjectInput,
+  CreateProjectInvitationInput,
+  normalizeIndianMobile,
+  ProjectInvitationResponse,
+  ProjectInvitationsResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectTeamResponse,
@@ -41,6 +40,7 @@ const received: ProjectInvitationResponse[] = [
     projectId: "demo-riverside",
     projectName: "Riverside Cottage",
     email: me,
+    status: "pending",
     role: "contractor",
     createdAt: "2026-11-25T09:00:00.000Z",
   },
@@ -74,19 +74,41 @@ export const projectRoutes: MockRoute[] = [
     respond: ({ params, body }) => {
       allow(params.id, ["engineer"]);
       const input = parseBody(CreateProjectInvitationInput, body);
-      const email = input.email.toLowerCase();
-      if (sent.some((i) => i.projectId === params.id && i.email === email))
+      const contact =
+        "email" in input
+          ? { email: input.email.toLowerCase() }
+          : { phone: normalizeIndianMobile(input.phone) };
+      if (
+        sent.some(
+          (i) =>
+            i.projectId === params.id &&
+            ("email" in contact
+              ? "email" in i && i.email === contact.email
+              : "phone" in i && i.phone === contact.phone),
+        )
+      )
         throw new MockError(409, "CONFLICT", "That person already has an invite");
       const invite = ProjectInvitationResponse.parse({
         id: mockId(params.id, "inv"),
         projectId: params.id,
         projectName: project(params.id).name,
-        email,
+        ...contact,
+        status: "pending",
         role: input.role,
         createdAt: new Date().toISOString(),
       });
       sent.push(invite);
       return invite;
+    },
+  },
+  {
+    method: "GET",
+    path: "/projects/:id/invitations",
+    respond: ({ params }) => {
+      allow(params.id, ["engineer"]);
+      return ProjectInvitationsResponse.parse(
+        sent.filter((invite) => invite.projectId === params.id),
+      );
     },
   },
   {

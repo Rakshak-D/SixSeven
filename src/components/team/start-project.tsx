@@ -22,27 +22,29 @@ export function Invitations() {
     <section className="mt-8" aria-label="Your invitations">
       <h2 className="text-3xl">Invitations</h2>
       <ul className="mt-3 space-y-3">
-        {invitations.data.map((i) => (
-          <li
-            key={i.id}
-            className="flex flex-wrap items-center gap-3 rounded-3xl border bg-band p-5"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block font-serif text-2xl leading-tight">{i.projectName}</span>
-              <span className="block text-muted-foreground">
-                Join as {roleName[i.role]} · invited {i.email}
-              </span>
-            </span>
-            <Button
-              disabled={accept.isPending}
-              onClick={() =>
-                accept.mutate(i.id, { onSuccess: () => toast.success(`Joined ${i.projectName}`) })
-              }
+        {invitations.data
+          .filter((i) => "email" in i && i.status === "pending")
+          .map((i) => (
+            <li
+              key={i.id}
+              className="flex flex-wrap items-center gap-3 rounded-3xl border bg-band p-5"
             >
-              Accept
-            </Button>
-          </li>
-        ))}
+              <span className="min-w-0 flex-1">
+                <span className="block font-serif text-2xl leading-tight">{i.projectName}</span>
+                <span className="block text-muted-foreground">
+                  Join as {roleName[i.role]} · invited {"email" in i ? i.email : i.phone}
+                </span>
+              </span>
+              <Button
+                disabled={accept.isPending}
+                onClick={() =>
+                  accept.mutate(i.id, { onSuccess: () => toast.success(`Joined ${i.projectName}`) })
+                }
+              >
+                Accept
+              </Button>
+            </li>
+          ))}
       </ul>
       <div className="mt-3">
         <FormError error={accept.error} />
