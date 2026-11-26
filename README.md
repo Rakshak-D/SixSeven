@@ -19,7 +19,7 @@ Install Node 24 with Corepack, PowerShell 7.2 or newer, and Docker Desktop in Li
 .\stop.ps1              # Stop this launcher session
 ```
 
-The launcher creates `.env` only when missing and stores the generated demo password there. It initializes a verified empty demo database when a valid demo password is configured. To sign in, use that password with `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid`. An existing database is seeded only when you pass `-Seed`. After the launcher confirms the app responds and PostgreSQL is up, it prints the app, health and OpenAPI URLs. The generated configuration defaults to prototype mode. Use `-Live` to exercise real API integration. No AI credentials are required.
+The launcher creates `.env` only when missing and stores the generated demo password there. It initializes a verified empty demo database when a valid demo password is configured. To sign in, use that password with `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid`. An existing database is seeded only when you pass `-Seed`. After the launcher confirms the app responds and PostgreSQL is up, it prints the app, health and OpenAPI URLs. New configuration defaults to live mode. Use the printed application URL for sign-in so the browser origin matches BETTER_AUTH_URL. Choose -Prototype explicitly for development fixtures. No AI credentials are required to use the rest of Slate.
 
 The app runs in the launcher terminal. Ctrl+C exits the app and leaves PostgreSQL running. Run `.\stop.ps1` from a second terminal while the launcher is active. It stops the app and stops PostgreSQL only if that launcher session started it. An already running database is reused and stays running. With no active launcher, the stop command leaves existing services running.
 
@@ -61,7 +61,7 @@ Run the PowerShell launcher regressions from an isolated worktree with an initia
 
 AGENTS.md is canonical. Root and nested CLAUDE.md files reference the corresponding AGENTS.md. docs/API.md is the canonical contract and is written by Codex. docs/FRONTEND_LEDGER.md is maintained only by Claude after its initialization. Read docs/devops.md for local tool and data paths.
 
-AI SDK packages remain available for deferred provider work.
+Ask Slate is optional and shows an offline state until AI_PROVIDER, AI_MODEL and AI_API_KEY are configured. Use a provider-supported model and its own API key. For an explicitly selected OpenAI-compatible provider, set AI_BASE_URL to its approved HTTPS API origin. Checklist generation keeps its labelled template fallback. The concrete calculator uses local formulas and runs offline from the provider.
 
 Supplier payments and medical reimbursements use a mock provider. Use synthetic account data when demonstrating these workflows. No funds move.
 
