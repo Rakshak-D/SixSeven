@@ -4,6 +4,7 @@
  * Delete an entry the moment the live route works for the UI (most need login first).
  * Every response is parsed with the route's shared Zod schema (src/shared/schemas/*).
  */
+import { assistantRoutes } from "./assistant-routes";
 import { changeRoutes } from "./change-routes";
 import { checklistRoutes } from "./checklist-routes";
 import { projectRoutes } from "./project-routes";
@@ -24,4 +25,5 @@ export const mocks: MockRoute[] = [
   ...checklistRoutes,
   ...changeRoutes,
   ...supplierRoutes,
+  ...assistantRoutes,
 ];
