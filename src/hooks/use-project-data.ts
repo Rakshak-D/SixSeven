@@ -147,12 +147,14 @@ export function useDecideProposal(projectId: string) {
     mutationFn: ({
       proposalId,
       decision,
+      note,
     }: {
       proposalId: string;
       decision: "approve" | "reject";
+      note: string;
     }) =>
       api("POST", `/proposals/${encodeURIComponent(proposalId)}/decision`, {
-        body: { decision },
+        body: { decision, note },
         schema: ProposalResponse,
       }),
     onSuccess: () => {
