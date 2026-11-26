@@ -796,6 +796,7 @@ export const checklistItems = pgTable(
     position: integer().notNull(),
     state: checklistState().notNull().default("todo"),
     removedAt: timestamp("removed_at", { withTimezone: true }),
+    requiresSteelProof: boolean("requires_steel_proof").notNull().default(false),
   },
   (t) => [
     foreignKey({
@@ -807,6 +808,47 @@ export const checklistItems = pgTable(
     unique("checklist_item_position").on(t.checklistId, t.position),
     check("checklist_item_task_valid", sql`length(btrim(${t.task})) between 1 and 120`),
     check("checklist_item_position_valid", sql`${t.position} between 0 and 39`),
+  ],
+);
+
+export const checklistSteelPhotos = pgTable(
+  "checklist_steel_photos",
+  {
+    id: text().primaryKey(),
+    projectId: text("project_id").notNull(),
+    itemId: text("item_id").notNull(),
+    progressId: text("progress_id").notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    mime: text().notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    createdBy: text("created_by").notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "steel_photo_proof_scope",
+      columns: [t.projectId, t.itemId, t.progressId],
+      foreignColumns: [
+        progressUpdates.projectId,
+        progressUpdates.checklistItemId,
+        progressUpdates.id,
+      ],
+    }),
+    foreignKey({
+      name: "steel_photo_actor_scope",
+      columns: [t.projectId, t.createdBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    index("steel_photo_item_proof").on(t.projectId, t.itemId, t.progressId),
+    check(
+      "steel_photo_capture_window",
+      sql`${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds'`,
+    ),
+    check(
+      "steel_photo_media",
+      sql`${t.sizeBytes} between 1 and 5000000 and ${t.mime} in ('image/jpeg','image/png','image/webp')`,
+    ),
   ],
 );
 

@@ -849,6 +849,57 @@ describe("M6 proposals and checklist verification", () => {
     expect(projectAfter.budgetPaise).toBe(25_000_000);
   });
 
+  it("requires private steel-marking evidence for the current flagged submission", async () => {
+    const project = await newProject(dateString(new Date()));
+    const draftPath = `/projects/${project}/checklists`;
+    const draft = ChecklistDraftResponse.parse(
+      await (await api(`${draftPath}?source=template`, engineer, {})).json(),
+    );
+    const saved = await api(`${draftPath}/records`, engineer, {
+      draftId: draft.draftId,
+      title: "Pre-pour steel inspection",
+      items: [{ ...draft.draft.items[0], requiresSteelProof: true }],
+    });
+    expect(saved.status).toBe(201);
+    const [item] = VerifiedChecklistResponse.parse(await saved.json()).items;
+    if (!item) throw new Error("Checklist item missing from fixture");
+    expect(item.requiresSteelProof).toBe(true);
+    const path = `/checklist-items/${item.id}`;
+    expect((await api(`${path}/start`, contractor, undefined, "POST")).status).toBe(200);
+    const image = await imageFile();
+    const completion = new FormData();
+    completion.set("note", "Synthetic completion evidence.");
+    completion.set("photos", image.file);
+    const submitted = VerifiedChecklistItemResponse.parse(
+      await (await api(`${path}/completion`, contractor, completion)).json(),
+    );
+    const progressId = submitted.history.at(-1)?.progressId;
+    if (!progressId) throw new Error("Progress link missing from fixture");
+    const review = { decision: "accept", progressId, note: "Reviewed the steel markings." };
+    await expectError(await api(`${path}/review`, engineer, review), 409, "STEEL_PROOF_REQUIRED");
+
+    const evidence = () => {
+      const form = new FormData();
+      form.set("progressId", progressId);
+      form.set("note", "Synthetic brand, BIS and mill certificate markings.");
+      form.set("photos", image.file);
+      form.set("capturedAt", new Date().toISOString());
+      return form;
+    };
+    const proofPath = `${path}/steel-proof`;
+    await expectError(await api(proofPath, contractor, evidence()), 403, "FORBIDDEN");
+    await expectError(await api(proofPath, outsider, evidence()), 404, "NOT_FOUND");
+    const recorded = await api(proofPath, engineer, evidence());
+    expect(recorded.status).toBe(201);
+    const [{ id }] = await recorded.json();
+    await expectError(await api(proofPath, engineer, evidence()), 409, "CONFLICT");
+    await expectError(await api(`${proofPath}/${id}`, outsider), 404, "NOT_FOUND");
+    const downloaded = await api(`${proofPath}/${id}`, owner);
+    expect(downloaded.status).toBe(200);
+    expect(Buffer.from(await downloaded.arrayBuffer())).toEqual(image.bytes);
+    expect((await api(`${path}/review`, engineer, review)).status).toBe(200);
+  });
+
   it("binds drafts, submissions and reviews and preserves modification history", async () => {
     const project = await newProject(dateString(new Date()));
     const draftPath = `/projects/${project}/checklists`;

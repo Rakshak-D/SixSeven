@@ -2,6 +2,12 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Engineer steel-marking hold point
+
+- Request #15, 2026-11-26 IST, branch `be/steel-hold-point`. Flagged checklist items require project engineer evidence for the current contractor submission before acceptance. The API stores capture and receipt times and retains prior evidence.
+- PostgreSQL fresh migration and seed passed. All 9 project reporting API tests passed, including no-evidence rejection, role denial, cross-project privacy and original photo byte retrieval. Typecheck passed.
+- Frontend handoff: `src/hooks/use-project-data.ts` and `src/components/engineer/review-list.tsx` can use the new multipart evidence endpoint before acceptance. Checklist creation and approved additions accept `requiresSteelProof`.
+
 ## Entry — Delivery and material identity verification (#13–14)
 
 - Branch `be/bag-verification`, migration `0013_bag_verification`. Added the engineer queue, verification routes, project-unique codes and transactional usage consumption. Existing materials remain quantity-based unless tracking is set on creation. Tracked and verified quantity corrections require a separate reconciliation mechanism.
