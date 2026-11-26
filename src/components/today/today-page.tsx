@@ -76,7 +76,7 @@ export function TodayPage() {
         </TabsList>
       </Tabs>
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {tab === "delivery" ? <DeliveryForm projectId={project.id} today={today} /> : null}
         {tab === "usage" ? <UsageForm projectId={project.id} today={today} /> : null}
         {tab === "attendance" ? <AttendanceForm projectId={project.id} today={today} /> : null}
