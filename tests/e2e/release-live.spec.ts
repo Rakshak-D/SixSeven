@@ -10,6 +10,22 @@ async function signIn(browser: Browser, page: Page, role: keyof typeof DemoAccou
   });
   try {
     await context.addInitScript((role) => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 640;
+        canvas.height = 480;
+        const drawing = canvas.getContext("2d");
+        if (!drawing) throw new Error("Cannot create the simulated camera");
+        const stream = canvas.captureStream(15);
+        const render = () => {
+          if (!stream.active) return;
+          drawing.fillStyle = "#345678";
+          drawing.fillRect(0, 0, canvas.width, canvas.height);
+          requestAnimationFrame(render);
+        };
+        render();
+        return stream;
+      };
       Object.defineProperty(globalThis, "BarcodeDetector", {
         configurable: true,
         value: class {
@@ -36,7 +52,7 @@ async function signIn(browser: Browser, page: Page, role: keyof typeof DemoAccou
   }
 }
 
-test.use({ trace: "off", screenshot: "off", video: "off" });
+test.use({ actionTimeout: 15000, trace: "off", screenshot: "off", video: "off" });
 
 test("three real sessions preserve project access and wage privacy after reload", async ({
   browser,
