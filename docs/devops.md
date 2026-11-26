@@ -47,3 +47,7 @@ Read current workflow runs and results on the PR; do not infer CI status from lo
 ## Demo and remote access
 
 The checked-in app profile is scaffold configuration, not a verified deployment. Confirm secrets and the official technical specification before starting it. Do not use unapproved external tunnels, hosting, or database services.
+
+## Provision an account for an email invite
+
+Self-service registration is disabled. A trusted deployment operator verifies the intended recipient out of band and loads the explicit application database and Better Auth settings. Set SLATE_PROVISION_DATABASE to the database name as confirmation and load a generated 16-64 character password into SLATE_PROVISION_PASSWORD through your local secret management. Then run pnpm exec tsx src/db/provision-invited-user.ts <invite-id> <display-name>. Deliver the password directly over a secure channel and remove the value from the shell environment. The command only provisions a new account for an existing pending email invitation. The recipient must still sign in and accept to gain project access. Phone invitations cannot be provisioned with this command.

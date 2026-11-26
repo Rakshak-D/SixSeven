@@ -178,6 +178,7 @@ export function WagesPage() {
                   <span className="block truncate text-[15px] text-muted-foreground">
                     {formatIsoDate(p.paidOn)} · {p.mode.toUpperCase()}
                     {p.reference ? ` · ${p.reference}` : ""}
+                    {p.note ? ` · ${p.note}` : ""}
                   </span>
                 </span>
                 <span className="num font-semibold">{formatPaise(current)}</span>

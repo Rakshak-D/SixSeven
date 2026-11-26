@@ -61,7 +61,7 @@ export function buildSpends(input: {
       id: p.id,
       kind: "wages",
       title: `${p.kind === "advance" ? "Advance" : "Wages"} · ${worker?.name ?? "worker"}`,
-      detail: [modeLabel[p.mode], p.reference].filter(Boolean).join(" · "),
+      detail: [modeLabel[p.mode], p.note, p.reference].filter(Boolean).join(" · "),
       date: p.paidOn,
       amountPaise: p.effectiveAmountPaise,
       // The engineer cannot read fixes, so a changed amount still says it was fixed.
