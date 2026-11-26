@@ -36,16 +36,61 @@ flowchart LR
 | Tooling | pnpm 12 via Corepack, Node 22 or newer, tsx | Pinned package manager and a strict lockfile, so every laptop installs the same versions. tsx runs TypeScript scripts such as the seed. |
 | Running and sharing | Docker Compose, cloudflared | One command starts PostgreSQL. A Cloudflare quick tunnel shares a running copy with other laptops without deploying or opening ports. |
 
-## 2. Run it
+## 2. Start, stop and reset
+
+**What runs where**
+
+| Piece | Port | What it is |
+|---|---|---|
+| PostgreSQL 16 | 5432 (loopback only) | Docker container `slate-db-1`; its data lives in `.cache/postgres`, so it survives restarts |
+| Slate dev server | 3000 | `next dev`: the screens and the API (`/api/v1`) in one process, reloads on code changes |
+| Shared production server | 3100 | Only while `./share.sh` runs: a production build behind a Cloudflare tunnel (section 3) |
+| Drizzle Studio | 4983 | Only while `pnpm db:studio` runs; open https://local.drizzle.studio |
+
+**Start (one command).** Linux, macOS or WSL: `./start.sh`. Windows PowerShell 7: `.\start.ps1`.
+
+```bash
+./start.sh            # live mode on http://localhost:3000
+./start.sh --seed     # same, and (re)apply the demo data
+```
+
+In order, it:
+1. Checks Node 24, Corepack and a running Docker Engine.
+2. Creates `.env` with random local secrets the first time.
+3. Starts the PostgreSQL container if it isn't already running.
+4. Installs packages from the lockfile.
+5. Applies any pending migrations.
+6. Seeds the demo data when the database is brand new (or with `--seed`).
+7. Starts the dev server in that terminal.
+
+It stops early with a plain message if a port is taken or `.env` doesn't match the local database.
+
+**Stop.**
+- The app: Ctrl+C in the terminal running `./start.sh` (Windows: `.\stop.ps1`).
+- PostgreSQL keeps running, which is fine. To stop it as well: `docker compose stop db`. Data stays in `.cache/postgres`.
+- `docker compose down` removes the container but keeps the data. Never delete `.cache/postgres` unless you mean to wipe everything.
+
+**Manual start** (same result, step by step):
 
 ```bash
 corepack pnpm install --frozen-lockfile
-cp .env.example .env            # then fill in the values (section 3)
+cp .env.example .env            # then fill in the values (section 6)
 docker compose up -d db         # local PostgreSQL (container slate-db-1)
 SLATE_MIGRATION_DATABASE=slate_demo pnpm db:migrate
 pnpm db:seed                    # demo accounts and the Greenfield Home project
 pnpm dev                        # http://localhost:3000
 ```
+
+**Reset to just the demo data** (wipes every project, account and photo people created):
+
+```bash
+# 1. stop the app (Ctrl+C), then:
+docker exec slate-db-1 psql -U slate -d postgres -c "drop database slate_demo with (force)" -c "create database slate_demo"
+mv .cache/uploads .cache/uploads-old      # uploaded photos; delete later
+./start.sh                                # empty database: migrates and seeds by itself
+```
+
+Back up first if you might want the data: `docker exec slate-db-1 pg_dump -U slate -Fc slate_demo > .cache/slate_demo.dump`. Every login session goes with the reset, so everyone signs in again.
 
 | Command | Does |
 |---|---|
@@ -54,13 +99,132 @@ pnpm dev                        # http://localhost:3000
 | `pnpm lint` · `pnpm typecheck` · `pnpm test` | Biome, TypeScript, Vitest |
 | `pnpm db:migrate` | Apply `src/db/migrations` (needs `SLATE_MIGRATION_DATABASE` = the database name in `DATABASE_URL`) |
 | `pnpm db:generate` | New migration from `src/db/schema.ts` changes |
-| `pnpm db:seed` | Demo data (idempotent) |
-| `pnpm db:studio` | Drizzle Studio (section 5) |
-| `./share.sh` | Share over a Cloudflare tunnel (section 7) |
+| `pnpm db:seed` | Demo data (idempotent; needs `SLATE_DEMO_SEED=1`) |
+| `pnpm db:studio` | Drizzle Studio (section 10) |
+| `./share.sh` | Share over a Cloudflare tunnel (section 3) |
 
 API tests (`tests/api`) need `SLATE_TEST_DATABASE=1` and a loopback database named `slate_test…`; CI provides one.
 
-## 3. Settings (`.env`)
+## 3. Share with other laptops (Cloudflare tunnel)
+
+```bash
+./share.sh            # add --build after code changes
+./share.sh --port 3200
+```
+
+How it works, step by step:
+1. **Build.** It runs `pnpm build` if there is no production build yet, or when you pass `--build`. Without `--build` it serves the old build, so after any code change always pass it.
+2. **Tunnel.** It starts `cloudflared tunnel --url http://localhost:3100`, a free Cloudflare *quick tunnel*: a public `https://….trycloudflare.com` address that forwards to your laptop, with no account, no deploy and no open ports.
+3. **Address.** It waits up to 60 s for Cloudflare to hand out the address and prints it.
+4. **Sign-in origin.** Sign-in only accepts requests from `BETTER_AUTH_URL`. So for this run it sets `BETTER_AUTH_URL` to the tunnel address and starts `next start` on :3100.
+
+Rules of thumb:
+- Sign in on the tunnel address, not `localhost:3100`.
+- **Ctrl+C** stops the server and the tunnel together.
+- The address changes every run, so send the new link each time.
+- It uses the same local database as the dev server: everyone sees the same data, and your laptop must stay on and online.
+- The link is public. Anyone who has it can reach the sign-in page.
+- The dev server on :3000 keeps working alongside it. Run `--build` **before** starting the dev server, or restart the dev server after the build (section 4).
+
+Install `cloudflared` once (no sudo):
+
+```bash
+curl -L -o ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+chmod +x ~/.local/bin/cloudflared
+```
+
+To run Slate *on* another laptop instead, clone the repo there and follow section 2 with its own
+`.env` and database.
+
+## 4. When something breaks
+
+| You see | Why | Fix |
+|---|---|---|
+| localhost keeps reloading by itself | A production build ran while the dev server was starting; the dev server keeps sending `HMR hash mismatch` | Stop the dev server (Ctrl+C) and start it again |
+| "Sign in to see your projects" after a reset | The reset wiped every login session | Sign in again |
+| Sign-in fails on the shared link | Signing in on `localhost:3100`, or an old tunnel address | Use the address `share.sh` printed this run |
+| `Port 3000 is unavailable` | Another dev server is already running | Use the running one, or stop it first |
+| `PostgreSQL did not become healthy` | Docker isn't running, or port 5432 is taken | Start Docker; check `docker ps` |
+| Ask Slate says it's offline | No `AI_MODEL` or `AI_API_KEY` in `.env` | Add them (section 11) and restart the server |
+| Demo password stopped working | `SLATE_DEMO_PASSWORD` changed in `.env` | Restart the server or run `pnpm db:seed`; the accounts follow `.env` |
+| Drizzle Studio won't open | Studio isn't running | `pnpm db:studio`, then https://local.drizzle.studio |
+
+## 5. Questions people ask
+
+**What is it built with, and why one app?**
+- It's one Next.js app that serves both the screens and the API (Hono at `/api/v1`), on PostgreSQL through Drizzle.
+- One codebase and one deploy.
+- The same Zod schemas check every request on the server and every response in the browser, so the two sides cannot drift apart silently.
+
+**How does login work?**
+- Better Auth with email and password. The session is an httpOnly cookie that page scripts cannot read.
+- Open sign-up is off: you can only create an account for an email that has a pending invitation.
+- Sign-in requests must come from the app's own origin.
+
+**How are roles enforced?**
+- On the server, on every request: the API looks up your membership for that project and its role.
+- A project you're not in returns 404, so its existence isn't revealed. A wrong role returns 403. Missing login returns 401.
+- The screens only hide buttons; the server is the real gate.
+
+**Who can do what?**
+- Engineers start projects, invite people (including more engineers), set up materials and checklists, verify deliveries and review work.
+- Contractors log deliveries, usage, attendance and wages.
+- Owners watch spending and approve changes and payments.
+- A project can have several engineers with equal rights. Any engineer can revoke an invite or remove a member, but never themselves.
+
+**How do you stop a contractor faking records?** The main defences:
+- Stock and audit records are append-only: the database rejects edits and deletes. A mistake is fixed with an adjustment that keeps the old value and a reason.
+- The engineer confirms deliveries; bag codes can be registered so each bag is used once.
+- Progress photos must carry a capture time no more than 10 minutes before upload.
+- The owner gets fraud flags: new supplier, bank-detail change, a delivery not confirmed in 2 days, an unusual price, a payment without a verified delivery, repeated delays.
+- Contractor and engineer collusion is made visible through flags and the audit trail, not prevented. We don't claim fraud is impossible.
+
+**How is money handled?**
+- Every amount is an integer number of paise, so there are no rounding errors.
+- The server calculates payment amounts and caps them at the owner's approved order.
+- Slate never holds money: payments use a mock provider that is labelled as a mock. A real build would use a licensed gateway.
+
+**What if two people save at the same time?**
+- Related writes run in one database transaction, with row locks where it matters. Using stock and consuming bag codes, for example, commit together or not at all.
+- Database constraints back this up: a unique challan number per supplier, foreign keys, and checks on money and quantities.
+
+**How do other people's changes show up?**
+- Every screen refreshes its data every 10 s and right after each save.
+- It's plain polling, chosen because it's simple and works through the tunnel. No WebSockets.
+
+**What does the AI do?**
+- Ask Slate answers short construction questions using Groq through the Vercel AI SDK.
+- Concrete and brick quantities come from fixed formulas on the server; the model only explains the numbers.
+- It can't see project records and turns down off-topic questions. It's limited to 10 questions per minute, and without a key it says it's offline.
+- Checklists can be drafted by AI and fall back to a template.
+- It is not engineering sign-off.
+
+**Where do photos go?**
+- In a private folder on the server (`UPLOAD_DIR`), never a public bucket.
+- They're served only to project members. sharp checks each file is a real image.
+
+**How does the Revit import work?**
+- The engineer exports quantities from Revit as .xlsx, and the browser reads it with fflate (an .xlsx is a zip of XML files).
+- It makes one material per category and unit. The .rvt file itself is not read.
+
+**How is it tested?**
+- TypeScript across the stack, Biome for lint and format, and Vitest for unit tests.
+- API tests run against a throwaway PostgreSQL in CI; Playwright drives real browsers.
+
+**Where's the API documentation?**
+- `GET /api/v1/doc` returns the OpenAPI document, generated from the same Zod schemas.
+- Section 13 lists every endpoint.
+
+**Can it go to production?**
+- The Dockerfile builds a standalone Node server, so it runs on any Node host with a managed PostgreSQL.
+- Today it runs on a laptop and is shared through a tunnel.
+- A real launch would still need verified phone sign-in, a real payment gateway, backups and hardening.
+
+**Does it work offline?** No. It needs a connection to the server.
+
+**Phone invites?** Stored, but they can't be redeemed until phone sign-in with verification exists.
+
+## 6. Settings (`.env`)
 
 | Variable | What |
 |---|---|
@@ -72,9 +236,9 @@ API tests (`tests/api`) need `SLATE_TEST_DATABASE=1` and a loopback database nam
 | `SLATE_DEMO_SEED`, `SLATE_DEMO_PASSWORD` | Seed switch and the demo accounts' password (8–64 characters). Change it and restart the server (or run `pnpm db:seed`): the demo accounts follow it |
 | `UPLOAD_DIR` | Private folder for uploaded photos |
 | `NEXT_PUBLIC_USE_MOCKS` | `0` = live database, `1` = in-browser demo data (dev only) |
-| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL` | Ask Slate and AI checklists (section 6) |
+| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL` | Ask Slate and AI checklists (section 11) |
 
-## 4. Accounts, roles and screens
+## 7. Accounts, roles and screens
 
 Demo accounts: `owner@demo.invalid`, `contractor@demo.invalid`, `engineer@demo.invalid`; password is
 `SLATE_DEMO_PASSWORD`. New people join by invitation: any engineer invites an email on **Team** as
@@ -96,7 +260,88 @@ Walkthroughs for both demos (seeded project, new project) are in [DEMO.md](DEMO.
 columns A–F; rows without a category (titles, subtotals) are skipped. One material per category and
 unit. The `.rvt` file itself is not read.
 
-## 5. Database
+## 8. Screens and navigation
+
+`/` sends you to `/projects`. Signed out, any page offers a link to `/login`.
+
+| Route | Screen | Who |
+|---|---|---|
+| `/login` | Sign in; **Invited? Create your account** for invited emails | Everyone |
+| `/projects` | Your projects, your invitations (Accept / Decline), **Start a project** | Everyone; Start only for engineers |
+| `/projects/[id]` | Project home: Owner Home, Contractor **Today**, Engineer Home with **Set up the project** | Members |
+| `/projects/[id]/logs` | Spends, stock movements, attendance, fixes (engineers see no money) | Owner, engineer |
+| `/projects/[id]/site` | Work by phase, checklist tasks, changes, progress timeline | Everyone |
+| `/projects/[id]/money` | Spending, wage sheet, suppliers, orders, mock payments, autopay | Owner |
+| `/projects/[id]/stock` | Stock per material with charts | Contractor, engineer |
+| `/projects/[id]/wages` | Wage sheet, record a payment, add or remove workers | Contractor |
+| `/projects/[id]/team` | People with tap-to-call; engineers invite, revoke and remove | Members |
+| `/styleguide` | Design tokens and components (development only) | Developers |
+
+Each role gets four tabs and one centre button. They sit in the top bar on desktop and the bottom dock on a phone:
+
+| Role | Tabs | Centre button |
+|---|---|---|
+| Owner | Home · Logs · Site · Money | **Approvals** |
+| Contractor | Today · Stock · Site · Wages | **Log** (delivery, usage, attendance) |
+| Engineer | Home · Logs · Site · Stock | **Review** (tasks and deliveries to check) |
+
+Other ways around:
+- The project name at the top switches projects and links to **Team** and **All projects and invitations**.
+- The sparkle button opens **Ask Slate**.
+- Your role is fixed per project, so switching to a project where you're the contractor switches to the contractor tabs.
+
+## 9. Where the code lives
+
+```text
+src/
+  app/                    Next.js routes (one folder per screen, section 8)
+    api/[[...route]]/     hands every /api/v1 request to the Hono app
+    api/auth/[...auth]/   Better Auth sign-in, sign-out and session
+  components/             screens and parts, one folder per area:
+    shell/                top bar, dock, project switcher, project list, role tabs (nav.ts)
+    today/ stock/ wages/  contractor screens (Today forms, Fix sheet, stock charts, wages)
+    owner/ money/ logs/   owner home, money page, logs page
+    engineer/ site/       engineer home, project setup and Revit import, review, site and checklist
+    team/ auth/           Team page, invitations, start a project, login form
+    payments/ approvals/  suppliers, payments, delivery checks, change approvals
+    photos/ assistant/    camera and photo proof, Ask Slate
+    charts/ ui/ brand/    charts, shadcn building blocks, logo
+  hooks/                  TanStack Query hooks: every API read and write the screens make
+  lib/                    browser-safe helpers: API client, formatting, dates, Revit parser (boq.ts)
+  shared/schemas/         the API contract: Zod schemas used by server and browser
+  server/
+    app.ts                the Hono app; mounts every route module
+    routes/               one file per resource: validates input, calls a service
+    services/             business rules, transactions and database queries
+    middleware/           sign-in check (auth.ts) and the error format (errors.ts)
+    ai/                   Ask Slate, checklist drafts, the quantity calculators
+  db/
+    schema.ts             every table (auth tables in auth-schema.ts)
+    migrations/           SQL migrations, applied in order
+    seed.ts               demo accounts and projects
+  mocks/                  in-browser demo data for NEXT_PUBLIC_USE_MOCKS=1
+tests/api/                API tests against a throwaway PostgreSQL
+tests/e2e/                Playwright browser tests
+docs/                     specification, API table, ledgers, this handbook
+```
+
+How one save travels, using a delivery as the example:
+1. The **screen** (`components/today/today-page.tsx`) calls a **hook** (`hooks/use-project-data.ts`).
+2. The hook sends JSON through `lib/api/client.ts` to `POST /api/v1/projects/{id}/deliveries`.
+3. The **route** (`server/routes/deliveries.ts`) checks the body against the shared **schema** (`shared/schemas/deliveries.ts`).
+4. The route calls the **service** (`server/services/stock-ledger.ts`). The service checks your membership and role, then writes the delivery and the audit entry in one transaction through Drizzle.
+5. The response is checked against the same schema in the browser. The hook then refreshes the affected lists, and other people's screens catch up within 10 s.
+
+To add a feature, work in this order:
+1. Schema in `src/shared/schemas`.
+2. A migration, if the database changes.
+3. The service.
+4. The route.
+5. A hook.
+6. The screen.
+7. Tests for each layer.
+
+## 10. Database
 
 - **Drizzle Studio:** `pnpm db:studio`, then open <https://local.drizzle.studio>. It reads `DATABASE_URL`
   from `.env`; browse and edit every table. Close it with Ctrl+C.
@@ -107,7 +352,7 @@ unit. The `.rvt` file itself is not read.
 - Money is integer **paise**; quantities have at most 3 decimals; dates are IST `YYYY-MM-DD`.
 - Ledgers are append-only: fix a wrong entry with an adjustment (`POST /projects/{id}/adjustments`), never an edit.
 
-## 6. AI (Ask Slate, checklists)
+## 11. AI (Ask Slate, checklists)
 
 `.env`: `AI_PROVIDER=groq`, `AI_MODEL=openai/gpt-oss-120b`, `AI_API_KEY=<your Groq key>`. Without
 `AI_MODEL` or the key, Ask Slate replies `{ "source": "offline" }` and checklists use the template.
@@ -123,28 +368,7 @@ deterministic server calculators (`src/server/ai/calculations.ts`: dry-volume fa
 concrete, 1.33 for mortar, 50 kg bag = 0.035 m³); the model only reports their numbers. Limits: 10
 questions per user per minute, 20 s timeout. Answers are not engineering sign-off.
 
-## 7. Share with other laptops (Cloudflare tunnel)
-
-```bash
-./share.sh            # add --build after code changes
-```
-
-It builds if needed, serves production on :3100, opens a free `https://….trycloudflare.com` tunnel
-and prints the address. Anyone with the link can use it from any laptop or phone; sign in there,
-not on localhost. Ctrl+C stops both. The address changes every run, and data stays in your local
-database, so your machine must stay on.
-
-Install `cloudflared` once (no sudo):
-
-```bash
-curl -L -o ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-chmod +x ~/.local/bin/cloudflared
-```
-
-To run Slate *on* another laptop instead, clone the repo there and follow section 2 with its own
-`.env` and database.
-
-## 8. API conventions
+## 12. API conventions
 
 - Base: `/api/v1`. Auth: Better Auth at `/api/auth` (`POST /api/auth/sign-in/email` with
   `{ email, password }`, `POST /api/auth/sign-out`). Sessions are an httpOnly cookie; send an `Origin`
@@ -165,7 +389,7 @@ curl -c jar -H "origin: $B" -H 'content-type: application/json' \
 curl -b jar $B/api/v1/projects
 ```
 
-## 9. Every endpoint: inputs and outputs
+## 13. Every endpoint: inputs and outputs
 
 #### `POST /invitations/signup`
 - **Body** (JSON): { email: string, name: string, password: string }
