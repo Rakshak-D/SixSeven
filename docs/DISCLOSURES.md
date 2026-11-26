@@ -28,3 +28,7 @@ Maintained by Codex. Update this file when tools, external services, dependencie
 - The M5 demo progress image is an original synthetic SVG illustration embedded in the opt-in seed and rasterized to PNG with Sharp. It contains no real worker or site photography and uses no external image source.
 - Repository LICENSE declares MIT, copyright Rakshak D, 2026.
 - This disclosure does not verify provenance of every pre-existing scaffold line or any external artifact that was not accessed.
+
+## Supplier payment simulation
+
+The supplier workflow uses synthetic account details and a mock payment provider. No payment gateway, bank API, real payment credentials or money movement are involved.

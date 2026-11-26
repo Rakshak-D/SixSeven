@@ -2,6 +2,13 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Approved suppliers, mock payments and owner flags
+
+- Requests #16–19 and #25, 2026-11-26 IST, branch `be/supplier-mock-payments`, migration `0014_supplier_mock_payments`. Added owner-only supplier, bank-change, order, mandate, approval and payment reads. Verified deliveries enter the mock queue transactionally. Release consumes approved capacity and enforces applicable mandate caps. The owner summary exposes deterministic review flags.
+- No external gateway or real payment data is used. Bank account values are reduced to their last four digits before storage. Only project owners can manage or read these operations. Delegation is outside the owner-only approval policy.
+- Fresh migration, seed, upgrade, Biome, typecheck and all 23 focused stock and supplier tests passed. The concurrent supplier test first exposed a database lock conflict. A project lock compatible with foreign-key checks preserves serialization and resolved it.
+- Frontend handoff: use `src/shared/schemas/supplier-payments.ts` from `src/hooks/use-supplier-payments.ts` and replace the strict frontend mock-only response readers in `src/lib/supplier-payments.ts` before enabling live supplier data. Supplier edits return a mock receipt; refresh the overview for updated state. Mandate updates require `paused`. The verification queue does not disclose prices.
+
 ## Entry — Delivery and material identity verification (#13–14)
 
 - Branch `be/bag-verification`, migration `0013_bag_verification`. Added the engineer queue, verification routes, project-unique codes and transactional usage consumption. Existing materials remain quantity-based unless tracking is set on creation. Tracked and verified quantity corrections require a separate reconciliation mechanism.
