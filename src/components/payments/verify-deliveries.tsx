@@ -77,8 +77,6 @@ function VerifyForm({
 }) {
   const verify = useVerifyDelivery(projectId);
   const [note, setNote] = useState("");
-  const [codes, setCodes] = useState("");
-  const bagCodes = codes.split(/\s+/).filter(Boolean);
   return (
     <div className="space-y-4">
       <p className="font-semibold">
@@ -88,25 +86,16 @@ function VerifyForm({
       <Field label="Your note" hint="What you counted and checked.">
         {(id) => <TextArea id={id} value={note} onChange={setNote} />}
       </Field>
-      {delivery.tracksBags ? (
-        <Field label="Bag codes" hint="Enter one code per bag, one per line.">
-          {(id) => <TextArea id={id} value={codes} onChange={setCodes} />}
-        </Field>
-      ) : null}
       <FormError error={verify.error} />
       <Button
         size="lg"
         className="w-full"
-        disabled={
-          !note.trim() ||
-          verify.isPending ||
-          (delivery.tracksBags && bagCodes.length !== delivery.qty)
-        }
+        disabled={!note.trim() || verify.isPending}
         onClick={() =>
           verify.mutate(
             {
               path: `/projects/${encodeURIComponent(projectId)}/deliveries/${encodeURIComponent(delivery.deliveryId)}/verify`,
-              body: { note, ...(delivery.tracksBags ? { codes: bagCodes } : {}) },
+              body: { note },
             },
             {
               onSuccess: () => {

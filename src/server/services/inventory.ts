@@ -44,7 +44,7 @@ export async function createMaterial(
   input: CreateMaterialInput,
 ) {
   return db.transaction(async (tx) => {
-    await requireProjectAccess(tx, actor, projectId, ["contractor"]);
+    await requireProjectAccess(tx, actor, projectId, ["contractor", "engineer"]);
     const [material] = await tx
       .insert(materials)
       .values({

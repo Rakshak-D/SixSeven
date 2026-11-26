@@ -20,6 +20,7 @@ import { addDays, mondayOf, todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise } from "@/lib/format";
 import { referenceRules } from "@/lib/payment-reference";
 import { CreateWagePaymentInput, type WagePaymentMode } from "@/shared/schemas/wages";
+import { WorkersCard } from "./workers-card";
 
 const eyebrow = "font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]";
 const days = (halfDays: number) => `${halfDays / 2} ${halfDays === 2 ? "day" : "days"}`;
@@ -202,6 +203,8 @@ export function WagesPage() {
           })}
         </ul>
       )}
+
+      {project.role === "contractor" ? <WorkersCard projectId={id} /> : null}
 
       <PaySheet projectId={id} today={today} state={pay} onClose={() => setPay(null)} />
       <FixSheet projectId={id} target={fix} onClose={() => setFix(null)} />

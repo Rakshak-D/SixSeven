@@ -18,7 +18,6 @@ import { useMaterials } from "@/hooks/use-project-data";
 import { usePaymentWrite } from "@/hooks/use-supplier-payments";
 import type { Supplier } from "@/lib/supplier-payments";
 import {
-  ApproveSupplierPaymentsInput,
   ChangeSupplierBankInput,
   CreateSupplierInput,
   CreateSupplierOrderInput,
@@ -176,7 +175,6 @@ export function BankChangeForm({ projectId, supplier, onDone }: Common & { suppl
 
 export function AutopayForm({ projectId, supplier, onDone }: Common & { supplier: Supplier }) {
   const [enabled, setEnabled] = useState(supplier.autopay.enabled);
-  const [paused, setPaused] = useState(supplier.autopay.paused ?? false);
   return (
     <WriteForm
       projectId={projectId}
@@ -199,7 +197,7 @@ export function AutopayForm({ projectId, supplier, onDone }: Common & { supplier
       ]}
       body={(v, note) => ({
         enabled,
-        paused,
+        paused: supplier.autopay.paused ?? false,
         perBillCapPaise: money(v.bill),
         perWeekCapPaise: money(v.week),
         note,
@@ -216,15 +214,6 @@ export function AutopayForm({ projectId, supplier, onDone }: Common & { supplier
           onChange={(e) => setEnabled(e.target.checked)}
         />
         Pay {supplier.name} automatically
-      </label>
-      <label className="flex min-h-11 items-center gap-3 font-semibold">
-        <input
-          type="checkbox"
-          className="size-5 accent-primary"
-          checked={paused}
-          onChange={(event) => setPaused(event.target.checked)}
-        />
-        Pause this supplier’s autopay
       </label>
       <p className="text-[15px] text-muted-foreground">
         Only after your engineer verifies a delivery that matches your order, and never above these
@@ -267,25 +256,6 @@ export function DecisionForm({
       onDone={onDone}
     >
       <p className="text-ink-2">{summary}</p>
-    </WriteForm>
-  );
-}
-
-export function BatchPaymentForm({ projectId, ids, onDone }: Common & { ids: string[] }) {
-  return (
-    <WriteForm
-      projectId={projectId}
-      path="/payments/approve"
-      schema={ApproveSupplierPaymentsInput}
-      body={(_, note) => ({ ids, note })}
-      submit="Approve selected mock payments"
-      saved="Mock payments recorded"
-      onDone={onDone}
-    >
-      <p className="text-ink-2">
-        The server checks all {ids.length} selected payments together. If any fails, the batch is
-        not recorded.
-      </p>
     </WriteForm>
   );
 }

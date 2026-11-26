@@ -6,10 +6,17 @@ import {
   AddProjectMemberInput,
   CreateProjectInput,
   CreateProjectInvitationInput,
+  InvitationClosedResponse,
+  InvitationSignUpInput,
+  InvitationSignUpResponse,
+  MyPermissionsResponse,
   MyPhoneResponse,
+  ProjectInvitationParams,
   ProjectInvitationQuery,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
+  ProjectMemberParams,
+  ProjectMemberRemovedResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectsResponse,
@@ -21,14 +28,19 @@ import { type AuthEnv, requireActor } from "../middleware/auth";
 import {
   acceptProjectInvitation,
   createProjectInvitation,
+  declineProjectInvitation,
   listMyInvitations,
   listProjectInvitations,
+  revokeProjectInvitation,
+  signUpInvited,
 } from "../services/invitations";
 import {
   addProjectMember,
+  canCreateProjects,
   createProject,
   listProjects,
   listProjectTeam,
+  removeProjectMember,
   requireProjectAccess,
   updateMyPhone,
 } from "../services/projects";
@@ -45,6 +57,24 @@ const errors = {
 };
 
 export const projects = createRouter<AuthEnv>()
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/invitations/signup",
+      tags: ["projects"],
+      request: { body: { required: true, content: json(InvitationSignUpInput) } },
+      responses: {
+        201: {
+          description: "Account created; sign in, then accept",
+          content: json(InvitationSignUpResponse),
+        },
+        400: error("Invalid request"),
+        409: error("No pending invitation for this email, or it already has an account"),
+        500: error("Unexpected error"),
+      },
+    }),
+    async (c) => c.json(await signUpInvited(getDatabase().db, c.req.valid("json")), 201),
+  )
   .openapi(
     createRoute({
       method: "post",
@@ -205,6 +235,73 @@ export const projects = createRouter<AuthEnv>()
   )
   .openapi(
     createRoute({
+      method: "post",
+      path: "/invitations/{id}/decline",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: IdParams },
+      responses: {
+        200: {
+          description: "Invitation declined and deleted",
+          content: json(InvitationClosedResponse),
+        },
+        ...errors,
+        409: error("Invitation already accepted"),
+      },
+    }),
+    async (c) =>
+      c.json(
+        await declineProjectInvitation(getDatabase().db, c.get("actor"), c.req.valid("param").id),
+        200,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "delete",
+      path: "/projects/{id}/invitations/{invitationId}",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: ProjectInvitationParams },
+      responses: {
+        200: {
+          description: "Pending invitation revoked and deleted (engineers)",
+          content: json(InvitationClosedResponse),
+        },
+        ...errors,
+        409: error("Invitation already accepted; remove the member instead"),
+      },
+    }),
+    async (c) => {
+      const { id, invitationId } = c.req.valid("param");
+      return c.json(
+        await revokeProjectInvitation(getDatabase().db, c.get("actor"), id, invitationId),
+        200,
+      );
+    },
+  )
+  .openapi(
+    createRoute({
+      method: "delete",
+      path: "/projects/{id}/members/{userId}",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: ProjectMemberParams },
+      responses: {
+        200: {
+          description: "Member removed; their records stay (engineers)",
+          content: json(ProjectMemberRemovedResponse),
+        },
+        ...errors,
+        409: error("Engineers cannot remove themselves"),
+      },
+    }),
+    async (c) => {
+      const { id, userId } = c.req.valid("param");
+      return c.json(await removeProjectMember(getDatabase().db, c.get("actor"), id, userId), 200);
+    },
+  )
+  .openapi(
+    createRoute({
       method: "get",
       path: "/projects/{id}/members",
       tags: ["projects"],
@@ -220,6 +317,23 @@ export const projects = createRouter<AuthEnv>()
     }),
     async (c) =>
       c.json(await listProjectTeam(getDatabase().db, c.get("actor"), c.req.valid("param").id), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/me/permissions",
+      tags: ["projects"],
+      middleware: auth,
+      responses: {
+        200: {
+          description: "What the caller may do outside a project",
+          content: json(MyPermissionsResponse),
+        },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json({ canCreateProjects: await canCreateProjects(getDatabase().db, c.get("actor")) }, 200),
   )
   .openapi(
     createRoute({

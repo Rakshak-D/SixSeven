@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { ChangeList } from "@/components/approvals/change-list";
+import { Field, TextArea } from "@/components/forms";
 import { Button } from "@/components/ui/button";
 import { useChangeRequests, useDecideProposal, useProposals } from "@/hooks/use-project-data";
 import { ApiClientError } from "@/lib/api/client";
@@ -68,19 +69,17 @@ export function ApprovalsList({ projectId }: { projectId: string }) {
                 <p className="text-[13px] text-muted-foreground">
                   Proposed {formatShortDate(istDateOf(p.createdAt))}
                 </p>
-                <label className="mt-3 block text-sm font-medium">
-                  Decision note
-                  <textarea
-                    className="mt-1 block w-full rounded-xl border bg-background px-3 py-2"
-                    required
-                    maxLength={2000}
-                    value={notes[p.id] ?? ""}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setNotes((current) => ({ ...current, [p.id]: value }));
-                    }}
-                  />
-                </label>
+                <div className="mt-3">
+                  <Field label="Your note" hint="Why you approve or reject. Required.">
+                    {(fieldId) => (
+                      <TextArea
+                        id={fieldId}
+                        value={notes[p.id] ?? ""}
+                        onChange={(value) => setNotes((current) => ({ ...current, [p.id]: value }))}
+                      />
+                    )}
+                  </Field>
+                </div>
                 <div className="mt-3 flex gap-2">
                   <Button className="flex-1" disabled={busy} onClick={() => choose(p, "approve")}>
                     Approve

@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { Db, Transaction } from "@/db/client";
 import { expectedDeliveries, materials, projectMembers } from "@/db/schema";
 import { ErrorCode } from "@/shared/errors";
@@ -102,6 +102,7 @@ async function lockPending(tx: Transaction, actor: Actor, id: string) {
       and(
         eq(projectMembers.projectId, expectedDeliveries.projectId),
         eq(projectMembers.userId, actor.userId),
+        isNull(projectMembers.removedAt),
       ),
     )
     .where(eq(expectedDeliveries.id, id))

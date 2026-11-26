@@ -24,49 +24,23 @@ The repository is public. Treat every committed file as public. The current defa
 
 ## Canonical instructions
 
-AGENTS.md is the canonical instruction source. Root and nested CLAUDE.md files must continue to import or reference the AGENTS.md beside them using the repository's existing @AGENTS.md mechanism. Codex maintains AGENTS.md files. Do not edit CLAUDE.md unless the import mechanism needs a coordinated correction.
+AGENTS.md is the canonical instruction source. Root and nested CLAUDE.md files import the AGENTS.md beside them with @AGENTS.md; keep that mechanism. Edit AGENTS.md, not CLAUDE.md.
 
-Before editing a directory, read its AGENTS.md and the root PROJECT_LEDGER.md, BACKEND_LEDGER.md, FRONTEND_LEDGER.md, DECISIONS.md, and docs/API.md as relevant. An instruction file does not prove the feature it describes exists.
+Before editing a directory, read its AGENTS.md and docs/API.md as relevant. An instruction file does not prove the feature it describes exists.
 
 ## Ownership
 
-| Owner | Paths and responsibilities |
-|---|---|
-| Codex | src/db/**; src/server/** including src/server/ai/**; src/app/api/[[...route]]/route.ts; src/shared/** and shared API schemas; docs/API.md; backend and integration tests including tests/api/** and backend/shared unit tests; package.json, pnpm-lock.yaml, pnpm-workspace.yaml; CI, build, database, container, deployment and repository hygiene configuration; README.md and docs/devops.md; every AGENTS.md file; PROJECT_LEDGER.md, BACKEND_LEDGER.md, DECISIONS.md, DISCLOSURES.md; overall coordination. |
-| Claude | Frontend implementation files in src/app/** except src/app/api/**; src/components/**; src/hooks/**; src/lib/api/**; src/mocks/**; frontend-specific tests and tests/e2e/**; docs/FRONTEND_LEDGER.md after initialization. AGENTS.md and CLAUDE.md instruction files are excluded. |
+Claude owns the whole repository: frontend, backend, database, shared contract, tests, configuration and records (set by Max, 2026-11-26). The earlier Codex/Claude lane split, its handoffs and its ledger gates no longer apply. Some nested AGENTS.md files still describe the old lanes; this section overrides them.
 
-Codex maintains all AGENTS.md files, including nested guidance located inside Claude-owned directories. Claude reads those instructions but does not edit them.
+## Contract-first API
 
-Codex must not edit frontend-owned implementation files without an explicitly coordinated handoff. Claude must not implement API routes, database access, authentication or authorization logic, or competing request/response schemas.
+The shared Zod schemas in src/shared/** and docs/API.md are the single API contract. Define method, path, authentication, authorization, request and response schemas, and errors there before building on them, and use those schemas on both sides; never define competing frontend-only shapes. Keep frontend-safe schemas free of database drivers, server-only modules, secrets, and runtime-only imports.
 
-### Frontend is closed to Codex (set by Max, 2026-11-26)
-
-- Codex does not edit any frontend file: `src/app/**` except `src/app/api/**`, `src/components/**`, `src/hooks/**`, `src/lib/api/**`, `src/mocks/**`, frontend tests, `tests/e2e/**`. This overrides every earlier line, ledger entry or handoff that says otherwise.
-- When Codex needs a frontend change, it writes the request in BACKEND_LEDGER.md (files, reason, expected change). Claude reads it and decides. Codex does not make the change itself, even a small one.
-- Every agent reads PROJECT_LEDGER.md, BACKEND_LEDGER.md and docs/FRONTEND_LEDGER.md at the start of every task and again before each commit, push or merge. Do not rely on memory of earlier sessions.
-- When main is merged into a frontend branch, Claude does not take frontend changes it did not make if they would change a feature Claude built. Small fixes (typos, lint, type errors) may stay, and Claude lists what changed and what it did in docs/FRONTEND_LEDGER.md and tells Max.
-
-### Mixed concerns and handoffs
-
-- src/app/api/[[...route]]/route.ts is the Next.js-to-Hono server bridge and is owned by Codex. src/server/app.ts and route modules are also Codex-owned.
-- src/app/api/auth/[...auth]/route.ts is the Better Auth server bridge and is owned by Codex.
-- src/app/layout.tsx, page files, client providers, and visual components are Claude-owned. A change there that alters server wiring or an API assumption needs a handoff before editing.
-- Root manifests, lockfiles, .env.example, GitHub workflows, Docker files, and shared build/lint configuration are Codex-owned. Claude records dependency or config requests in FRONTEND_LEDGER.md; Codex reviews and implements them.
-- src/shared/** and docs/API.md are Codex-owned contract sources. Claude requests changes in FRONTEND_LEDGER.md or a GitHub issue; Codex evaluates and updates the canonical contract.
-- tests/api/** and backend integration tests are Codex-owned. Frontend-specific tests are Claude-owned. Cross-stack end-to-end acceptance work must be assigned in PROJECT_LEDGER.md before either side edits shared test setup.
-- docs/FRONTEND_LEDGER.md is exclusively written by Claude after initialization. Codex reads it and records responses in BACKEND_LEDGER.md or the API contract without editing Claude's ledger.
-
-A handoff names the files, reason, expected change, branch/commit, and checks. Keep the change in the receiving owner's lane where possible. For a file with unavoidable mixed ownership, agree on the handoff in the relevant ledger or issue before editing; review both sides before integration.
-
-## Contract-first parallel work
-
-The shared Zod schemas in src/shared/** and docs/API.md are the single API contract. Codex defines method, path, authentication, authorization, request and response schemas, and errors before feature implementation. Keep frontend-safe schemas free of database drivers, server-only modules, secrets, and runtime-only imports.
-
-Claude may use only development fixtures derived from the agreed shared contract. Mark mock data clearly in the UI and in FRONTEND_LEDGER.md; never return a fake success that looks live. Keep contract availability, backend readiness, and frontend integration as separate statuses. Breaking contract changes require coordination and a contract-only integration step before dependent work is merged.
+Mark mock data clearly in the UI and never return a fake success that looks live. The live app runs with NEXT_PUBLIC_USE_MOCKS=0.
 
 ## Planned feature: anti-fraud and payments
 
-Status: PLANNED. The frontend developer approved this direction on 2026-11-25 in the team doc "SixSeven: Anti-Fraud and Payments Plan". It is not yet in docs/SPECIFICATION.md or docs/API.md, and no milestone is assigned. Before any implementation, Codex folds it into the specification, the shared contract and a milestone. Backend requests 13 to 19 in docs/FRONTEND_LEDGER.md carry the details.
+Status: PLANNED. The frontend developer approved this direction on 2026-11-25 in the team doc "SixSeven: Anti-Fraud and Payments Plan". It is not yet in docs/SPECIFICATION.md or docs/API.md, and no milestone is assigned. Before any implementation, fold it into the specification, the shared contract and a milestone. Requests 13 to 19 in docs/FRONTEND_LEDGER.md carry the details.
 
 The problem it answers: a contractor buys genuine material, shows the owner the real bill, resells the stock and builds with cheaper material. The fix checks material again at the moment of use and keeps the contractor out of the money flow. Once authorized, these rules hold:
 
@@ -87,22 +61,22 @@ Use:
 - be/<topic> for backend features
 - ai/<topic> for AI integrations
 - ops/<topic> for infrastructure
-- fe/<topic> for frontend work owned exclusively by Claude
+- fe/<topic> for frontend work
+- fix/<topic> for fixes across the stack
 
 Before each implementation task:
 1. Verify the branch and clean working-tree status.
 2. Fetch remote changes and confirm the exact main base.
-3. Read the latest API contract and both relevant ledgers.
+3. Read the latest API contract.
 4. Check whether main or an active branch changed the intended files.
-5. Confirm every planned file belongs to the current owner's lane.
 
-Create feature branches from the latest verified main. Do not create a branch for Claude's lane on Claude's behalf. Never commit or push directly to main. Use pull requests and merge commits so active branch ancestry remains synchronizable. When an active branch needs main, merge main into it with a merge commit; do not rebase or force-push shared work. Do not assume squash-merging keeps a long-lived local branch synchronized.
+Create feature branches from the latest verified main. Never commit or push directly to main. Use pull requests and merge commits so active branch ancestry remains synchronizable. When an active branch needs main, merge main into it with a merge commit; do not rebase or force-push shared work. Do not assume squash-merging keeps a long-lived local branch synchronized.
 
-On conflicts, identify the files and commits. Resolve only conflicts fully inside your ownership where the right result is clear. Stop for cross-ownership conflicts and coordinate. Never resolve blindly with ours or theirs. Do not delete remote branches.
+On conflicts, identify the files and commits. Resolve conflicts only where the right result is clear; otherwise stop and ask Max. Never resolve blindly with ours or theirs. Do not delete remote branches.
 
 ## Dependency and repository hygiene
 
-Codex is the sole writer of shared dependency manifests and lockfiles. Inspect current packages before considering a change. Use the pinned package manager and lockfile; do not install global packages, upgrade unnecessarily, overlap libraries, or hand-merge generated lockfiles. Keep package-manager stores, caches, Corepack data, and temp files under ignored .cache/ paths inside this workspace where supported.
+Inspect current packages before considering a change. Use the pinned package manager and lockfile; do not install global packages, upgrade unnecessarily, overlap libraries, or hand-merge generated lockfiles. Keep package-manager stores, caches, Corepack data, and temp files under ignored .cache/ paths inside this workspace where supported.
 
 Keep real environment files, credentials, node_modules, build outputs, test reports, logs, local databases and dumps, generated uploads, caches, and temporary files ignored. Track only sanitized environment examples and required lockfiles. Inspect the exact diff and staged paths for secrets and generated content before every commit.
 
@@ -118,6 +92,6 @@ Do not modify unrelated code to make a check pass. Do not disable lint, tests, s
 
 ## Project records
 
-Codex maintains PROJECT_LEDGER.md, BACKEND_LEDGER.md, DECISIONS.md, DISCLOSURES.md, docs/API.md, and all AGENTS.md files. Claude maintains FRONTEND_LEDGER.md after its existing initialization.
+The records live in docs/: PROJECT_LEDGER.md, BACKEND_LEDGER.md, FRONTEND_LEDGER.md, DECISIONS.md, DISCLOSURES.md, DEMO.md and API.md. Keep entries short.
 
 Use PLANNED, IN_PROGRESS, BLOCKED, IMPLEMENTED, VERIFIED, and INTEGRATED precisely. VERIFIED requires actual verification. INTEGRATED requires the work to be merged and integration-tested. Record backend checkpoints with an IST timestamp, milestone, branch, scope, files, API/database changes, verification commands and outcomes, dependencies, limitations, frontend effects, commit/PR reference when available, and next action.

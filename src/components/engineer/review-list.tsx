@@ -1,19 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Field, FormError, firstProblem, TextArea } from "@/components/forms";
-import { PhotoPicker, photoProblem } from "@/components/photos/photo-picker";
 import { ProofPhoto } from "@/components/photos/proof-photo";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChecklists, useReviewChecklistItem, useTimeline } from "@/hooks/use-project-data";
-import { api } from "@/lib/api/client";
 import { activeItems, latestSubmission, type VerifiedItem } from "@/lib/checklist";
 import { istDateOf } from "@/lib/dates";
 import { formatShortDate, formatTimeIst } from "@/lib/format";
-import { SteelProofPhotos } from "@/shared/schemas/checklist";
 import type { ProgressResponse } from "@/shared/schemas/progress";
 
 function ReviewCard({
@@ -29,36 +25,8 @@ function ReviewCard({
   const submission = latestSubmission(item);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string>();
-  const client = useQueryClient();
-  const [steelFiles, setSteelFiles] = useState<File[]>([]);
-  const steelPath = `/checklist-items/${encodeURIComponent(item.id)}/steel-proof`;
-  const steelKey = [projectId, "steel-proof", item.id];
-  const steel = useQuery({
-    queryKey: steelKey,
-    enabled: Boolean(item.requiresSteelProof),
-    queryFn: () => api("GET", steelPath, { schema: SteelProofPhotos }),
-  });
-  const upload = useMutation({
-    mutationFn: (progressId: string) => {
-      const invalid = photoProblem(steelFiles);
-      if (invalid) throw new Error(invalid);
-      const form = new FormData();
-      form.set("progressId", progressId);
-      form.set("note", note);
-      for (const photo of steelFiles) {
-        form.append("photos", photo);
-        form.append("capturedAt", new Date(photo.lastModified).toISOString());
-      }
-      return api("POST", steelPath, { body: form, schema: SteelProofPhotos });
-    },
-    onSuccess: async () => {
-      setSteelFiles([]);
-      await client.invalidateQueries({ queryKey: steelKey });
-    },
-  });
   if (!submission?.progressId) return null;
   const progressId = submission.progressId;
-  const evidence = steel.data?.filter((photo) => photo.progressId === progressId) ?? [];
 
   function decide(decision: "accept" | "send_back") {
     const found = firstProblem([
@@ -106,45 +74,12 @@ function ReviewCard({
         >
           {(id) => <TextArea id={id} value={note} onChange={setNote} />}
         </Field>
-        {item.requiresSteelProof ? (
-          <div className="space-y-2">
-            <p className="font-medium">Steel-marking evidence</p>
-            {evidence.length ? (
-              <div className="flex gap-2 overflow-x-auto">
-                {evidence.map((photo) => (
-                  <ProofPhoto key={photo.id} url={photo.url} alt="Steel markings" />
-                ))}
-              </div>
-            ) : (
-              <>
-                <PhotoPicker files={steelFiles} onChange={setSteelFiles} max={3} />
-                <Button
-                  variant="outline"
-                  disabled={
-                    steel.isPending ||
-                    steel.isError ||
-                    upload.isPending ||
-                    !note.trim() ||
-                    !steelFiles.length
-                  }
-                  onClick={() => upload.mutate(progressId)}
-                >
-                  Save steel evidence
-                </Button>
-              </>
-            )}
-            <FormError error={upload.error ?? steel.error} />
-          </div>
-        ) : null}
         <FormError error={problem ?? review.error} />
         <div className="grid grid-cols-2 gap-2">
           <Button variant="outline" disabled={review.isPending} onClick={() => decide("send_back")}>
             Send back / Reject
           </Button>
-          <Button
-            disabled={review.isPending || !proof || (item.requiresSteelProof && !evidence.length)}
-            onClick={() => decide("accept")}
-          >
+          <Button disabled={review.isPending || !proof} onClick={() => decide("accept")}>
             Accept
           </Button>
         </div>

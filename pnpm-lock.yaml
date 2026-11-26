@@ -215,6 +215,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(kysely@0.29.9)(postgres@4.1.1)
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       hono:
         specifier: ^4.13.21
         version: 4.13.21

@@ -17,6 +17,7 @@ import { CreateWagePaymentInput } from "@/shared/schemas/wages";
 import { account, user } from "./auth-schema";
 import { getDatabase } from "./client";
 import { disposableDatabase } from "./config";
+import { demoPassword, syncDemoPasswords } from "./demo-passwords";
 import {
   adjustments,
   attendance,
@@ -109,16 +110,7 @@ async function seed() {
     throw new Error("Enable the seed explicitly for the disposable demo database");
   }
   disposableDatabase(process.env.CI === "true" ? "test" : "demo");
-  const password = process.env.SLATE_DEMO_PASSWORD;
-  if (
-    !password ||
-    password.length < 12 ||
-    password.length > 64 ||
-    password.startsWith("replace-with-")
-  ) {
-    throw new Error("Set SLATE_DEMO_PASSWORD to a local secret of 12–64 characters");
-  }
-  const demoPassword: string = password;
+  const password = demoPassword();
 
   const { db, sql } = getDatabase();
   let cleanupDemoPhoto: (() => Promise<void>) | undefined;
@@ -134,7 +126,7 @@ async function seed() {
           .from(user)
           .where(eq(user.email, identity.email));
         if (!existing) {
-          await auth.api.signUpEmail({ body: { ...identity, password: demoPassword } });
+          await auth.api.signUpEmail({ body: { ...identity, password } });
           [existing] = await tx
             .select({ id: user.id })
             .from(user)
@@ -153,6 +145,8 @@ async function seed() {
       const contractor = await provision(identities.contractor);
       const engineer = await provision(identities.engineer);
       const isolated = await provision(identities.isolated);
+      // Existing demo accounts follow the current SLATE_DEMO_PASSWORD.
+      await syncDemoPasswords(tx);
       const projectId = "demo-greenfield";
       const isolatedId = "demo-isolated";
       await tx

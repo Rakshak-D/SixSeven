@@ -9,6 +9,7 @@ checks pass) · **VERIFIED** (exercised in a browser at phone and desktop sizes)
 
 | Screen / feature | Route | API it needs | Status |
 |---|---|---|---|
+| Team: invite site engineers, revoke waiting invites, remove people (confirm sheet); Invitations: Decline | `/projects/[id]/team`, `/projects` | `POST /projects/:id/invitations` (engineer role), `DELETE /projects/:id/invitations/:invitationId`, `DELETE /projects/:id/members/:userId`, `POST /invitations/:id/decline` | INTEGRATED on `fix/team-membership`: API tests on PostgreSQL; Team page checked at 390/768/1440 in light and dark on live demo data (Revoke and Decline buttons covered by tests, not seen in the browser) |
 | Ask Slate (site assistant), redesigned for phone and desktop | every `/projects/[id]` page | `POST /projects/:id/ai/chat` (requests 29, 30) | IMPLEMENTED; checked in a browser on demo data |
 | Owner Home: left in budget, spent over time (from `spendByWeek`), needs you, today on site, recent spends with filters, material use vs plan, stock sparklines | `/projects/[id]` (owner) | summary, stock, movements, materials, activity, proposals, checklists, wage-payments, workers, adjustments | MOCKED, verified in a browser |
 | Owner approvals (centre button and Home): approve or reject proposed changes | sheet | `GET /projects/:id/proposals`, `POST /proposals/:id/decision` | MOCKED, verified in a browser |
@@ -63,14 +64,22 @@ proposed method + path, fields, priority / blocking.
 | Work | Waits on |
 |---|---|
 | Worker removal with a reason on the team screen | Ready (request 5) |
-| Expected deliveries: schedule, accept, reject, challan photo | Ready (request 6) |
-| Set my phone number | Ready (request 12) |
+| Expected deliveries: schedule, accept, reject, challan photo | Removed from the UI (2026-11-26) |
+| Set my phone number | Removed from the UI (2026-11-26) |
 | Cheque payments and reference rules | PR #29 |
 | Approval chain and medical claims against the live routes, including the 10-character minimum note on checklist and attendance requests | Ready (requests 20, 23) |
 | Ask Slate: use the shared schemas, label offline replies, show streaming | Requests 29, 30 |
 | Desktop top nav cuts the project name to a letter or two at 1024 to 1440 px (older than the Ask Slate button) | Ready |
 
 ## Entries
+
+### 2026-11-26 IST · End-to-end prototype (live, no mocks)
+
+- **Branch:** `fix/e2e-prototype` from main `1c661f3`. Claude now owns the whole repo; the lane rules are gone from root AGENTS.md.
+- **Restored our design** (as at `adae389`) and kept the live wiring. Removed from the UI: expected deliveries, concrete calculator, project setup panel, steel proof, bag codes, batch payments, items to review, challan upload, phone card, and the duplicate /sign-in page. Their backend stays, unused.
+- **Added:** invite sign-up (`POST /invitations/signup`) and the join mode on /login; engineers may create materials; engineer setup on home (Revit .xlsx import, add material, checklist builder); contractor workers on Wages.
+- **Verified:** a script of real API requests against the dev server, flows A and B, 35/35 steps passed; lint, typecheck, 107 unit tests and the build pass. The new API test in `tests/api/auth-projects.test.ts` is NOT_RUN locally (no slate_test database); CI runs it.
+- **Not verified:** the screens in a browser; Max checks them by hand.
 
 ### 2026-11-26 IST · Ask Slate redesign
 

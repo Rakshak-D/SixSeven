@@ -14,6 +14,7 @@ import {
   SignInResponse,
 } from "@/shared/schemas/auth";
 import {
+  MyPermissionsResponse,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
   ProjectMemberResponse,
@@ -74,6 +75,10 @@ function call(path: string, cookie?: string, body?: unknown, headers: Record<str
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+function remove(path: string, cookie?: string) {
+  return app.request(`/api/v1${path}`, { method: "DELETE", headers: cookie ? { cookie } : {} });
 }
 
 async function error(response: Response, status: number, code: string) {
@@ -224,6 +229,7 @@ describe("projects and scoped access", () => {
         name: "Demo Owner",
         role: "owner",
         phone: "+919876543210",
+        isMe: false,
       });
       expect(roster.find(({ userId }) => userId === engineer.userId)).not.toHaveProperty("phone");
       expect(
@@ -248,10 +254,10 @@ describe("projects and scoped access", () => {
   };
 
   it("creates a project and membership atomically, and scopes roles and listings per project", async () => {
-    const owner = await login(DemoAccountEmail.owner);
+    const creator = await login(DemoAccountEmail.engineer);
     const unauthorized = await call("/projects", undefined, input);
     await error(unauthorized, 401, "UNAUTHENTICATED");
-    const response = await call("/projects", owner.cookie, input);
+    const response = await call("/projects", creator.cookie, input);
     expect(response.status).toBe(201);
     const created = ProjectResponse.parse(await response.json());
     expect(created.role).toBe("engineer");
@@ -262,18 +268,18 @@ describe("projects and scoped access", () => {
       .select()
       .from(projectMembers)
       .where(
-        and(eq(projectMembers.projectId, created.id), eq(projectMembers.userId, owner.userId)),
+        and(eq(projectMembers.projectId, created.id), eq(projectMembers.userId, creator.userId)),
       );
     expect(member?.role).toBe("engineer");
     const audit = await db.select().from(auditLog).where(eq(auditLog.projectId, created.id));
     expect(audit.map(({ entity }) => entity).sort()).toEqual(["member", "project"]);
-    expect(audit.every(({ actorId }) => actorId === owner.userId)).toBe(true);
+    expect(audit.every(({ actorId }) => actorId === creator.userId)).toBe(true);
 
-    const own = ProjectsResponse.parse(await (await call("/projects", owner.cookie)).json());
+    const own = ProjectsResponse.parse(await (await call("/projects", creator.cookie)).json());
     expect(own).toEqual(
       expect.arrayContaining([
         created,
-        expect.objectContaining({ id: "demo-greenfield", role: "owner" }),
+        expect.objectContaining({ id: "demo-greenfield", role: "engineer" }),
       ]),
     );
     expect(own.some(({ id }) => id === "demo-isolated")).toBe(false);
@@ -281,7 +287,7 @@ describe("projects and scoped access", () => {
     const other = ProjectsResponse.parse(await (await call("/projects", isolated.cookie)).json());
     expect(other.map(({ id }) => id)).toEqual(["demo-isolated"]);
     expect(
-      ProjectResponse.parse(await (await call(`/projects/${created.id}`, owner.cookie)).json()),
+      ProjectResponse.parse(await (await call(`/projects/${created.id}`, creator.cookie)).json()),
     ).toEqual(created);
     await error(await call(`/projects/${created.id}`, isolated.cookie), 404, "NOT_FOUND");
     await error(await call("/projects/missing-project", isolated.cookie), 404, "NOT_FOUND");
@@ -373,7 +379,7 @@ describe("projects and scoped access", () => {
     const invite = { email: DemoAccountEmail.owner.toUpperCase(), role: "owner" };
     await error(await call(path, contractor.cookie, invite), 404, "NOT_FOUND");
     await error(
-      await call(path, engineer.cookie, { ...invite, role: "engineer" }),
+      await call(path, engineer.cookie, { ...invite, role: "admin" }),
       400,
       "VALIDATION_ERROR",
     );
@@ -469,8 +475,158 @@ describe("projects and scoped access", () => {
     );
   });
 
+  it("lets only a pending email invitee create an account, once", async () => {
+    const engineer = await login(DemoAccountEmail.engineer);
+    const project = ProjectResponse.parse(
+      await (await call("/projects", engineer.cookie, input)).json(),
+    );
+    const email = `joiner-${crypto.randomUUID()}@example.test`;
+    const account = { email, name: "New Joiner", password: "joiner-pass-123" };
+    await error(await call("/invitations/signup", undefined, account), 409, "CONFLICT");
+    const invited = await call(`/projects/${project.id}/invitations`, engineer.cookie, {
+      email,
+      role: "contractor",
+    });
+    expect(invited.status).toBe(201);
+    const invitation = ProjectInvitationResponse.parse(await invited.json());
+    await error(
+      await call("/invitations/signup", undefined, { ...account, password: "short" }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    expect((await call("/invitations/signup", undefined, account)).status).toBe(201);
+    await error(await call("/invitations/signup", undefined, account), 409, "CONFLICT");
+    const signIn = await authRequest("sign-in/email", {
+      body: { email, password: account.password },
+    });
+    expect(signIn.status).toBe(200);
+    const cookie = signIn.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .join("; ");
+    const accepted = await call(`/invitations/${invitation.id}/accept`, cookie, {});
+    expect(accepted.status).toBe(200);
+    expect(ProjectMemberResponse.parse(await accepted.json()).role).toBe("contractor");
+  });
+
+  it("lets any engineer invite engineers, and closes invitations and memberships", async () => {
+    const engineer = await login(DemoAccountEmail.engineer);
+    const owner = await login(DemoAccountEmail.owner);
+    const contractor = await login(DemoAccountEmail.contractor);
+    const project = ProjectResponse.parse(
+      await (await call("/projects", engineer.cookie, input)).json(),
+    );
+    const path = `/projects/${project.id}/invitations`;
+    const members = `/projects/${project.id}/members`;
+    const invite = async (cookie: string, email: string, role: string) => {
+      const created = await call(path, cookie, { email, role });
+      expect(created.status).toBe(201);
+      return ProjectInvitationResponse.parse(await created.json());
+    };
+
+    // A second engineer joins through an engineer invitation and can invite people too.
+    const email = `engineer-${crypto.randomUUID()}@example.test`;
+    const second = await invite(engineer.cookie, email, "engineer");
+    const account = { email, name: "Second Engineer", password: "second-pass-123" };
+    expect((await call("/invitations/signup", undefined, account)).status).toBe(201);
+    const signIn = await authRequest("sign-in/email", {
+      body: { email, password: account.password },
+    });
+    const engineer2 = {
+      cookie: signIn.headers
+        .getSetCookie()
+        .map((value) => value.split(";")[0])
+        .join("; "),
+    };
+    const joined = await call(`/invitations/${second.id}/accept`, engineer2.cookie, {});
+    expect(ProjectMemberResponse.parse(await joined.json()).role).toBe("engineer");
+
+    // The invited person declines; the invitation is gone and the address can be invited again.
+    const toOwner = await invite(engineer2.cookie, DemoAccountEmail.owner, "owner");
+    const decline = `/invitations/${toOwner.id}/decline`;
+    await error(await call(decline, contractor.cookie, {}), 404, "NOT_FOUND");
+    const declined = await call(decline, owner.cookie, {});
+    expect(declined.status).toBe(200);
+    expect(await declined.json()).toEqual({ id: toOwner.id, outcome: "declined" });
+    await error(await call(decline, owner.cookie, {}), 404, "NOT_FOUND");
+    expect(
+      ProjectInvitationsResponse.parse(await (await call("/invitations", owner.cookie)).json()),
+    ).not.toContainEqual(expect.objectContaining({ id: toOwner.id }));
+
+    // An engineer revokes a pending invitation; nobody else can.
+    const again = await invite(engineer.cookie, DemoAccountEmail.owner, "owner");
+    await error(await remove(`${path}/${again.id}`, owner.cookie), 404, "NOT_FOUND");
+    const revoked = await remove(`${path}/${again.id}`, engineer2.cookie);
+    expect(await revoked.json()).toEqual({ id: again.id, outcome: "revoked" });
+    await error(await remove(`${path}/${again.id}`, engineer.cookie), 404, "NOT_FOUND");
+    await error(await call(`/invitations/${again.id}/accept`, owner.cookie, {}), 404, "NOT_FOUND");
+
+    // An accepted invitation cannot be revoked; the member is removed instead.
+    const toContractor = await invite(engineer.cookie, DemoAccountEmail.contractor, "contractor");
+    expect(
+      (await call(`/invitations/${toContractor.id}/accept`, contractor.cookie, {})).status,
+    ).toBe(200);
+    await error(await remove(`${path}/${toContractor.id}`, engineer.cookie), 409, "CONFLICT");
+    await error(await remove(`${members}/${engineer.userId}`, contractor.cookie), 403, "FORBIDDEN");
+    const removed = await remove(`${members}/${contractor.userId}`, engineer.cookie);
+    expect(removed.status).toBe(200);
+    expect(await removed.json()).toMatchObject({ userId: contractor.userId, role: "contractor" });
+    await error(await remove(`${members}/${contractor.userId}`, engineer.cookie), 404, "NOT_FOUND");
+    await error(await call(`/projects/${project.id}`, contractor.cookie), 404, "NOT_FOUND");
+    expect(
+      ProjectsResponse.parse(await (await call("/projects", contractor.cookie)).json()),
+    ).not.toContainEqual(expect.objectContaining({ id: project.id }));
+    const roster = ProjectTeamResponse.parse(await (await call(members, engineer2.cookie)).json());
+    expect(roster.map(({ role }) => role).sort()).toEqual(["engineer", "engineer"]);
+    expect(roster.filter(({ isMe }) => isMe)).toHaveLength(1);
+
+    // The removed person can be invited back onto the same membership.
+    const back = await invite(engineer.cookie, DemoAccountEmail.contractor, "contractor");
+    expect((await call(`/invitations/${back.id}/accept`, contractor.cookie, {})).status).toBe(200);
+    expect(
+      ProjectResponse.parse(await (await call(`/projects/${project.id}`, contractor.cookie)).json())
+        .role,
+    ).toBe("contractor");
+
+    // Two engineers removing each other at once: one wins, so an engineer always remains.
+    const [engineer2Id] = roster.filter(({ role, isMe }) => role === "engineer" && isMe);
+    const mutual = await Promise.all([
+      remove(`${members}/${engineer2Id.userId}`, engineer.cookie),
+      remove(`${members}/${engineer.userId}`, engineer2.cookie),
+    ]);
+    expect(mutual.map(({ status }) => status).sort()).toEqual([200, 404]);
+    const survivor = mutual[0].status === 200 ? engineer : engineer2;
+    const survivorId = survivor === engineer ? engineer.userId : engineer2Id.userId;
+    await error(await remove(`${members}/${survivorId}`, survivor.cookie), 409, "CONFLICT");
+
+    const { db } = getDatabase();
+    const actions = await db
+      .select({ action: auditLog.action, entity: auditLog.entity })
+      .from(auditLog)
+      .where(eq(auditLog.projectId, project.id));
+    for (const [entity, action] of [
+      ["invitation", "declined"],
+      ["invitation", "revoked"],
+      ["member", "removed"],
+    ])
+      expect(actions).toContainEqual({ entity, action });
+  });
+
+  it("lets only engineers start a project", async () => {
+    const permissions = async (cookie: string) =>
+      MyPermissionsResponse.parse(await (await call("/me/permissions", cookie)).json());
+    const engineer = await login(DemoAccountEmail.engineer);
+    expect(await permissions(engineer.cookie)).toEqual({ canCreateProjects: true });
+    for (const role of ["owner", "contractor"] as const) {
+      const { cookie } = await login(DemoAccountEmail[role]);
+      expect(await permissions(cookie)).toEqual({ canCreateProjects: false });
+      await error(await call("/projects", cookie, input), 403, "FORBIDDEN");
+    }
+    await error(await call("/me/permissions"), 401, "UNAUTHENTICATED");
+  });
+
   it("rolls back a project and its creator membership when audit recording fails", async () => {
-    const { cookie } = await login(DemoAccountEmail.contractor);
+    const { cookie } = await login(DemoAccountEmail.engineer);
     const { db, sql } = getDatabase();
     const name = `Rollback ${crypto.randomUUID()}`;
     await sql`create function slate_test_reject_project_audit() returns trigger language plpgsql as $$
@@ -493,5 +649,8 @@ describe("projects and scoped access", () => {
     expect(spec.paths["/api/v1/projects"]).toHaveProperty("post");
     expect(spec.paths["/api/v1/projects/{id}"]).toHaveProperty("get");
     expect(spec.paths["/api/v1/projects/{id}/members"]).toHaveProperty("post");
+    expect(spec.paths["/api/v1/projects/{id}/members/{userId}"]).toHaveProperty("delete");
+    expect(spec.paths["/api/v1/projects/{id}/invitations/{invitationId}"]).toHaveProperty("delete");
+    expect(spec.paths["/api/v1/invitations/{id}/decline"]).toHaveProperty("post");
   });
 });

@@ -10,7 +10,6 @@ import { mocksEnabled } from "@/mocks";
 import { AssistantInput, AssistantResponse } from "@/shared/schemas/assistant";
 import type { ProjectResponse } from "@/shared/schemas/projects";
 import { Answer } from "./answer";
-import { ConcreteEstimate } from "./concrete-estimate";
 
 const suggestions = [
   {
@@ -135,8 +134,6 @@ export function AssistantSheet({
           Demo: these are fixed sample answers, not live AI.
         </p>
       ) : null}
-
-      {!mocksEnabled ? <ConcreteEstimate projectId={project.id} /> : null}
 
       {turns.length === 0 ? (
         <>

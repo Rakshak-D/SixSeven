@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { MaterialCalculationInput } from "@/shared/schemas/material-calculation";
-import { calculateMaterialEstimates } from "./calculations";
+import { calculateBrickwork, calculateMaterialEstimates } from "./calculations";
 
 it("converts mixed units and preserves zero wastage", () => {
   const input = MaterialCalculationInput.parse({
@@ -20,4 +20,19 @@ it("converts mixed units and preserves zero wastage", () => {
   expect(calculateMaterialEstimates({ ...input, wasteMarginPercent: 5 }).sandM3).toBeGreaterThan(
     estimate.sandM3,
   );
+});
+
+it("counts bricks and mortar for a one-brick wall", () => {
+  const wall = calculateBrickwork({
+    lengthM: 4,
+    heightM: 3,
+    thicknessM: 0.23,
+    brickMm: [190, 90, 90],
+    jointMm: 10,
+    mortarRatio: 6,
+    wastagePercent: 0,
+  });
+  // 2.76 m³ of wall at 500 modular bricks per m³.
+  expect(wall).toMatchObject({ wallVolumeM3: 2.76, bricks: 1380, mortarWetM3: 0.636 });
+  expect(wall.cementBags50Kg).toBe(4);
 });

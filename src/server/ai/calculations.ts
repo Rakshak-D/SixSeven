@@ -36,3 +36,43 @@ export function calculateMaterialEstimates(input: MaterialCalculationInput) {
     ],
   });
 }
+
+export type BrickworkInput = {
+  lengthM: number;
+  heightM: number;
+  thicknessM: number;
+  brickMm: [number, number, number];
+  jointMm: number;
+  mortarRatio: number;
+  wastagePercent: number;
+};
+
+/**
+ * Bricks and cement mortar for a solid wall. Each brick plus its joint occupies
+ * (l + j)(w + j)(h + j); mortar is the wall volume the bricks leave, with a dry-volume factor of 1.33.
+ */
+export function calculateBrickwork(input: BrickworkInput) {
+  const wall = input.lengthM * input.heightM * input.thicknessM;
+  if (!(wall > 0 && wall <= 10000)) throw new Error("Wall volume must be between 0 and 10000 m³");
+  const [l, w, h] = input.brickMm.map((mm) => mm / 1000);
+  const j = input.jointMm / 1000;
+  const withJoint = (l + j) * (w + j) * (h + j);
+  const bricksExact = wall / withJoint;
+  const waste = 1 + input.wastagePercent / 100;
+  const mortarWet = Math.max(wall - bricksExact * l * w * h, 0);
+  const mortarDry = mortarWet * 1.33 * waste;
+  const cementM3 = mortarDry / (1 + input.mortarRatio);
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  return {
+    wallVolumeM3: round(wall),
+    bricks: Math.ceil(bricksExact * waste),
+    mortarWetM3: round(mortarWet),
+    cementBags50Kg: Math.ceil(cementM3 / 0.035),
+    sandM3: round(cementM3 * input.mortarRatio),
+    assumptions: [
+      `Brick ${input.brickMm.join(" × ")} mm with ${input.jointMm} mm joints; solid wall, no openings deducted.`,
+      `Cement mortar 1:${input.mortarRatio}, dry-volume factor 1.33, one 50 kg bag = 0.035 m³.`,
+      `Wastage: ${input.wastagePercent}% on bricks and mortar.`,
+    ],
+  };
+}

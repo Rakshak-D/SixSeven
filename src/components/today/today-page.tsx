@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -14,9 +13,7 @@ import {
   rupeesToPaise,
   SavedNotice,
 } from "@/components/forms";
-import { PhotoPicker, photoProblem } from "@/components/photos/photo-picker";
 import { useCurrentProject } from "@/components/shell/project-context";
-import { ExpectedDeliveries } from "@/components/today/expected-deliveries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,12 +29,9 @@ import {
   useStock,
   useWorkers,
 } from "@/hooks/use-project-data";
-import { api } from "@/lib/api/client";
 import { todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise, formatQty } from "@/lib/format";
-import { ChallanPhotoResponse, CreateChallanPhotoInput } from "@/shared/schemas/deliveries";
 import { effectiveValue, FixSheet, type FixTarget } from "./fix-sheet";
-import { ProjectSetup } from "./project-setup";
 
 const eyebrow = "font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]";
 const card = "rounded-[1.75rem] border bg-card p-5 sm:p-6";
@@ -70,8 +64,6 @@ export function TodayPage() {
         <ChangeList projectId={project.id} viewer={project.role} mine />
       </div>
 
-      {project.role === "contractor" ? <ProjectSetup projectId={project.id} /> : null}
-
       <Tabs
         value={tab}
         onValueChange={(next) => router.replace(`${pathname}?log=${next}`, { scroll: false })}
@@ -84,17 +76,12 @@ export function TodayPage() {
         </TabsList>
       </Tabs>
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {tab === "delivery" ? <DeliveryForm projectId={project.id} today={today} /> : null}
         {tab === "usage" ? <UsageForm projectId={project.id} today={today} /> : null}
         {tab === "attendance" ? <AttendanceForm projectId={project.id} today={today} /> : null}
         <TodayEntries projectId={project.id} today={today} kind={tab} onFix={setFix} />
       </div>
-      {tab === "delivery" ? (
-        <div className="mt-4">
-          <ExpectedDeliveries projectId={project.id} canDecide />
-        </div>
-      ) : null}
       <FixSheet projectId={project.id} target={fix} onClose={() => setFix(null)} />
     </div>
   );
@@ -234,59 +221,7 @@ function DeliveryForm({ projectId, today }: { projectId: string; today: string }
       <Button type="submit" size="lg" className="w-full" disabled={save.isPending}>
         {save.isPending ? "Saving…" : "Save delivery"}
       </Button>
-      {save.isSuccess ? (
-        <ChallanEvidence key={save.data.id} projectId={projectId} deliveryId={save.data.id} />
-      ) : null}
     </form>
-  );
-}
-
-function ChallanEvidence({ projectId, deliveryId }: { projectId: string; deliveryId: string }) {
-  const client = useQueryClient();
-  const [photos, setPhotos] = useState<File[]>([]);
-  const save = useMutation({
-    mutationFn: () => {
-      const problem = photoProblem(photos);
-      if (problem) throw new Error(problem);
-      const photo = photos[0];
-      const fields = CreateChallanPhotoInput.parse({
-        photo,
-        capturedAt: new Date(photo.lastModified).toISOString(),
-      });
-      const form = new FormData();
-      form.set("photo", fields.photo);
-      form.set("capturedAt", fields.capturedAt);
-      return api(
-        "POST",
-        `/projects/${encodeURIComponent(projectId)}/deliveries/${encodeURIComponent(deliveryId)}/challan-photo`,
-        {
-          body: form,
-          schema: ChallanPhotoResponse,
-        },
-      );
-    },
-    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
-  });
-  return (
-    <div className="space-y-2 border-t pt-3">
-      <p className="font-medium">Challan photo</p>
-      {save.isSuccess ? (
-        <SavedNotice>Challan evidence saved.</SavedNotice>
-      ) : (
-        <>
-          <PhotoPicker files={photos} onChange={setPhotos} max={1} />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!photos.length || save.isPending}
-            onClick={() => save.mutate()}
-          >
-            Attach challan photo
-          </Button>
-        </>
-      )}
-      <FormError error={save.error} />
-    </div>
   );
 }
 
@@ -294,21 +229,14 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
   const choice = useMaterialChoice(projectId);
   const save = useCreateUsage(projectId);
   const [qty, setQty] = useState("");
-  const [codes, setCodes] = useState("");
-  const bagCodes = codes.split(/\s+/).filter(Boolean);
   const [date, setDate] = useState(today);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string>();
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (save.isPending) return;
     const found = firstProblem([
       [parseQty(qty) === undefined, "Enter the quantity used."],
-      [
-        Boolean(choice.material?.tracksBags) && bagCodes.length !== parseQty(qty),
-        "Enter one registered code per bag.",
-      ],
       [!note.trim(), "Say where it was used."],
     ]);
     setProblem(found);
@@ -319,13 +247,11 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
         qty: parseQty(qty) as number,
         occurredOn: date,
         note,
-        ...(choice.material?.tracksBags ? { bagCodes } : {}),
       },
       {
         onSuccess: () => {
           setQty("");
           setNote("");
-          setCodes("");
         },
       },
     );
@@ -362,11 +288,6 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
       <Field label="Where was it used?">
         {(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
-      {choice.material?.tracksBags ? (
-        <Field label="Registered bag codes" hint="Enter one code per bag, one per line.">
-          {(id) => <Input id={id} value={codes} onChange={(e) => setCodes(e.target.value)} />}
-        </Field>
-      ) : null}
       <FormError error={problem ?? save.error} />
       {save.isSuccess && !save.isPending ? (
         <SavedNotice>
