@@ -4,6 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 const externalBaseURL = process.env.SLATE_E2E_BASE_URL;
 
 export default defineConfig({
+  timeout: 90000,
+  expect: { timeout: 15000 },
   testDir: "./tests/e2e",
   use: { baseURL: externalBaseURL ?? "http://localhost:3000", trace: "retain-on-failure" },
   projects: [

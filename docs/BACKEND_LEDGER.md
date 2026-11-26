@@ -327,3 +327,9 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Frontend implications: root and nested ownership now assigns frontend implementation to Claude, backend/contracts/infra to Codex. Frontend ledger requests for schemas and auth remain open pending specification; ownership request is answered. Codex did not modify the Claude-owned ledger.
 - Commit or PR reference: pending.
 - Next action: run only permitted local checks, commit, push chore/coordination, and open a PR. Do not merge without user approval.
+
+## Final integration checkpoint
+
+- PRs #29, #41 and #42 are merged. The published migration order is 0016 wage payments then 0017 capture timestamps.
+- Release work adds shared chat and calculator contracts, server-derived authorized context, bounded provider calls and deterministic concrete estimates. No live provider key was used.
+- Windows live startup and two browser onboarding and access tests passed on the isolated local release environment. Broader feature verification remains pending.

@@ -151,6 +151,7 @@ export function OwnerHome() {
   if (summary.isError) return <p className="text-destructive">{summary.error.message}</p>;
 
   const s = summary.data;
+  const fraudFlags = s.role === "owner" ? (s.fraudFlags ?? []) : [];
   const left = s.budgetPaise - s.spendPaise;
   const usedPct = s.budgetPaise ? Math.round((s.spendPaise / s.budgetPaise) * 100) : 0;
   const split = "spendSplit" in s ? s.spendSplit : null;
@@ -479,6 +480,19 @@ export function OwnerHome() {
         description="Changes and payments that need your yes."
       >
         <ApprovalsList projectId={id} />
+        {fraudFlags.length > 0 ? (
+          <section className="rounded-[1.75rem] border bg-card p-5">
+            <h2 className="text-3xl">Items to review</h2>
+            <ul className="mt-3 divide-y">
+              {fraudFlags.map((flag) => (
+                <li key={`${flag.kind}-${flag.refId}`} className="flex justify-between gap-2 py-2">
+                  <span className="capitalize">{flag.kind.replaceAll("_", " ")}</span>
+                  <time dateTime={flag.raisedOn}>{formatIsoDate(flag.raisedOn)}</time>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </Sheet>
     </div>
   );

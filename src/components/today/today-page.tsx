@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -13,6 +14,7 @@ import {
   rupeesToPaise,
   SavedNotice,
 } from "@/components/forms";
+import { PhotoPicker, photoProblem } from "@/components/photos/photo-picker";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,8 +31,10 @@ import {
   useStock,
   useWorkers,
 } from "@/hooks/use-project-data";
+import { api } from "@/lib/api/client";
 import { todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise, formatQty } from "@/lib/format";
+import { ChallanPhotoResponse, CreateChallanPhotoInput } from "@/shared/schemas/deliveries";
 import { effectiveValue, FixSheet, type FixTarget } from "./fix-sheet";
 
 const eyebrow = "font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]";
@@ -221,10 +225,59 @@ function DeliveryForm({ projectId, today }: { projectId: string; today: string }
       <Button type="submit" size="lg" className="w-full" disabled={save.isPending}>
         {save.isPending ? "Saving…" : "Save delivery"}
       </Button>
-      <p className="text-[14px] text-muted-foreground">
-        The challan photo needs the photo upload, which is not connected yet.
-      </p>
+      {save.isSuccess ? (
+        <ChallanEvidence key={save.data.id} projectId={projectId} deliveryId={save.data.id} />
+      ) : null}
     </form>
+  );
+}
+
+function ChallanEvidence({ projectId, deliveryId }: { projectId: string; deliveryId: string }) {
+  const client = useQueryClient();
+  const [photos, setPhotos] = useState<File[]>([]);
+  const save = useMutation({
+    mutationFn: () => {
+      const problem = photoProblem(photos);
+      if (problem) throw new Error(problem);
+      const photo = photos[0];
+      const fields = CreateChallanPhotoInput.parse({
+        photo,
+        capturedAt: new Date(photo.lastModified).toISOString(),
+      });
+      const form = new FormData();
+      form.set("photo", fields.photo);
+      form.set("capturedAt", fields.capturedAt);
+      return api(
+        "POST",
+        `/projects/${encodeURIComponent(projectId)}/deliveries/${encodeURIComponent(deliveryId)}/challan-photo`,
+        {
+          body: form,
+          schema: ChallanPhotoResponse,
+        },
+      );
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
+  });
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <p className="font-medium">Challan photo</p>
+      {save.isSuccess ? (
+        <SavedNotice>Challan evidence saved.</SavedNotice>
+      ) : (
+        <>
+          <PhotoPicker files={photos} onChange={setPhotos} max={1} />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!photos.length || save.isPending}
+            onClick={() => save.mutate()}
+          >
+            Attach challan photo
+          </Button>
+        </>
+      )}
+      <FormError error={save.error} />
+    </div>
   );
 }
 

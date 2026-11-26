@@ -583,3 +583,10 @@ proposed method + path, fields, priority / blocking.
 - **Design decisions:** none yet; 2–3 visual directions go to the frontend developer first.
 - **Blockers:** none for design work. Mocks and forms need backend request 1.
 - **Next:** pitch design directions, then build login + layout shell + Today screen on mocks.
+
+## Final integration checkpoint
+
+- #4 and #24: engineer project creation, email invites, recipient acceptance and persisted sent states are LIVE_VERIFIED on desktop and phone-sized viewports with seeded users. Phone invitation creation uses the shared contract. Phone redemption is BLOCKED_EXTERNAL_CONFIGURATION pending verified ownership.
+- #9, #21, #22 and #27: wage modes, required notes and capture times are FRONTEND_IMPLEMENTED after PRs #29, #41 and #42. The wage, proposal, camera and upload-specific browser flows remain NOT_VERIFIED.
+- #13–19 and #25: supplier and delivery reads, mock payment controls, typed bag codes, steel evidence and owner review flags have backend contracts. Live browser verification is pending. Delegation remains NOT_IMPLEMENTED.
+- #29–30: Ask Slate uses the shared request and response, including an explicit offline result. Rectangular concrete estimates are BACKEND_IMPLEMENTED. Live provider output is NOT_VERIFIED.
