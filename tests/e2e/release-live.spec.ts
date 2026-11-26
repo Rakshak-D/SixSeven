@@ -280,23 +280,24 @@ test("three real sessions preserve project access and wage privacy after reload"
         await contractorPage.keyboard.press("Escape");
         await contractorPage.getByRole("tab", { name: "Delivery" }).click();
         const expected = contractorPage.getByRole("region", { name: "Expected deliveries" });
-        await expected.getByText("Schedule delivery", { exact: true }).click();
+        await expected.getByText("Schedule delivery", { exact: true }).press("Enter");
         await expected.getByLabel("Expected quantity").fill("2");
         await expected.getByLabel("Expected supplier").fill("Synthetic release supplier");
-        await expected.getByRole("button", { name: "Save schedule" }).click();
+        await expected.getByRole("button", { name: "Save schedule" }).press("Enter");
         await expect(expected.getByText(/Synthetic release supplier.*pending/)).toBeVisible();
-        await expected.getByText("Record arrival or rejection").click();
+        await expected.getByText("Record arrival or rejection").press("Enter");
         await expected.getByLabel("Unit cost (₹)").fill("450");
         await expected.getByLabel("Challan number").fill("RELEASE-1");
         await expected.getByLabel("Arrival note").fill("Synthetic delivery for the release test");
-        await expected.getByRole("button", { name: "Record arrival" }).click();
+        await expected.getByRole("button", { name: "Record arrival" }).press("Enter");
         await expect(expected.getByText(/Synthetic release supplier.*accepted/)).toBeVisible();
         const challanEvidence = expected.getByText("Challan evidence", { exact: true });
-        await challanEvidence.evaluate((element) => element.scrollIntoView({ block: "center" }));
-        await challanEvidence.click();
-        await expected.getByRole("button", { name: "Take photo", exact: true }).click();
-        await expected.getByRole("button", { name: "Capture", exact: true }).click();
-        await expected.getByRole("button", { name: "Attach challan photo" }).click();
+        await challanEvidence.press("Enter");
+        await expected.getByRole("button", { name: "Take photo", exact: true }).press("Enter");
+        const capturePhoto = expected.getByRole("button", { name: "Capture", exact: true });
+        await expect(capturePhoto).toBeEnabled();
+        await capturePhoto.press("Enter");
+        await expected.getByRole("button", { name: "Attach challan photo" }).press("Enter");
         await expect(expected.getByText("Challan evidence saved.")).toBeVisible();
         const savedPhoto = await expected
           .getByRole("link", { name: "Open saved photo" })
@@ -306,11 +307,11 @@ test("three real sessions preserve project access and wage privacy after reload"
 
         await expected.getByLabel("Expected quantity").fill("1");
         await expected.getByLabel("Expected supplier").fill("Rejected synthetic supplier");
-        await expected.getByRole("button", { name: "Save schedule" }).click();
+        await expected.getByRole("button", { name: "Save schedule" }).press("Enter");
         const rejected = expected
           .getByRole("listitem")
           .filter({ hasText: "Rejected synthetic supplier" });
-        await rejected.getByText("Record arrival or rejection").click();
+        await rejected.getByText("Record arrival or rejection").press("Enter");
         await rejected
           .getByLabel("Rejection reason")
           .fill("Truck did not arrive at the scheduled time");
@@ -318,7 +319,7 @@ test("three real sessions preserve project access and wage privacy after reload"
           new Date(Date.now() + 86400000),
         );
         await rejected.getByLabel("Reschedule date (optional)").fill(tomorrow);
-        await rejected.getByRole("button", { name: "Reject expected delivery" }).click();
+        await rejected.getByRole("button", { name: "Reject expected delivery" }).press("Enter");
         await expect(expected.getByText(`Rescheduled to ${tomorrow}`)).toBeVisible();
         const apiPath = `/api/v1${path}`;
         const overviewPath = `${apiPath}/supplier-payments`;
@@ -373,12 +374,12 @@ test("three real sessions preserve project access and wage privacy after reload"
         expect((await setCap(50000)).status()).toBe(200);
         const teamPath = new URL(desktop.url()).pathname;
         await desktop.goto(path);
-        await desktop.getByRole("button", { name: "Verify", exact: true }).click();
+        await desktop.getByRole("button", { name: "Verify", exact: true }).press("Enter");
         await desktop.getByLabel("Your note").fill("Counted both sealed bags on site");
-        await desktop.getByRole("button", { name: "Scan bag code" }).click();
+        await desktop.getByRole("button", { name: "Scan bag code" }).press("Enter");
         await expect(desktop.getByLabel("Bag codes")).toHaveValue("release-a");
         await desktop.getByLabel("Bag codes").fill("release-a\nrelease-b");
-        await desktop.getByRole("button", { name: "It arrived as recorded" }).click();
+        await desktop.getByRole("button", { name: "It arrived as recorded" }).press("Enter");
         await expect(desktop.getByText("Every delivery is checked.")).toBeVisible();
         const initialPayments = await (await owner.request.get(overviewPath)).json();
         const [bill] = initialPayments.payments;
