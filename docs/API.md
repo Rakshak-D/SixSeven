@@ -184,3 +184,26 @@ Checklist creation and approved checklist additions may set `requiresSteelProof:
 | GET /checklist-items/:id/steel-proof/:photoId | Members | Protected JPEG, PNG or WebP with private, no-store caching. |
 
 Maximum 5,000,000 bytes per image. Captures more than ten minutes old or more than 30 seconds in the future are rejected. An item can have one upload per submission. Previous evidence remains readable. The server records receipt independently of the client timestamp. The upload records visual evidence and its submitting engineer. It cannot authenticate steel quality.
+
+## Supplier orders and mock payments
+
+All operations in this section require owner membership in the resource's project. Cross-project resources return 404. Shared contracts are in `supplier-payments.ts`. The backend is implemented. The frontend still requires live API wiring.
+
+| Operation | Body or query | Response |
+|---|---|---|
+| GET /projects/:id/suppliers | None | 200 `SuppliersResponse` |
+| POST /projects/:id/suppliers | `CreateSupplierInput` | 201 `SupplierWriteResponse` |
+| POST /suppliers/:id/approve | `SupplierNoteInput` | 200 `SupplierWriteResponse` |
+| POST /suppliers/:id/bank-change | `ChangeSupplierBankInput` | 200 `SupplierWriteResponse` |
+| POST /suppliers/:id/bank-change/approve | `SupplierNoteInput` | 200 `SupplierWriteResponse` |
+| PUT /suppliers/:id/autopay | `SetSupplierAutopayInput` | 200 `SupplierWriteResponse` |
+| PUT /projects/:id/autopay | `PauseSupplierPaymentsInput` | 200 `SupplierWriteResponse` |
+| POST /projects/:id/orders | `CreateSupplierOrderInput` | 201 `SupplierWriteResponse` |
+| GET /projects/:id/supplier-payments | `SupplierPaymentsQuery` | 200 `SupplierPaymentsOverview` |
+| GET /projects/:id/payments | `SupplierPaymentsQuery` | 200 `SupplierPaymentsResponse` |
+| POST /supplier-payments/:id/decision | `DecideSupplierPaymentInput` | 200 `SupplierWriteResponse` |
+| POST /payments/approve | `ApproveSupplierPaymentsInput` | 200 `SupplierWriteResponse` |
+
+Use synthetic bank identifiers. The backend stores masked bank data only. A change needs explicit owner confirmation and a 24-hour cooldown. Pending and cooling-down changes hold release. Both release paths require a verified delivery covered in full by a single approved supplier order for the same material. Enabled mandates enforce per-bill and cumulative Monday-to-Sunday IST limits. Pause disables automatic releases while preserving deliberate owner decisions within applicable caps. Conflict (409) covers ineligible or already-decided requests. Batch approval is atomic. The amount uses exact quantity × price with half-up rounding to whole paise. The receipt's `provider` is always `mock`.
+
+The owner summary may include `fraudFlags` with the detected condition, description and source ID. Rules are deterministic signals for owner review and are not proof of fraud.

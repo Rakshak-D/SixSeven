@@ -1,5 +1,5 @@
 {
-  "id": "9f4aae7a-d8bd-43fb-8417-7dbcf89b5be8",
+  "id": "8c22dea8-2592-43a2-86e3-37a3fc7f125c",
   "prevId": "612ba55e-96f0-4806-a00a-31b555b86184",
   "version": "7",
   "dialect": "postgresql",
@@ -1146,13 +1146,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "requires_steel_proof": {
-          "name": "requires_steel_proof",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {},
@@ -1287,157 +1280,6 @@
       },
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.checklist_steel_photos": {
-      "name": "checklist_steel_photos",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "item_id": {
-          "name": "item_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "progress_id": {
-          "name": "progress_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "storage_key": {
-          "name": "storage_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mime": {
-          "name": "mime",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size_bytes": {
-          "name": "size_bytes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "captured_at": {
-          "name": "captured_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "received_at": {
-          "name": "received_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "steel_photo_item_proof": {
-          "name": "steel_photo_item_proof",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "item_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "progress_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "steel_photo_proof_scope": {
-          "name": "steel_photo_proof_scope",
-          "tableFrom": "checklist_steel_photos",
-          "tableTo": "progress_updates",
-          "columnsFrom": [
-            "project_id",
-            "item_id",
-            "progress_id"
-          ],
-          "columnsTo": [
-            "project_id",
-            "checklist_item_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "steel_photo_actor_scope": {
-          "name": "steel_photo_actor_scope",
-          "tableFrom": "checklist_steel_photos",
-          "tableTo": "project_members",
-          "columnsFrom": [
-            "project_id",
-            "created_by"
-          ],
-          "columnsTo": [
-            "project_id",
-            "user_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "checklist_steel_photos_storage_key_unique": {
-          "name": "checklist_steel_photos_storage_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "storage_key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "steel_photo_capture_window": {
-          "name": "steel_photo_capture_window",
-          "value": "\"checklist_steel_photos\".\"captured_at\" between \"checklist_steel_photos\".\"received_at\" - interval '10 minutes' and \"checklist_steel_photos\".\"received_at\" + interval '30 seconds'"
-        },
-        "steel_photo_media": {
-          "name": "steel_photo_media",
-          "value": "\"checklist_steel_photos\".\"size_bytes\" between 1 and 5000000 and \"checklist_steel_photos\".\"mime\" in ('image/jpeg','image/png','image/webp')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.delivery_challan_photos": {
@@ -3375,6 +3217,526 @@
         "stock_movement_shape": {
           "name": "stock_movement_shape",
           "value": "\n    \"stock_movements\".\"qty\" between -99999999999.999 and 99999999999.999 and (\n      (\"stock_movements\".\"type\" = 'delivery' and \"stock_movements\".\"qty\" > 0 and nullif(btrim(\"stock_movements\".\"supplier\"), '') is not null\n        and nullif(btrim(\"stock_movements\".\"challan_no\"), '') is not null and \"stock_movements\".\"unit_cost_paise\" is not null\n        and \"stock_movements\".\"unit_cost_paise\" between 0 and 9007199254740991) or\n      (\"stock_movements\".\"type\" in ('usage', 'adjustment') and \"stock_movements\".\"qty\" <> 0 and\n        (\"stock_movements\".\"type\" <> 'usage' or \"stock_movements\".\"qty\" < 0)\n        and \"stock_movements\".\"supplier\" is null and \"stock_movements\".\"challan_no\" is null and \"stock_movements\".\"unit_cost_paise\" is null)\n    )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.supplier_orders": {
+      "name": "supplier_orders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qty": {
+          "name": "qty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "remaining_qty": {
+          "name": "remaining_qty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_unit_price_paise": {
+          "name": "max_unit_price_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "supplier_order_match": {
+          "name": "supplier_order_match",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "supplier_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "material_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "supplier_order_supplier_scope": {
+          "name": "supplier_order_supplier_scope",
+          "tableFrom": "supplier_orders",
+          "tableTo": "suppliers",
+          "columnsFrom": [
+            "project_id",
+            "supplier_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "supplier_order_material_scope": {
+          "name": "supplier_order_material_scope",
+          "tableFrom": "supplier_orders",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "project_id",
+            "material_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "supplier_order_scope": {
+          "name": "supplier_order_scope",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "supplier_order_limits": {
+          "name": "supplier_order_limits",
+          "value": "\"supplier_orders\".\"qty\" > 0 and \"supplier_orders\".\"remaining_qty\" between 0 and \"supplier_orders\".\"qty\" and \"supplier_orders\".\"max_unit_price_paise\" between 1 and 9007199254740991"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.supplier_payments": {
+      "name": "supplier_payments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_id": {
+          "name": "delivery_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "supplier_id": {
+          "name": "supplier_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "amount_paise": {
+          "name": "amount_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "paid_by": {
+          "name": "paid_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decision_note": {
+          "name": "decision_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "supplier_payment_weekly_spend": {
+          "name": "supplier_payment_weekly_spend",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "supplier_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "decided_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "supplier_payment_verified_delivery": {
+          "name": "supplier_payment_verified_delivery",
+          "tableFrom": "supplier_payments",
+          "tableTo": "delivery_verifications",
+          "columnsFrom": [
+            "project_id",
+            "delivery_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "delivery_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "supplier_payment_supplier_scope": {
+          "name": "supplier_payment_supplier_scope",
+          "tableFrom": "supplier_payments",
+          "tableTo": "suppliers",
+          "columnsFrom": [
+            "project_id",
+            "supplier_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "supplier_payment_order_scope": {
+          "name": "supplier_payment_order_scope",
+          "tableFrom": "supplier_payments",
+          "tableTo": "supplier_orders",
+          "columnsFrom": [
+            "project_id",
+            "order_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "supplier_payments_delivery_id_unique": {
+          "name": "supplier_payments_delivery_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "delivery_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "supplier_payment_state": {
+          "name": "supplier_payment_state",
+          "value": "\n    (\"supplier_payments\".\"status\" = 'pending' and \"supplier_payments\".\"amount_paise\" = 0 and \"supplier_payments\".\"decided_at\" is null and \"supplier_payments\".\"paid_by\" is null)\n    or (\"supplier_payments\".\"status\" = 'paid' and \"supplier_payments\".\"amount_paise\" between 1 and 9007199254740991 and \"supplier_payments\".\"decided_at\" is not null and\n      \"supplier_payments\".\"paid_by\" is not null and \"supplier_payments\".\"paid_by\" in ('autopay','owner') and \"supplier_payments\".\"supplier_id\" is not null and \"supplier_payments\".\"order_id\" is not null)\n    or (\"supplier_payments\".\"status\" = 'declined' and \"supplier_payments\".\"amount_paise\" = 0 and \"supplier_payments\".\"decided_at\" is not null and \"supplier_payments\".\"paid_by\" is null)\n  "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.supplier_project_rules": {
+      "name": "supplier_project_rules",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "paused": {
+          "name": "paused",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "supplier_project_rules_project_id_projects_id_fk": {
+          "name": "supplier_project_rules_project_id_projects_id_fk",
+          "tableFrom": "supplier_project_rules",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.suppliers": {
+      "name": "suppliers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gstin": {
+          "name": "gstin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_last4": {
+          "name": "account_last4",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pending_last4": {
+          "name": "pending_last4",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank_requested_at": {
+          "name": "bank_requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank_effective_at": {
+          "name": "bank_effective_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "autopay_enabled": {
+          "name": "autopay_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "autopay_paused": {
+          "name": "autopay_paused",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "per_bill_cap_paise": {
+          "name": "per_bill_cap_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "per_week_cap_paise": {
+          "name": "per_week_cap_paise",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "supplier_project_name": {
+          "name": "supplier_project_name",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(btrim(\"name\"))",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "suppliers_project_id_projects_id_fk": {
+          "name": "suppliers_project_id_projects_id_fk",
+          "tableFrom": "suppliers",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "supplier_project_pair": {
+          "name": "supplier_project_pair",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        },
+        "supplier_project_gstin": {
+          "name": "supplier_project_gstin",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "gstin"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "supplier_account_mask": {
+          "name": "supplier_account_mask",
+          "value": "\"suppliers\".\"account_last4\" ~ '^[0-9]{4}$' and (\"suppliers\".\"pending_last4\" is null or \"suppliers\".\"pending_last4\" ~ '^[0-9]{4}$')"
+        },
+        "supplier_valid_caps": {
+          "name": "supplier_valid_caps",
+          "value": "\"suppliers\".\"per_bill_cap_paise\" between 0 and 9007199254740991 and \"suppliers\".\"per_week_cap_paise\" between 0 and 9007199254740991 and\n    (not \"suppliers\".\"autopay_enabled\" or (\"suppliers\".\"per_bill_cap_paise\" > 0 and \"suppliers\".\"per_week_cap_paise\" >= \"suppliers\".\"per_bill_cap_paise\"))"
         }
       },
       "isRLSEnabled": false

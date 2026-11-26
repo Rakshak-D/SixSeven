@@ -17,6 +17,7 @@ import type { Actor } from "../middleware/auth";
 import { ApiError } from "../middleware/errors";
 import { recordAudit } from "./audit";
 import { requireProjectAccess } from "./projects";
+import { queueSupplierPayment } from "./supplier-payments";
 
 const notFound = () => new ApiError(404, ErrorCode.NOT_FOUND, "Delivery not found");
 const quantityError = () =>
@@ -133,6 +134,7 @@ export async function verifyDelivery(
       entityId: id,
       payload: { verification: true, bagCodeCount: codes.length },
     });
+    await queueSupplierPayment(tx, actor, delivery.projectId, id);
     return DeliveryVerificationResponse.parse({
       ok: true,
       deliveryId: id,

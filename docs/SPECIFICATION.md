@@ -38,3 +38,9 @@ Actual attendance and paid attendance entitlement are distinct. Only a medical e
 ## Steel-marking hold point
 
 Flag applicable checklist items at creation or through an approved checklist addition. A flagged item requires a project engineer to upload private steel-marking photos before accepting the current contractor submission. The evidence documents the reported brand, BIS mark and mill test certificate markings. Sending back a submission preserves its evidence. A new contractor submission requires its own photos. The system records who uploaded the evidence and receipt times. Visual review does not independently verify material quality.
+
+## Mock supplier payments and owner review signals
+
+Only project owners maintain suppliers, confirm bank changes, approve orders and decide supplier payments. Engineer verification can queue a matching delivery and trigger mock autopay when its mandate is active. Contractor wage payments use a separate authorization path. Supplier payments require supplier approval, one approved order with sufficient remaining quantity, acceptable unit price, and compliance with applicable mandate caps. A bank change holds release until the owner confirms it and the 24-hour cooldown ends. Release consumes order capacity and records the mock receipt and audit event together. Synthetic bank data is masked and no funds move.
+
+Owner-only review signals cover suppliers added within seven IST calendar dates, pending or cooling-down bank changes, deliveries without engineer confirmation after two days, unit prices above 125% of the average of the previous three to five positive deliveries of that material, at least two reschedules for the same supplier and material within 30 days, and paid receipts missing verification. Database relationships guard the last condition during normal writes. These are deterministic prompts for review.
