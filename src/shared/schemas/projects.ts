@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { Id, IsoDate, Label, Paise, Role, Timestamp } from "./common";
 
-const InvitationRole = z.enum(["owner", "contractor"]);
+/** Any engineer on a project may invite more engineers, owners and contractors. */
+const InvitationRole = z.enum(["owner", "contractor", "engineer"]);
 export const IndianMobileInput = z
   .string()
   .trim()
@@ -42,6 +43,24 @@ export type CreateProjectInvitationInput = z.infer<typeof CreateProjectInvitatio
 export type ProjectInvitationResponse = z.infer<typeof ProjectInvitationResponse>;
 export type ProjectInvitationsResponse = z.infer<typeof ProjectInvitationsResponse>;
 export type ProjectInvitationQuery = z.infer<typeof ProjectInvitationQuery>;
+/**
+ * Reply to declining or revoking a pending invitation. The invitation is deleted, so the same
+ * address can be invited again; the activity log keeps the record.
+ */
+export const InvitationClosedResponse = z.strictObject({
+  id: Id,
+  outcome: z.enum(["declined", "revoked"]),
+});
+export type InvitationClosedResponse = z.infer<typeof InvitationClosedResponse>;
+/** Reply to removing someone. Their membership stays, marked removed, so their records keep their author. */
+export const ProjectMemberRemovedResponse = z.strictObject({
+  userId: Id,
+  role: Role,
+  removedAt: Timestamp,
+});
+export type ProjectMemberRemovedResponse = z.infer<typeof ProjectMemberRemovedResponse>;
+export const ProjectInvitationParams = z.strictObject({ id: Id, invitationId: Id });
+export const ProjectMemberParams = z.strictObject({ id: Id, userId: Id });
 
 export const AddProjectMemberInput = z.strictObject({
   email: z.email().max(254),
@@ -58,6 +77,8 @@ export const ProjectTeamResponse = z.array(
   ProjectMemberResponse.extend({
     name: Label,
     phone: IndianMobile.optional(),
+    /** True on the caller's own row, so the screen can hide actions on yourself. */
+    isMe: z.boolean(),
   }),
 );
 

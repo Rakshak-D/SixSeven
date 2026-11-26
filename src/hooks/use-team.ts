@@ -5,9 +5,11 @@ import { mocksEnabled } from "@/mocks";
 import {
   CreateProjectInput,
   CreateProjectInvitationInput,
+  InvitationClosedResponse,
   MyPermissionsResponse,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
+  ProjectMemberRemovedResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectTeamResponse,
@@ -84,5 +86,49 @@ export function useInvite(projectId: string) {
         schema: ProjectInvitationResponse,
       }),
     onSuccess: () => client.invalidateQueries({ queryKey: [projectId, "invitations"] }),
+  });
+}
+
+/** The invited person says no. The invitation disappears from their list. */
+export function useDeclineInvitation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api("POST", `/invitations/${encodeURIComponent(id)}/decline`, {
+        schema: InvitationClosedResponse,
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["invitations"] }),
+  });
+}
+
+/** An engineer withdraws an invitation nobody has accepted yet. */
+export function useRevokeInvitation(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api(
+        "DELETE",
+        `/projects/${encodeURIComponent(projectId)}/invitations/${encodeURIComponent(id)}`,
+        { schema: InvitationClosedResponse },
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId, "invitations"] }),
+  });
+}
+
+/** An engineer takes someone off the project. Their past records stay. */
+export function useRemoveMember(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      api(
+        "DELETE",
+        `/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`,
+        { schema: ProjectMemberRemovedResponse },
+      ),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: [projectId, "team"] }),
+        client.invalidateQueries({ queryKey: [projectId, "invitations"] }),
+      ]),
   });
 }

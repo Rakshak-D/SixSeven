@@ -6,6 +6,7 @@ import { createAuth } from "@/server/auth";
 import { ErrorCode } from "@/shared/errors";
 import {
   type CreateProjectInvitationInput,
+  InvitationClosedResponse,
   type InvitationSignUpInput,
   normalizeIndianMobile,
   type ProjectInvitationQuery,
@@ -74,7 +75,13 @@ export async function createProjectInvitation(
           .select({ id: user.id })
           .from(user)
           .innerJoin(projectMembers, eq(projectMembers.userId, user.id))
-          .where(and(eq(projectMembers.projectId, projectId), sql`lower(${user.email}) = ${email}`))
+          .where(
+            and(
+              eq(projectMembers.projectId, projectId),
+              isNull(projectMembers.removedAt),
+              sql`lower(${user.email}) = ${email}`,
+            ),
+          )
       : [];
     if (member)
       throw new ApiError(409, ErrorCode.CONFLICT, "That account already belongs to this project");
@@ -157,10 +164,15 @@ export async function acceptProjectInvitation(db: Db, actor: Actor, id: string) 
       if (!existing) throw new ApiError(404, ErrorCode.NOT_FOUND, "Invitation not found");
       throw new ApiError(409, ErrorCode.CONFLICT, "Invitation already accepted");
     }
+    // Someone removed earlier rejoins on the same row (their old records point at it), with the new role.
     const [member] = await tx
       .insert(projectMembers)
       .values({ projectId: invitation.projectId, userId: actor.userId, role: invitation.role })
-      .onConflictDoNothing({ target: [projectMembers.projectId, projectMembers.userId] })
+      .onConflictDoUpdate({
+        target: [projectMembers.projectId, projectMembers.userId],
+        set: { role: invitation.role, removedAt: null, removedBy: null },
+        setWhere: isNotNull(projectMembers.removedAt),
+      })
       .returning({ userId: projectMembers.userId, role: projectMembers.role });
     if (!member) throw new ApiError(409, ErrorCode.CONFLICT, "You already belong to this project");
     await recordAudit(tx, {
@@ -172,6 +184,71 @@ export async function acceptProjectInvitation(db: Db, actor: Actor, id: string) 
       payload: { role: member.role, invitationId: id },
     });
     return member;
+  });
+}
+
+/** The invited person says no. The invitation is deleted so they can be invited again later. */
+export async function declineProjectInvitation(db: Db, actor: Actor, id: string) {
+  return db.transaction(async (tx) => {
+    const email = await accountEmail(tx, actor);
+    const target = and(eq(projectInvitations.id, id), eq(projectInvitations.email, email));
+    const [declined] = await tx
+      .delete(projectInvitations)
+      .where(and(target, isNull(projectInvitations.acceptedAt)))
+      .returning({ projectId: projectInvitations.projectId, role: projectInvitations.role });
+    if (!declined) {
+      const [existing] = await tx
+        .select({ id: projectInvitations.id })
+        .from(projectInvitations)
+        .where(target);
+      if (!existing) throw new ApiError(404, ErrorCode.NOT_FOUND, "Invitation not found");
+      throw new ApiError(409, ErrorCode.CONFLICT, "Invitation already accepted");
+    }
+    await recordAudit(tx, {
+      projectId: declined.projectId,
+      actorId: actor.userId,
+      action: "declined",
+      entity: "invitation",
+      entityId: id,
+      payload: { role: declined.role },
+    });
+    return InvitationClosedResponse.parse({ id, outcome: "declined" });
+  });
+}
+
+/**
+ * An engineer withdraws an invitation nobody has accepted yet. To take away an accepted one,
+ * remove the member instead.
+ */
+export async function revokeProjectInvitation(db: Db, actor: Actor, projectId: string, id: string) {
+  return db.transaction(async (tx) => {
+    await requireProjectAccess(tx, actor, projectId, ["engineer"]);
+    const target = and(eq(projectInvitations.id, id), eq(projectInvitations.projectId, projectId));
+    const [revoked] = await tx
+      .delete(projectInvitations)
+      .where(and(target, isNull(projectInvitations.acceptedAt)))
+      .returning({ role: projectInvitations.role });
+    if (!revoked) {
+      const [existing] = await tx
+        .select({ id: projectInvitations.id })
+        .from(projectInvitations)
+        .where(target);
+      if (!existing) throw new ApiError(404, ErrorCode.NOT_FOUND, "Invitation not found");
+      throw new ApiError(
+        409,
+        ErrorCode.CONFLICT,
+        "Already accepted. Remove the person from the team instead",
+      );
+    }
+    await recordAudit(tx, {
+      projectId,
+      actorId: actor.userId,
+      action: "revoked",
+      entity: "invitation",
+      entityId: id,
+      payload: { role: revoked.role },
+    });
+    return InvitationClosedResponse.parse({ id, outcome: "revoked" });
   });
 }
 

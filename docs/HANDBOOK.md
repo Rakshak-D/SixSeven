@@ -77,12 +77,16 @@ API tests (`tests/api`) need `SLATE_TEST_DATABASE=1` and a loopback database nam
 ## 4. Accounts, roles and screens
 
 Demo accounts: `owner@demo.invalid`, `contractor@demo.invalid`, `engineer@demo.invalid`; password is
-`SLATE_DEMO_PASSWORD`. New people join by invitation: the engineer invites an email on **Team**, the
-person picks **Invited? Create your account** on `/login`, signs up, then accepts on **Projects**.
+`SLATE_DEMO_PASSWORD`. New people join by invitation: any engineer invites an email on **Team** as
+owner, contractor or another site engineer; the person picks **Invited? Create your account** on
+`/login`, signs up, then accepts or declines on **Projects**. A project can have several engineers with
+the same rights. On **Team** an engineer can revoke an invite nobody has accepted yet, or remove anyone
+except themselves. A removed person loses access at once, keeps their name on what they already logged,
+and can be invited back.
 
 | Role | Sees and does |
 |---|---|
-| Engineer | The only role that starts projects; **Set up the project** on home (Revit .xlsx import, add material, write checklist); reviews tasks; verifies deliveries; invites on Team; no wage amounts |
+| Engineer | The only role that starts projects; **Set up the project** on home (Revit .xlsx import, add material, write checklist); reviews tasks; verifies deliveries; on Team invites people (more engineers too), revokes waiting invites and removes people; no wage amounts |
 | Contractor | **Today** (delivery, usage, attendance, Fix); **Stock**; **Wages** (pay, add/remove workers); works checklist tasks. Cannot start projects |
 | Owner | Home (budget, spend, approvals with a note); **Money** (suppliers, orders, mock payments, autopay); **Logs**. Cannot start projects |
 
@@ -187,25 +191,37 @@ curl -b jar $B/api/v1/projects
 - **Errors:** 400, 401, 403, 404, 409, 500
 
 #### `GET /projects/{id}/members`
-- **200**: array of { userId: string, role: `owner` \| `contractor` \| `engineer`, name: string, phone?: string }
+- **200**: array of { userId: string, role: `owner` \| `contractor` \| `engineer`, name: string, phone?: string, isMe: boolean }
 - **Errors:** 400, 401, 403, 404, 500
 
 #### `POST /projects/{id}/invitations`
-- **Body** (JSON): { email: string, role: `owner` \| `contractor` } **or** { phone: string, role: `owner` \| `contractor` }
-- **201**: { id: string, projectId: string, projectName: string, role: `owner` \| `contractor`, createdAt: string, status: `pending` \| `accepted`, email: string } **or** { id: string, projectId: string, projectName: string, role: `owner` \| `contractor`, createdAt: string, status: `pending` \| `accepted`, phone: string }
+- **Body** (JSON): { email: string, role: `owner` \| `contractor` \| `engineer` } **or** { phone: string, role: `owner` \| `contractor` \| `engineer` }
+- **201**: { id: string, projectId: string, projectName: string, role: `owner` \| `contractor` \| `engineer`, createdAt: string, status: `pending` \| `accepted`, email: string } **or** { id: string, projectId: string, projectName: string, role: `owner` \| `contractor` \| `engineer`, createdAt: string, status: `pending` \| `accepted`, phone: string }
 - **Errors:** 400, 401, 403, 404, 409, 500
 
 #### `GET /projects/{id}/invitations`
 - **Query:** status?: `pending` \| `accepted`
-- **200**: array of { id: string, projectId: string, projectName: string, role: `owner` \| `contractor`, createdAt: string, status: `pending` \| `accepted`, email: string } **or** { id: string, projectId: string, projectName: string, role: `owner` \| `contractor`, createdAt: string, status: `pending` \| `accepted`, phone: string }
+- **200**: array of { id: string, projectId: string, projectName: string, role: `owner` \| `contractor` \| `engineer`, createdAt: string, status: `pending` \| `accepted`, email: string } **or** { id: string, projectId: string, projectName: string, role: `owner` \| `contractor` \| `engineer`, createdAt: string, status: `pending` \| `accepted`, phone: string }
 - **Errors:** 400, 401, 403, 404, 500
 
 #### `GET /invitations`
-- **200**: array of { id: string, projectId: string, projectName: string, role: `owner` \| `contractor`, createdAt: string, status: `pending` \| `accepted`, email: string } **or** { id: string, projectId: string, projectName: string, role: `owner` \| `contractor`, createdAt: string, status: `pending` \| `accepted`, phone: string }
+- **200**: array of { id: string, projectId: string, projectName: string, role: `owner` \| `contractor` \| `engineer`, createdAt: string, status: `pending` \| `accepted`, email: string } **or** { id: string, projectId: string, projectName: string, role: `owner` \| `contractor` \| `engineer`, createdAt: string, status: `pending` \| `accepted`, phone: string }
 - **Errors:** 400, 401, 403, 404, 500
 
 #### `POST /invitations/{id}/accept`
 - **200**: { userId: string, role: `owner` \| `contractor` \| `engineer` }
+- **Errors:** 400, 401, 403, 404, 409, 500
+
+#### `POST /invitations/{id}/decline`
+- **200**: { id: string, outcome: `declined` \| `revoked` }
+- **Errors:** 400, 401, 403, 404, 409, 500
+
+#### `DELETE /projects/{id}/invitations/{invitationId}`
+- **200**: { id: string, outcome: `declined` \| `revoked` }
+- **Errors:** 400, 401, 403, 404, 409, 500
+
+#### `DELETE /projects/{id}/members/{userId}`
+- **200**: { userId: string, role: `owner` \| `contractor` \| `engineer`, removedAt: string }
 - **Errors:** 400, 401, 403, 404, 409, 500
 
 #### `GET /me/permissions`
@@ -525,4 +541,3 @@ curl -b jar $B/api/v1/projects
 - **Body** (JSON): { messages: object[] }
 - **200**: { source: `ai` \| `prototype`, reply: string } **or** { source: `offline`, message: string }
 - **Errors:** 400, 401, 403, 404, 413, 429, 500, 503
-

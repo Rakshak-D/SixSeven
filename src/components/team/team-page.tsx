@@ -2,21 +2,33 @@
 
 import { Phone } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Field, FormError, firstProblem, NativeSelect, SavedNotice } from "@/components/forms";
+import { Sheet } from "@/components/sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useInvite, useSentInvitations, useTeam } from "@/hooks/use-team";
+import {
+  useInvite,
+  useRemoveMember,
+  useRevokeInvitation,
+  useSentInvitations,
+  useTeam,
+} from "@/hooks/use-team";
+import type { ProjectTeamResponse } from "@/shared/schemas/projects";
 
 const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 const card = "rounded-[1.75rem] border bg-card p-5 sm:p-6";
+type Member = ProjectTeamResponse[number];
+type InviteRole = keyof typeof roleLabel;
 
 function InviteForm({ projectId }: { projectId: string }) {
   const invite = useInvite(projectId);
+  const revoke = useRevokeInvitation(projectId);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"owner" | "contractor">("owner");
+  const [role, setRole] = useState<InviteRole>("owner");
   const [problem, setProblem] = useState<string>();
   const sent = useSentInvitations(projectId);
 
@@ -53,9 +65,10 @@ function InviteForm({ projectId }: { projectId: string }) {
         </Field>
         <Field label="Their role">
           {(id) => (
-            <NativeSelect id={id} value={role} onChange={(v) => setRole(v as typeof role)}>
+            <NativeSelect id={id} value={role} onChange={(v) => setRole(v as InviteRole)}>
               <option value="owner">Owner</option>
               <option value="contractor">Contractor</option>
+              <option value="engineer">Site engineer</option>
             </NativeSelect>
           )}
         </Field>
@@ -65,27 +78,102 @@ function InviteForm({ projectId }: { projectId: string }) {
           {invite.isPending ? "Inviting…" : "Invite"}
         </Button>
       </form>
-      <FormError error={sent.error} />
+      <FormError error={sent.error ?? revoke.error} />
       {sent.data?.length ? (
         <ul className="mt-4 divide-y">
-          {sent.data.map((i) => (
-            <li key={i.id} className="flex items-center justify-between gap-3 py-3">
-              <span className="min-w-0 truncate">
-                {"email" in i ? i.email : i.phone} · {roleLabel[i.role]}
-              </span>
-              <Badge variant="outline">{i.status === "accepted" ? "Accepted" : "Waiting"}</Badge>
-            </li>
-          ))}
+          {sent.data.map((i) => {
+            const who = "email" in i ? i.email : i.phone;
+            return (
+              <li key={i.id} className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 truncate">
+                  {who} · {roleLabel[i.role]}
+                </span>
+                {i.status === "accepted" ? (
+                  <Badge variant="outline">Accepted</Badge>
+                ) : (
+                  <span className="flex shrink-0 items-center gap-2">
+                    <Badge variant="outline">Waiting</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={revoke.isPending}
+                      aria-label={`Revoke the invite for ${who}`}
+                      onClick={() =>
+                        revoke.mutate(i.id, {
+                          onSuccess: () => toast.success(`Invite for ${who} revoked`),
+                        })
+                      }
+                    >
+                      Revoke
+                    </Button>
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>
   );
 }
 
-/** Everyone on the project, with tap-to-call. The engineer also invites from here. */
+/** Asks before taking someone off the project: they lose access straight away. */
+function RemoveSheet({
+  projectId,
+  member,
+  onClose,
+}: {
+  projectId: string;
+  member: Member | null;
+  onClose: () => void;
+}) {
+  const remove = useRemoveMember(projectId);
+  return (
+    <Sheet
+      open={member !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          remove.reset();
+          onClose();
+        }
+      }}
+      title={member ? `Remove ${member.name}?` : "Remove"}
+      description="They lose access to this project at once. Everything they already logged stays, with their name on it. You can invite them again later."
+    >
+      {member ? (
+        <div className="space-y-4">
+          <p className="text-[15px]">
+            {member.name} · {roleLabel[member.role]}
+          </p>
+          <FormError error={remove.error} />
+          <Button
+            variant="destructive"
+            size="lg"
+            className="w-full"
+            disabled={remove.isPending}
+            onClick={() =>
+              remove.mutate(member.userId, {
+                onSuccess: () => {
+                  toast.success(`${member.name} removed`);
+                  onClose();
+                },
+              })
+            }
+          >
+            {remove.isPending ? "Removing…" : "Remove from project"}
+          </Button>
+        </div>
+      ) : null}
+    </Sheet>
+  );
+}
+
+/** Everyone on the project, with tap-to-call. Engineers also invite and remove people here. */
 export function TeamPage() {
   const project = useCurrentProject();
   const team = useTeam(project.id);
+  const isEngineer = project.role === "engineer";
+  const [removing, setRemoving] = useState<Member | null>(null);
   return (
     <div className="animate-rise space-y-4">
       <div>
@@ -106,7 +194,7 @@ export function TeamPage() {
           ) : (
             <ul className="mt-2 divide-y">
               {team.data.map((m) => (
-                <li key={m.userId} className="flex items-center gap-3 py-3">
+                <li key={m.userId} className="flex flex-wrap items-center gap-3 py-3">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{m.name}</span>
                     <span className="block text-[15px] text-muted-foreground">
@@ -114,21 +202,36 @@ export function TeamPage() {
                       {m.phone ? ` · ${m.phone}` : " · no number shared"}
                     </span>
                   </span>
-                  {m.phone ? (
-                    <Button asChild variant="outline" size="sm">
-                      <a href={`tel:${m.phone}`} aria-label={`Call ${m.name}`}>
-                        <Phone aria-hidden="true" />
-                        Call
-                      </a>
-                    </Button>
-                  ) : null}
+                  <span className="flex shrink-0 gap-2">
+                    {m.phone ? (
+                      <Button asChild variant="outline" size="sm">
+                        <a href={`tel:${m.phone}`} aria-label={`Call ${m.name}`}>
+                          <Phone aria-hidden="true" />
+                          Call
+                        </a>
+                      </Button>
+                    ) : null}
+                    {isEngineer && !m.isMe ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Remove ${m.name} from the project`}
+                        onClick={() => setRemoving(m)}
+                      >
+                        Remove
+                      </Button>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>
           )}
         </section>
-        {project.role === "engineer" ? <InviteForm projectId={project.id} /> : null}
+        {isEngineer ? <InviteForm projectId={project.id} /> : null}
       </div>
+      {isEngineer ? (
+        <RemoveSheet projectId={project.id} member={removing} onClose={() => setRemoving(null)} />
+      ) : null}
     </div>
   );
 }

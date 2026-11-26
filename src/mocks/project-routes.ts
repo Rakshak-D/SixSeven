@@ -7,9 +7,11 @@ import type { Role } from "@/shared/schemas/common";
 import {
   CreateProjectInput,
   CreateProjectInvitationInput,
+  InvitationClosedResponse,
   normalizeIndianMobile,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
+  ProjectMemberRemovedResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectTeamResponse,
@@ -63,8 +65,11 @@ export const projectRoutes: MockRoute[] = [
     path: "/projects/:id/members",
     respond: ({ params }) => {
       allow(params.id, ["owner", "contractor", "engineer"]);
+      const mine = project(params.id).role;
       return ProjectTeamResponse.parse(
-        teams.get(params.id) ?? [member("owner"), member("contractor"), member("engineer")],
+        (teams.get(params.id) ?? [member("owner"), member("contractor"), member("engineer")]).map(
+          (m) => ({ ...m, isMe: m.role === mine }),
+        ),
       );
     },
   },
@@ -131,10 +136,69 @@ export const projectRoutes: MockRoute[] = [
         startDate: new Date().toISOString().slice(0, 10),
         budgetPaise: 450_000_000,
       });
-      teams.set(invite.projectId, [member("engineer"), member(invite.role)]);
+      teams.set(
+        invite.projectId,
+        invite.role === "engineer"
+          ? [member("engineer")]
+          : [member("engineer"), member(invite.role)],
+      );
       return ProjectMemberResponse.parse({
         userId: demoPeople[invite.role].id,
         role: invite.role,
+      });
+    },
+  },
+  {
+    method: "POST",
+    path: "/invitations/:id/decline",
+    respond: ({ params }) => {
+      const index = received.findIndex((i) => i.id === params.id);
+      if (index < 0) throw new MockError(404, "NOT_FOUND", "Invitation not found");
+      received.splice(index, 1);
+      return InvitationClosedResponse.parse({ id: params.id, outcome: "declined" });
+    },
+  },
+  {
+    method: "DELETE",
+    path: "/projects/:id/invitations/:invitationId",
+    respond: ({ params }) => {
+      allow(params.id, ["engineer"]);
+      const index = sent.findIndex(
+        (i) => i.id === params.invitationId && i.projectId === params.id,
+      );
+      if (index < 0) throw new MockError(404, "NOT_FOUND", "Invitation not found");
+      if (sent[index].status === "accepted")
+        throw new MockError(
+          409,
+          "CONFLICT",
+          "Already accepted. Remove the person from the team instead",
+        );
+      sent.splice(index, 1);
+      return InvitationClosedResponse.parse({ id: params.invitationId, outcome: "revoked" });
+    },
+  },
+  {
+    method: "DELETE",
+    path: "/projects/:id/members/:userId",
+    respond: ({ params }) => {
+      allow(params.id, ["engineer"]);
+      const team = teams.get(params.id) ?? [
+        member("owner"),
+        member("contractor"),
+        member("engineer"),
+      ];
+      const gone = team.find((m) => m.userId === params.userId);
+      if (!gone) throw new MockError(404, "NOT_FOUND", "Not on this project");
+      if (gone.role === project(params.id).role)
+        throw new MockError(409, "CONFLICT", "You cannot remove yourself from the project");
+      teams.set(
+        params.id,
+        team.filter((m) => m !== gone),
+      );
+      return ProjectMemberRemovedResponse.parse({
+        userId: gone.userId,
+        role: gone.role,
+        removedAt: new Date().toISOString(),
       });
     },
   },

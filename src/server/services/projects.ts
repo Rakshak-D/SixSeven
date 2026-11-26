@@ -10,6 +10,7 @@ import type {
   AddProjectMemberInput,
   CreateProjectInput,
   MyPhoneResponse,
+  ProjectMemberRemovedResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectTeamResponse,
@@ -36,7 +37,13 @@ export async function requireProjectAccess(
     .select(projectFields)
     .from(projects)
     .innerJoin(projectMembers, eq(projects.id, projectMembers.projectId))
-    .where(and(eq(projects.id, projectId), eq(projectMembers.userId, actor.userId)));
+    .where(
+      and(
+        eq(projects.id, projectId),
+        eq(projectMembers.userId, actor.userId),
+        isNull(projectMembers.removedAt),
+      ),
+    );
   if (!project) throw new ApiError(404, ErrorCode.NOT_FOUND, "Project not found");
   if (roles && !roles.includes(project.role)) {
     throw new ApiError(403, ErrorCode.FORBIDDEN, "Your project role does not allow this operation");
@@ -49,7 +56,7 @@ export async function listProjects(db: Db, actor: Actor): Promise<ProjectRespons
     .select(projectFields)
     .from(projects)
     .innerJoin(projectMembers, eq(projects.id, projectMembers.projectId))
-    .where(eq(projectMembers.userId, actor.userId))
+    .where(and(eq(projectMembers.userId, actor.userId), isNull(projectMembers.removedAt)))
     .orderBy(asc(projects.createdAt), asc(projects.id));
 }
 
@@ -65,9 +72,12 @@ export async function listProjectTeam(
       .select({ userId: user.id, role: projectMembers.role, name: user.name, phone: user.phone })
       .from(projectMembers)
       .innerJoin(user, eq(user.id, projectMembers.userId))
-      .where(eq(projectMembers.projectId, projectId))
+      .where(and(eq(projectMembers.projectId, projectId), isNull(projectMembers.removedAt)))
       .orderBy(asc(user.name), asc(user.id));
-    return members.map(({ phone, ...member }) => (phone === null ? member : { ...member, phone }));
+    return members.map(({ phone, ...member }) => {
+      const row = { ...member, isMe: member.userId === actor.userId };
+      return phone === null ? row : { ...row, phone };
+    });
   });
 }
 
@@ -201,5 +211,65 @@ export async function addProjectMember(
       payload: { role: input.role },
     });
     return membership;
+  });
+}
+
+/**
+ * An engineer takes someone off the project. The membership row stays, marked removed, because
+ * their deliveries, wages and approvals still name them; they just lose access. Engineers cannot
+ * remove themselves, so every project keeps at least one engineer. The project row is locked first
+ * so two engineers removing each other at the same moment cannot both succeed.
+ */
+export async function removeProjectMember(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+  userId: string,
+): Promise<ProjectMemberRemovedResponse> {
+  return db.transaction(async (tx) => {
+    await tx
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .for("update");
+    await requireProjectAccess(tx, actor, projectId, ["engineer"]);
+    if (userId === actor.userId)
+      throw new ApiError(409, ErrorCode.CONFLICT, "You cannot remove yourself from the project");
+    const [removed] = await tx
+      .update(projectMembers)
+      .set({ removedAt: sql`now()`, removedBy: actor.userId })
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, userId),
+          isNull(projectMembers.removedAt),
+        ),
+      )
+      .returning({
+        userId: projectMembers.userId,
+        role: projectMembers.role,
+        removedAt: projectMembers.removedAt,
+      });
+    if (!removed) throw new ApiError(404, ErrorCode.NOT_FOUND, "Not on this project");
+    // Their accepted invitation goes too, so the same address can be invited back later.
+    await tx
+      .delete(projectInvitations)
+      .where(
+        and(eq(projectInvitations.projectId, projectId), eq(projectInvitations.acceptedBy, userId)),
+      );
+    await tx.insert(auditLog).values({
+      id: crypto.randomUUID(),
+      projectId,
+      actorId: actor.userId,
+      action: "removed",
+      entity: "member",
+      entityId: userId,
+      payload: { role: removed.role },
+    });
+    return {
+      userId: removed.userId,
+      role: removed.role,
+      removedAt: (removed.removedAt as Date).toISOString(),
+    };
   });
 }
