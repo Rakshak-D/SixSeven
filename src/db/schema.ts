@@ -28,7 +28,7 @@ export const projectRole = pgEnum("project_role", [
 ]);
 export const movementType = pgEnum("movement_type", ["delivery", "usage", "adjustment"]);
 export const wagePaymentKind = pgEnum("wage_payment_kind", ["wage", "advance"]);
-export const wagePaymentMode = pgEnum("wage_payment_mode", ["cash", "upi", "bank"]);
+export const wagePaymentMode = pgEnum("wage_payment_mode", ["cash", "upi", "bank", "cheque"]);
 export const adjustmentTarget = pgEnum("adjustment_target", [
   "stock_movements",
   "attendance",
@@ -342,6 +342,7 @@ export const wagePayments = pgTable(
     mode: wagePaymentMode().notNull(),
     paidOn: date("paid_on").notNull(),
     reference: text(),
+    note: text(),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id),
@@ -357,6 +358,19 @@ export const wagePayments = pgTable(
     index("wage_payments_project_day_idx").on(t.projectId, t.paidOn, t.workerId),
     index("wage_payments_worker_day_idx").on(t.projectId, t.workerId, t.paidOn),
     check("wage_payment_amount_paise_valid", sql`${t.amountPaise} between 1 and 9007199254740991`),
+    check(
+      "wage_payment_reference_by_mode",
+      sql`case ${t.mode}::text
+      when 'cash' then ${t.reference} is null
+      when 'upi' then ${t.reference} is not null and ${t.reference} ~ '^[0-9]{12}$'
+      when 'bank' then ${t.reference} is not null and ${t.reference} ~ '^[A-Za-z0-9]{6,22}$'
+      when 'cheque' then ${t.reference} is not null and ${t.reference} ~ '^[0-9]{6}$'
+      else false end`,
+    ),
+    check(
+      "wage_payment_note_required",
+      sql`${t.note} is not null and char_length(btrim(${t.note})) between 1 and 2000`,
+    ),
   ],
 );
 
@@ -686,6 +700,8 @@ export const deliveryChallanPhotos = pgTable(
     projectId: text("project_id").notNull(),
     deliveryId: text("delivery_id").primaryKey(),
     storageKey: text("storage_key").notNull().unique(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
     mime: text().notNull(),
     sizeBytes: integer("size_bytes").notNull(),
     createdBy: text("created_by")
@@ -694,6 +710,13 @@ export const deliveryChallanPhotos = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    check(
+      "challan_photo_capture_window",
+      sql`
+      (${t.capturedAt} is null and ${t.receivedAt} is null)
+      or (${t.capturedAt} is not null and ${t.receivedAt} is not null
+        and ${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds')`,
+    ),
     foreignKey({
       name: "delivery_challan_photo_movement_fk",
       columns: [t.projectId, t.deliveryId],
@@ -784,6 +807,8 @@ export const progressPhotos = pgTable(
   "progress_photos",
   {
     id: text().primaryKey(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
     projectId: text("project_id").notNull(),
     progressId: text("progress_id").notNull(),
     mime: text().notNull(),
@@ -793,6 +818,13 @@ export const progressPhotos = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    check(
+      "progress_photo_capture_window",
+      sql`
+      (${t.capturedAt} is null and ${t.receivedAt} is null)
+      or (${t.capturedAt} is not null and ${t.receivedAt} is not null
+        and ${t.capturedAt} between ${t.receivedAt} - interval '10 minutes' and ${t.receivedAt} + interval '30 seconds')`,
+    ),
     foreignKey({
       name: "progress_photos_project_update_fk",
       columns: [t.projectId, t.progressId],

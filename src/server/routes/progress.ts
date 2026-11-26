@@ -6,7 +6,8 @@ import { getDatabase } from "@/db/client";
 import { ErrorCode, ErrorResponse } from "@/shared/errors";
 import { IdParams, Note } from "@/shared/schemas/common";
 import {
-  CreateProgressInput,
+  CaptureTimestampParts,
+  CreateCapturedProgressInput,
   PhotoFile,
   PhotoParams,
   ProgressResponse,
@@ -24,6 +25,7 @@ const MultipartProgressInput = z.strictObject({
   note: Note,
   checklistItemId: IdParams.shape.id.optional(),
   photos: z.union([OpenApiPhotoFile, z.array(OpenApiPhotoFile).min(1).max(10)]),
+  capturedAt: CaptureTimestampParts,
 });
 const MAX_PROGRESS_REQUEST_BYTES = 51_000_000;
 const uploadAccess = createMiddleware<AuthEnv>(async (c, next) => {
@@ -80,10 +82,11 @@ export const progress = createRouter<AuthEnv>()
     async (c) => {
       const form = c.req.valid("form");
       const files = Array.isArray(form.photos) ? form.photos : [form.photos];
-      const parsed = CreateProgressInput.safeParse({
+      const parsed = CreateCapturedProgressInput.safeParse({
         note: form.note,
         ...(form.checklistItemId && { checklistItemId: form.checklistItemId }),
         photos: files,
+        capturedAt: [form.capturedAt].flat(),
       });
       if (!parsed.success) {
         throw new ApiError(

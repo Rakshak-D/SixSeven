@@ -15,7 +15,7 @@ import {
   VoteChangeRequestInput,
 } from "@/shared/schemas/change-requests";
 import { Id, IdParams } from "@/shared/schemas/common";
-import { PhotoFile } from "@/shared/schemas/progress";
+import { CaptureTimestamp, PhotoFile } from "@/shared/schemas/progress";
 import { json, projectAuth, projectBody, projectErrors } from "../lib/project-route";
 import { createRouter } from "../lib/router";
 import type { AuthEnv } from "../middleware/auth";
@@ -32,11 +32,10 @@ import { getMedicalBillPhoto } from "../services/medical-claims";
 import { requireProjectAccess } from "../services/projects";
 
 const billPhoto = PhotoFile.openapi({ type: "string", format: "binary" });
-const captureTime = z.iso.datetime({ offset: true });
 const billForm = MedicalExpenseFields.extend({
   billPaise: z.string().regex(/^[0-9]+$/),
   billPhotos: z.union([billPhoto, z.array(billPhoto).min(1).max(3)]),
-  capturedAt: z.union([captureTime, z.array(captureTime).min(1).max(3)]),
+  capturedAt: z.union([CaptureTimestamp, z.array(CaptureTimestamp).min(1).max(3)]),
 });
 const billParams = z.strictObject({ id: Id, requestId: Id, photoId: Id });
 const binary = z.string().openapi({ format: "binary" });

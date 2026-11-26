@@ -9,12 +9,13 @@ import type {
   TimelineResponse as Timeline,
 } from "@/shared/schemas/progress";
 import {
-  CreateProgressInput,
+  CreateCapturedProgressInput,
   PhotoMime,
   ProgressResponse,
   TimelineResponse,
 } from "@/shared/schemas/progress";
 import { recordAudit } from "./audit";
+import { captureTimes } from "./capture-times";
 import { persistValidatedPhotos, readStoredPhoto, validateImageUpload } from "./photo-storage";
 import { requireProjectAccess } from "./projects";
 
@@ -31,6 +32,8 @@ function publicPhoto(
     mime: string;
     sizeBytes: number;
     takenOn: string;
+    capturedAt: Date | null;
+    receivedAt: Date | null;
   },
 ) {
   return {
@@ -38,6 +41,8 @@ function publicPhoto(
     mime: PhotoMime.parse(photo.mime),
     sizeBytes: photo.sizeBytes,
     takenOn: photo.takenOn,
+    ...(photo.capturedAt && { capturedAt: photo.capturedAt.toISOString() }),
+    ...(photo.receivedAt && { receivedAt: photo.receivedAt.toISOString() }),
     url: `/api/v1/projects/${projectId}/photos/${photo.id}`,
   };
 }
@@ -46,15 +51,16 @@ export async function writeProgressWithPhotos<T>(
   db: Db,
   actor: Actor,
   projectId: string,
-  rawInput: CreateProgressInput,
+  rawInput: CreateCapturedProgressInput,
   finish: (tx: Transaction, progress: Progress) => Promise<T>,
 ): Promise<T> {
   await requireProjectAccess(db, actor, projectId, ["contractor", "engineer"]);
-  const input = CreateProgressInput.parse(rawInput);
+  const input = CreateCapturedProgressInput.parse(rawInput);
+  const receivedAt = new Date();
+  const captured = captureTimes(input.capturedAt, input.photos.length, receivedAt);
   const validated: Awaited<ReturnType<typeof validateImageUpload>>[] = [];
   for (const file of input.photos) validated.push(await validateImageUpload(file));
   const stored = await persistValidatedPhotos(validated);
-  const takenOn = istDate(new Date());
   try {
     return await db.transaction(async (tx) => {
       await requireProjectAccess(tx, actor, projectId, ["contractor", "engineer"]);
@@ -88,13 +94,15 @@ export async function writeProgressWithPhotos<T>(
       const photoRows = await tx
         .insert(progressPhotos)
         .values(
-          stored.photos.map((photo) => ({
+          stored.photos.map((photo, i) => ({
             id: crypto.randomUUID(),
             projectId,
             progressId,
             mime: photo.mime,
             sizeBytes: photo.sizeBytes,
-            takenOn,
+            takenOn: istDate(captured[i]),
+            capturedAt: captured[i],
+            receivedAt,
             storageKey: photo.storageKey,
           })),
         )
@@ -103,6 +111,8 @@ export async function writeProgressWithPhotos<T>(
           mime: progressPhotos.mime,
           sizeBytes: progressPhotos.sizeBytes,
           takenOn: progressPhotos.takenOn,
+          capturedAt: progressPhotos.capturedAt,
+          receivedAt: progressPhotos.receivedAt,
         });
 
       await recordAudit(tx, {
@@ -138,7 +148,7 @@ export function createProgressUpdate(
   db: Db,
   actor: Actor,
   projectId: string,
-  input: CreateProgressInput,
+  input: CreateCapturedProgressInput,
 ) {
   return writeProgressWithPhotos(db, actor, projectId, input, async (_tx, progress) => progress);
 }
@@ -170,6 +180,8 @@ export async function getProjectTimeline(
             mime: progressPhotos.mime,
             sizeBytes: progressPhotos.sizeBytes,
             takenOn: progressPhotos.takenOn,
+            capturedAt: progressPhotos.capturedAt,
+            receivedAt: progressPhotos.receivedAt,
           })
           .from(progressPhotos)
           .where(

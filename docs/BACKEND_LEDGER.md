@@ -4,11 +4,32 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
 ## Entry — Required operational notes (#21)
 
+- Final release: proposal notes and development fixtures updated. The 100 source tests and TypeScript passed before the final main sync.
 - Branch `be/required-operation-notes`. New delivery and usage writes, checklist acceptance and proposal decisions require `Note`. Proposal decisions store the note in their audit event. Historical responses remain readable. Change-request actions already require notes and wage payment notes are in #29.
 - Frontend handoff: add a nonblank decision note to the proposal flow in `src/components/owner/approvals-list.tsx` and submit it through `src/hooks/use-project-data.ts`. Verify that all delivery, usage and checklist review submissions and fixtures send notes. Keep the rollout in draft until the proposal consumer is ready.
 
 - The hosted check found six legacy fixtures missing newly required notes in `src/mocks/routes.test.ts`. Frontend must update proposal, stock and checklist-review requests and test fixtures before this draft can merge.
 - Verified the refreshed backend contract on disposable PostgreSQL. Fresh migrations, seed and all 44 auth, stock and reporting API tests passed. The frontend fixture and proposal rollout blockers above still apply.
+
+## Entry — Photo capture timestamps (#27)
+
+- Branch `be/photo-capture-times`. New progress, checklist completion and challan uploads require an ISO `capturedAt` per image. It must be no more than ten minutes before receipt or 30 seconds ahead. Migration `0013_photo_capture_times` preserves existing metadata and constrains the new capture/receipt pairs in PostgreSQL. Medical uses the same timestamp validator.
+- Frontend handoff: send ordered `capturedAt` parts in both uploads in `src/hooks/use-project-data.ts` and single `capturedAt` with challan FormData. Use the camera capture time. Keep this PR in draft until the active clients send the required parts. Client timestamps cannot authenticate a camera.
+- Existing disposable PostgreSQL upgraded successfully. Biome, typecheck and 151 local tests passed before the final main sync. Full CI is required before integration.
+- Regenerated the unpublished migration as `0016_photo_capture_times` after the steel migration. Fresh migrations, seed and all 37 PostgreSQL stock, reporting and migration tests passed, including a baseline upgrade.
+
+## Entry — Request #22 wage notes and mode references
+
+- Branch: `be/wage-payment-modes`, PR #29. Published the existing `CreateWagePaymentInput` with required `note`, no cash reference and the mode-specific references. Exported `WagePaymentMode`. Historical reads accept null or absent notes and preserve original references.
+- Frontend handoff: `src/lib/spends.ts` must label `cheque`. Wage entry forms and mock fixtures must include a note and omit a cash reference. The UI should render a legacy note as absent. Reconciled on the medical baseline as `0013_wage_payment_contract`; fresh PostgreSQL migration, seed and 54 focused tests passed. Full typecheck still fails at src/components/wages/wages-page.tsx (missing note) and src/lib/spends.ts (missing cheque label). This remains a draft.
+- Regenerated the unpublished migration as `0016_wage_payment_contract` after the steel migration. Fresh migrations, seed and all 29 PostgreSQL labour, reporting and migration tests passed, including a baseline upgrade.
+
+## Entry — Request #9 wage payment modes
+
+- Timestamp: 2026-11-26 IST. Branch: `be/wage-payment-modes`.
+- Added cheque and mode-specific references on new wage and advance records. Clear validation errors return on `reference`. Preserved historical values by adding the PostgreSQL check as `NOT VALID`, which applies to new rows without scanning or rewriting old ones.
+- Frontend handoff: in `src/lib/spends.ts`, add `cheque: "Cheque"` to `modeLabel` to resolve TS7053. In `src/components/wages/wages-page.tsx`, offer cheque, make UPI/bank/cheque references required with mode-specific validation, and keep references as strings to preserve leading zeros.
+- Keep the PR in draft until the frontend consumer changes and full CI passes. Regenerate this unmerged migration if another migration is integrated first.
 
 ## Entry — Engineer steel-marking hold point
 

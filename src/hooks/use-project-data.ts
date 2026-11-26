@@ -214,7 +214,10 @@ function proofForm(input: { note: string; photos: File[]; checklistItemId?: stri
   const form = new FormData();
   form.set("note", input.note);
   if (input.checklistItemId) form.set("checklistItemId", input.checklistItemId);
-  for (const photo of input.photos) form.append("photos", photo);
+  for (const photo of input.photos) {
+    form.append("photos", photo);
+    form.append("capturedAt", new Date(photo.lastModified).toISOString());
+  }
   return form;
 }
 

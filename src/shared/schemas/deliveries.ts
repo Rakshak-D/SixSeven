@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Id, IsoDate, Label, Note, Paise, PositiveQty, Qty, Timestamp } from "./common";
-import { PhotoFile, PhotoResponse } from "./progress";
+import { CaptureTimestamp, PhotoFile, PhotoResponse } from "./progress";
 
 export const CreateDeliveryInput = z.strictObject({
   materialId: Id,
@@ -53,7 +53,10 @@ export const ExpectedDeliveryResponse = CreateExpectedDeliveryInput.extend({
 });
 export const ExpectedDeliveriesResponse = z.array(ExpectedDeliveryResponse);
 export const ChallanPhotoParams = z.strictObject({ id: Id, deliveryId: Id });
-export const CreateChallanPhotoInput = z.strictObject({ photo: PhotoFile });
+export const CreateChallanPhotoInput = z.strictObject({
+  photo: PhotoFile,
+  capturedAt: CaptureTimestamp,
+});
 export const ChallanPhotoResponse = PhotoResponse.omit({ id: true, takenOn: true }).extend({
   deliveryId: Id,
   createdAt: Timestamp,

@@ -1,20 +1,50 @@
 import { z } from "zod";
-import { Id, IsoDate, Label, Paise, PositivePaise, SignedPaise, Timestamp } from "./common";
+import { Id, IsoDate, Label, Note, Paise, PositivePaise, SignedPaise, Timestamp } from "./common";
 
 const PaymentKind = z.enum(["wage", "advance"]);
-const PaymentMode = z.enum(["cash", "upi", "bank"]);
+export const WagePaymentMode = z.enum(["cash", "upi", "bank", "cheque"]);
 const payment = {
   workerId: Id,
   amountPaise: PositivePaise,
   kind: PaymentKind,
-  mode: PaymentMode,
+  mode: WagePaymentMode,
   paidOn: IsoDate,
 };
-export const CreateWagePaymentInput = z.strictObject({ ...payment, reference: Label.optional() });
+const paymentReferences = {
+  upi: { pattern: /^[0-9]{12}$/, message: "Enter a 12-digit UPI transaction reference" },
+  bank: {
+    pattern: /^[A-Za-z0-9]{6,22}$/,
+    message: "Enter a 6–22 character alphanumeric bank reference",
+  },
+  cheque: { pattern: /^[0-9]{6}$/, message: "Enter a 6-digit cheque number" },
+};
+export const CreateWagePaymentInput = z
+  .strictObject({
+    ...payment,
+    note: Note,
+    reference: Label.optional().describe(
+      "UPI: 12 digits. Bank: 6–22 alphanumeric characters. Cheque: 6 digits. Cash: omit.",
+    ),
+  })
+  .superRefine(({ mode, reference }, ctx) => {
+    if (mode === "cash") {
+      if (reference)
+        ctx.addIssue({
+          code: "custom",
+          path: ["reference"],
+          message: "Cash payments do not use a reference",
+        });
+      return;
+    }
+    const { pattern, message } = paymentReferences[mode];
+    if (!reference || !pattern.test(reference))
+      ctx.addIssue({ code: "custom", path: ["reference"], message });
+  });
 export const WagePaymentResponse = z.strictObject({
   id: Id,
   ...payment,
   reference: Label.nullable(),
+  note: Note.nullable().optional(),
 });
 export const WageSheetQuery = z
   .strictObject({
@@ -44,6 +74,7 @@ export const WageSheetResponse = z.strictObject({
 export const WageExportContentType = { csv: "text/csv", pdf: "application/pdf" } as const;
 
 export type CreateWagePaymentInput = z.infer<typeof CreateWagePaymentInput>;
+export type WagePaymentMode = z.infer<typeof WagePaymentMode>;
 export type WagePaymentResponse = z.infer<typeof WagePaymentResponse>;
 export type WageSheetQuery = z.infer<typeof WageSheetQuery>;
 export type WageSheetResponse = z.infer<typeof WageSheetResponse>;

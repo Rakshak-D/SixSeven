@@ -135,6 +135,42 @@ async function newMaterial(actor = contractor) {
 }
 
 describe("attendance and wage accounting", () => {
+  it("records cheque references as strings and enforces the format in PostgreSQL", async () => {
+    const worker = await newWorker();
+    const payment = {
+      workerId: worker.id,
+      amountPaise: 1000,
+      kind: "wage",
+      mode: "cheque",
+      note: "Synthetic worker payment",
+      paidOn: "2026-11-24",
+    };
+    await failure(
+      await call(projectId, "wage-payments", contractor, payment),
+      400,
+      "VALIDATION_ERROR",
+    );
+    const accepted = await call(projectId, "wage-payments", contractor, {
+      ...payment,
+      reference: "000123",
+    });
+    expect(accepted.status).toBe(201);
+    expect(WagePaymentResponse.parse(await accepted.json())).toMatchObject({
+      mode: "cheque",
+      reference: "000123",
+    });
+    const { sql } = getDatabase();
+    await expect(sql`insert into wage_payments
+      (id, project_id, worker_id, amount_paise, kind, mode, paid_on, reference, note, created_by)
+      values (${crypto.randomUUID()}, ${projectId}, ${worker.id}, 1000, 'wage', 'upi',
+        '2026-11-24', 'invalid', 'Synthetic payment', ${contractor.userId})`).rejects.toMatchObject(
+      {
+        code: "23514",
+        constraint_name: "wage_payment_reference_by_mode",
+      },
+    );
+  });
+
   it("deactivates a worker once, preserves historical wages and rejects new attendance", async () => {
     const worker = await newWorker();
     const recorded = await call(projectId, "attendance", contractor, {
@@ -240,6 +276,7 @@ describe("attendance and wage accounting", () => {
         amountPaise: 100,
         kind: "wage",
         mode: "cash",
+        note: "Synthetic worker payment",
         paidOn: day,
       }),
       401,
@@ -393,8 +430,9 @@ describe("attendance and wage accounting", () => {
       amountPaise: 50_000,
       kind: "wage",
       mode: "upi",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-22",
-      reference: "UPI-2026-001",
+      reference: "202611250001",
     });
     expect(wage.status).toBe(201);
     const wageRecord = WagePaymentResponse.parse(await wage.json());
@@ -403,6 +441,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 10_000,
       kind: "advance",
       mode: "cash",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-23",
     });
     expect(advance.status).toBe(201);
@@ -440,7 +479,9 @@ describe("attendance and wage accounting", () => {
       amountPaise: 25_000,
       kind: "wage",
       mode: "bank",
+      note: "Synthetic worker payment",
       paidOn: day,
+      reference: "BANKREF001",
     });
     const paymentId = WagePaymentResponse.parse(await payResponse.json()).id;
     const material = await newMaterial();
@@ -584,6 +625,7 @@ describe("attendance and wage accounting", () => {
       amountPaise: 20_000,
       kind: "wage",
       mode: "cash",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-25",
     });
     const paymentId = WagePaymentResponse.parse(await payment.json()).id;
@@ -748,7 +790,9 @@ describe("attendance and wage accounting", () => {
       amountPaise: 100_000,
       kind: "wage",
       mode: "bank",
+      note: "Synthetic worker payment",
       paidOn: "2026-11-26",
+      reference: "BANKREF002",
     });
     const range = "from=2026-11-26&to=2026-11-26";
     const jsonResponse = await call(projectId, `wage-sheet?${range}&format=json`, owner);
@@ -874,8 +918,9 @@ describe("attendance and wage accounting", () => {
         amountPaise: maxPaise,
         kind,
         mode: "bank",
+        note: "Synthetic worker payment",
         paidOn: date,
-        reference: `overflow-${index}`,
+        reference: `overflow0${index}`,
       });
       expect(payment.status).toBe(201);
     }
