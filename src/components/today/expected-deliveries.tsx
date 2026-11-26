@@ -134,7 +134,7 @@ export function ExpectedDeliveries({
             ) : null}
             {canDecide && entry.deliveryId ? (
               <details>
-                <summary className="cursor-pointer text-sm">Challan evidence</summary>
+                <summary className="w-fit cursor-pointer text-sm">Challan evidence</summary>
                 <ChallanEvidence projectId={projectId} deliveryId={entry.deliveryId} />
               </details>
             ) : null}
