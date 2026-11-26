@@ -13,6 +13,11 @@ const visibleEntities = new Set([
   "worker",
   "delivery",
   "expectedDelivery",
+  "supplier",
+  "supplierBankChange",
+  "supplierOrder",
+  "supplierRule",
+  "supplierPayment",
   "usage",
   "attendance",
   "wagePayment",
@@ -60,6 +65,7 @@ export async function listProjectActivity(
     return ActivityResponse.parse(
       rows
         .filter((row) => visibleEntities.has(row.entity) && visibleActions.has(row.action))
+        .filter((row) => access.role === "owner" || !row.entity.startsWith("supplier"))
         // appendStockMovement also audits a compensating adjustment movement. The correction row
         // below is the user-facing event; showing both creates a misleading duplicate.
         .filter((row) => !(row.entity === "adjustment" && row.action === "created"))

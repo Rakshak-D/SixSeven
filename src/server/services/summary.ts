@@ -6,6 +6,7 @@ import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
 import { Qty } from "@/shared/schemas/common";
 import { type SummaryResponse as Summary, SummaryResponse } from "@/shared/schemas/summary";
+import { listFraudFlags } from "./fraud-flags";
 import { requireProjectAccess } from "./projects";
 import { accruedPaise, loadEffectiveAttendance } from "./wage-calculations";
 
@@ -313,6 +314,7 @@ export async function getProjectSummary(
       role: access.role,
       spendSplit,
       spendByWeek: weeks,
+      ...(access.role === "owner" && { fraudFlags: await listFraudFlags(tx, projectId, today) }),
     });
   });
 }
