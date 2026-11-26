@@ -16,15 +16,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMaterials } from "@/hooks/use-project-data";
 import { usePaymentWrite } from "@/hooks/use-supplier-payments";
+import type { Supplier } from "@/lib/supplier-payments";
 import {
-  AddOrderInput,
-  AddSupplierInput,
-  BankChangeInput,
-  NoteInput,
-  SetAutopayInput,
-  type Supplier,
-} from "@/lib/supplier-payments";
-import { ApproveSupplierPaymentsInput } from "@/shared/schemas/supplier-payments";
+  ApproveSupplierPaymentsInput,
+  ChangeSupplierBankInput,
+  CreateSupplierInput,
+  CreateSupplierOrderInput,
+  DecideSupplierPaymentInput,
+  PauseSupplierPaymentsInput,
+  SetSupplierAutopayInput,
+  SupplierNoteInput,
+} from "@/shared/schemas/supplier-payments";
 
 /** One text or number box of a payment form. */
 type Box = { key: string; label: string; initial?: string; numeric?: boolean; hint?: string };
@@ -122,7 +124,7 @@ export function AddSupplierForm({ projectId, onDone }: Common) {
     <WriteForm
       projectId={projectId}
       path={`${projectPath(projectId)}/suppliers`}
-      schema={AddSupplierInput}
+      schema={CreateSupplierInput}
       boxes={[
         { key: "name", label: "Supplier name", hint: "As written on their bills." },
         { key: "gstin", label: "GSTIN" },
@@ -142,7 +144,7 @@ export function ApproveForm({ projectId, supplier, onDone }: Common & { supplier
     <WriteForm
       projectId={projectId}
       path={`${supplierPath(supplier.id)}${bank ? "/bank-change" : ""}/approve`}
-      schema={NoteInput}
+      schema={SupplierNoteInput}
       body={(_, note) => ({ note })}
       submit={bank ? "Approve new account" : "Approve supplier"}
       saved={bank ? "Approved. Payments resume in 24 hours." : "Supplier approved"}
@@ -162,7 +164,7 @@ export function BankChangeForm({ projectId, supplier, onDone }: Common & { suppl
     <WriteForm
       projectId={projectId}
       path={`${supplierPath(supplier.id)}/bank-change`}
-      schema={BankChangeInput}
+      schema={ChangeSupplierBankInput}
       boxes={[{ key: "account", label: "New synthetic account number", numeric: true }]}
       body={(v, note) => ({ account: v.account, note })}
       submit="Record the change"
@@ -174,12 +176,13 @@ export function BankChangeForm({ projectId, supplier, onDone }: Common & { suppl
 
 export function AutopayForm({ projectId, supplier, onDone }: Common & { supplier: Supplier }) {
   const [enabled, setEnabled] = useState(supplier.autopay.enabled);
+  const [paused, setPaused] = useState(supplier.autopay.paused ?? false);
   return (
     <WriteForm
       projectId={projectId}
       method="PUT"
       path={`${supplierPath(supplier.id)}/autopay`}
-      schema={SetAutopayInput}
+      schema={SetSupplierAutopayInput}
       boxes={[
         {
           key: "bill",
@@ -196,7 +199,7 @@ export function AutopayForm({ projectId, supplier, onDone }: Common & { supplier
       ]}
       body={(v, note) => ({
         enabled,
-        paused: supplier.autopay.paused ?? false,
+        paused,
         perBillCapPaise: money(v.bill),
         perWeekCapPaise: money(v.week),
         note,
@@ -214,6 +217,15 @@ export function AutopayForm({ projectId, supplier, onDone }: Common & { supplier
         />
         Pay {supplier.name} automatically
       </label>
+      <label className="flex min-h-11 items-center gap-3 font-semibold">
+        <input
+          type="checkbox"
+          className="size-5 accent-primary"
+          checked={paused}
+          onChange={(event) => setPaused(event.target.checked)}
+        />
+        Pause this supplier’s autopay
+      </label>
       <p className="text-[15px] text-muted-foreground">
         Only after your engineer verifies a delivery that matches your order, and never above these
         limits.
@@ -228,7 +240,7 @@ export function PauseForm({ projectId, paused, onDone }: Common & { paused: bool
       projectId={projectId}
       method="PUT"
       path={`${projectPath(projectId)}/autopay`}
-      schema={NoteInput.extend({ paused: SetAutopayInput.shape.enabled })}
+      schema={PauseSupplierPaymentsInput}
       body={(_, note) => ({ paused: !paused, note })}
       submit={paused ? "Resume autopay" : "Pause autopay"}
       saved={paused ? "Autopay resumed" : "Autopay paused"}
@@ -248,7 +260,7 @@ export function DecisionForm({
     <WriteForm
       projectId={projectId}
       path={`/supplier-payments/${encodeURIComponent(paymentId)}/decision`}
-      schema={NoteInput.extend({ approve: SetAutopayInput.shape.enabled })}
+      schema={DecideSupplierPaymentInput}
       body={(_, note) => ({ approve, note })}
       submit={approve ? "Pay (mock)" : "Decline payment"}
       saved={approve ? "Mock payment recorded" : "Payment declined"}
@@ -286,7 +298,7 @@ export function OrderForm({ projectId, supplier, onDone }: Common & { supplier: 
     <WriteForm
       projectId={projectId}
       path={`${projectPath(projectId)}/orders`}
-      schema={AddOrderInput}
+      schema={CreateSupplierOrderInput}
       boxes={[
         { key: "qty", label: "Quantity", numeric: true },
         { key: "price", label: "Highest rate per unit (₹)", numeric: true },

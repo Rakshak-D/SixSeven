@@ -592,3 +592,23 @@ proposed method + path, fields, priority / blocking.
 - #29–30: Ask Slate uses the shared request and response, including an explicit offline result. Rectangular concrete estimates are BACKEND_IMPLEMENTED. Live provider output is NOT_VERIFIED.
 
 - Follow-up: #5, #6 and #13-14 are LIVE_VERIFIED for worker lifecycle, scheduled acceptance, tracked material creation, typed bag verification, usage and duplicate-code rejection in phone and desktop browser runs. Expected-delivery rejection, phone settings, evidence and batch payments still need workflow-specific browser checks.
+
+## Release request reconciliation
+
+| Requests | Backend or contract | Frontend and live verification |
+|---|---|---|
+| 1–3 | CONTRACT_AVAILABLE for shared core and auth. Collaboration policy remains recorded. | Auth LIVE_VERIFIED in three browser sessions. |
+| 4, 24 | BACKEND_IMPLEMENTED for engineer project creation, email acceptance and phone invitation persistence. | Email and project screens LIVE_VERIFIED. Verified-phone redemption BLOCKED_EXTERNAL_CONFIGURATION. |
+| 5–6 | BACKEND_IMPLEMENTED for worker lifecycle and expected deliveries. | Worker lifecycle and scheduled acceptance LIVE_VERIFIED. Rejection and camera challans NOT_VERIFIED in the browser. |
+| 7–8 | BACKEND_IMPLEMENTED for completion evidence, review and audited checklist changes through #20. | FRONTEND_IMPLEMENTED. Full evidence and checklist-change browser paths NOT_VERIFIED. |
+| 9, 21–22 | BACKEND_IMPLEMENTED for modes, required notes and legacy-compatible payment reads. | FRONTEND_IMPLEMENTED. Wage form and proposal decision workflow NOT_VERIFIED in the browser. |
+| 10–12 | BACKEND_IMPLEMENTED for weekly spend, engineer-safe roster and shared contact settings. | FRONTEND_IMPLEMENTED. Browser access/privacy checks passed. Weekly figures, roster presentation and contact edits NOT_VERIFIED in browser. |
+| 13–14 | BACKEND_IMPLEMENTED for engineer registration and transactional consumption. | LIVE_VERIFIED with typed codes and duplicate rejection. Scanner UI NOT_IMPLEMENTED. |
+| 15 | BACKEND_IMPLEMENTED for flagged steel reviews and protected images. | FRONTEND_IMPLEMENTED for uploading and displaying evidence. The browser capture path is NOT_VERIFIED. |
+| 16–19, 25 | BACKEND_IMPLEMENTED for suppliers, orders, approvals, mandates, mock payment release and review flags. Delegation NOT_IMPLEMENTED. | FRONTEND_IMPLEMENTED for owner controls. Live payment and flag walkthrough NOT_VERIFIED in browser. |
+| 20, 23 | BACKEND_IMPLEMENTED for the approval chain and mock reimbursement. | FRONTEND_IMPLEMENTED. Medical and checklist change decisions NOT_VERIFIED in browser. |
+| 26 | BACKEND_IMPLEMENTED for preserving the compensating movement reason. | Existing stock log consumes the movement note. Live rendering NOT_VERIFIED in browser. |
+| 27–28 | BACKEND_IMPLEMENTED for capture/receipt timestamps and ordered medical photo parts. | FRONTEND_IMPLEMENTED across progress, completion, challan, medical and steel uploads. Camera runs NOT_VERIFIED. |
+| 29–30 | BACKEND_IMPLEMENTED for authorized assistant context and deterministic rectangular concrete quantities. | FRONTEND_IMPLEMENTED. Provider response NOT_VERIFIED without configuration. Prototype replies remain MOCKED and labelled. |
+
+The follow-up live browser suite passed on desktop and phone-sized viewports. It used browser controls for project setup, worker lifecycle, scheduled arrivals, bag verification, stock usage and attendance entry. It used authenticated browser requests for attendance approvals and wage exports, medical bill privacy and reimbursement, contractor completion and engineer steel review, and capped owner mock payments. Camera hardware, medical and steel forms, live provider output and the owner batch-payment form remain NOT_VERIFIED.
