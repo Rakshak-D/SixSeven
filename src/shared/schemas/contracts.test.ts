@@ -218,9 +218,28 @@ describe("auth, reports and corrections", () => {
       kind: "advance",
       mode: "upi",
       paidOn: dates.to,
+      note: "Paid for site work",
     };
-    expect(CreateWagePaymentInput.safeParse(payment).success).toBe(true);
-    expect(CreateWagePaymentInput.safeParse({ ...payment, mode: "cheque" }).success).toBe(false);
+    for (const [mode, reference] of [
+      ["cash", undefined],
+      ["upi", "202611250001"],
+      ["bank", "ABCD1234"],
+      ["cheque", "000123"],
+    ] as const) {
+      expect(CreateWagePaymentInput.safeParse({ ...payment, mode, reference }).success).toBe(true);
+      if (mode !== "cash") {
+        expect(CreateWagePaymentInput.safeParse({ ...payment, mode }).success).toBe(false);
+        expect(
+          CreateWagePaymentInput.safeParse({ ...payment, mode, reference: "A-B" }).success,
+        ).toBe(false);
+      }
+    }
+    expect(
+      CreateWagePaymentInput.safeParse({ ...payment, mode: "cash", reference: "OLD123" }).success,
+    ).toBe(false);
+    expect(CreateWagePaymentInput.safeParse({ ...payment, mode: "cash", note: " " }).success).toBe(
+      false,
+    );
     expect(
       WageSheetResponse.safeParse({
         ...dates,
@@ -260,7 +279,10 @@ describe("progress and reviewed decisions", () => {
 
   it("validates proposal decisions and their response states", () => {
     expect(DecideProposalInput.safeParse({ decision: "accept" }).success).toBe(false);
-    expect(DecideProposalInput.safeParse({ decision: "approve" }).success).toBe(true);
+    expect(DecideProposalInput.safeParse({ decision: "approve" }).success).toBe(false);
+    expect(
+      DecideProposalInput.safeParse({ decision: "approve", note: "Approved on site" }).success,
+    ).toBe(true);
     expect(
       ProposalResponse.safeParse({
         id: "p1",

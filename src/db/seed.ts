@@ -50,6 +50,7 @@ const demoDeliveries = [
     unitCostPaise: 41_500,
     supplier: "Demo Supply Yard",
     challanNo: "DEMO-001",
+    note: "Synthetic cement delivery",
     occurredOn: "2026-11-19",
   },
   {
@@ -59,6 +60,7 @@ const demoDeliveries = [
     unitCostPaise: 125_000,
     supplier: "Demo Supply Yard",
     challanNo: "DEMO-002",
+    note: "Synthetic sand delivery",
     occurredOn: "2026-11-20",
   },
   {
@@ -68,6 +70,7 @@ const demoDeliveries = [
     unitCostPaise: 6_800,
     supplier: "Demo Supply Yard",
     challanNo: "DEMO-003",
+    note: "Synthetic steel delivery",
     occurredOn: "2026-11-21",
   },
 ];
@@ -358,8 +361,9 @@ async function seed() {
             amountPaise: 90_000,
             kind: "wage",
             mode: "bank",
+            note: "Synthetic worker payment",
             paidOn: "2026-11-22",
-            reference: "DEMO-WAGE-001",
+            reference: "DEMOWAGE001",
           },
         },
         {
@@ -369,6 +373,7 @@ async function seed() {
             amountPaise: 20_000,
             kind: "advance",
             mode: "cash",
+            note: "Synthetic worker payment",
             paidOn: "2026-11-23",
           },
         },

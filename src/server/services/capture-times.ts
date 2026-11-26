@@ -1,8 +1,7 @@
-import { z } from "zod";
 import { ErrorCode } from "@/shared/errors";
+import { CaptureTimestamp } from "@/shared/schemas/progress";
 import { ApiError } from "../middleware/errors";
 
-const capture = z.iso.datetime({ offset: true });
 const maxAge = 10 * 60 * 1000;
 const maxAhead = 30 * 1000;
 
@@ -15,7 +14,7 @@ export function captureTimes(values: string[], photoCount: number, receivedAt: D
     );
   }
   return values.map((value) => {
-    const parsed = capture.safeParse(value);
+    const parsed = CaptureTimestamp.safeParse(value);
     const time = parsed.success ? Date.parse(parsed.data) : Number.NaN;
     const age = receivedAt.getTime() - time;
     if (!Number.isFinite(time) || age > maxAge || age < -maxAhead) {

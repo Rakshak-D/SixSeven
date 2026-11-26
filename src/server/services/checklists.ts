@@ -284,7 +284,14 @@ export function startItem(db: Db, actor: Actor, id: string) {
   );
 }
 
-export async function submitItem(db: Db, actor: Actor, id: string, note: string, photos: File[]) {
+export async function submitItem(
+  db: Db,
+  actor: Actor,
+  id: string,
+  note: string,
+  photos: File[],
+  capturedAt: string[],
+) {
   const item = await accessItem(db, actor, id, "contractor");
   if (item.removedAt || !["doing", "sent_back"].includes(item.state))
     throw conflict("Checklist item is not ready for submission");
@@ -292,7 +299,7 @@ export async function submitItem(db: Db, actor: Actor, id: string, note: string,
     db,
     actor,
     item.projectId,
-    { note, photos, checklistItemId: id },
+    { note, photos, capturedAt, checklistItemId: id },
     async (tx, progress) => {
       const current = await accessItem(tx, actor, id, "contractor");
       return transition(tx, actor, current, ["doing", "sent_back"], "waiting", {

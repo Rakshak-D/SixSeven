@@ -2,14 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import {
-  Field,
-  FormError,
-  firstProblem,
-  NativeSelect,
-  rupeesToPaise,
-  SavedNotice,
-} from "@/components/forms";
+import { Field, FormError, NativeSelect, rupeesToPaise, SavedNotice } from "@/components/forms";
 import { Sheet } from "@/components/sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { effectiveValue, FixSheet, type FixTarget } from "@/components/today/fix-sheet";
@@ -25,7 +18,8 @@ import {
 } from "@/hooks/use-project-data";
 import { addDays, mondayOf, todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise } from "@/lib/format";
-import { referenceProblem, referenceRules } from "@/lib/payment-reference";
+import { referenceRules } from "@/lib/payment-reference";
+import { CreateWagePaymentInput, type WagePaymentMode } from "@/shared/schemas/wages";
 
 const eyebrow = "font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]";
 const days = (halfDays: number) => `${halfDays / 2} ${halfDays === 2 ? "day" : "days"}`;
@@ -262,34 +256,35 @@ function PayForm({
     state.duePaise && state.duePaise > 0 ? String(state.duePaise / 100) : "",
   );
   const [kind, setKind] = useState<"wage" | "advance">("wage");
-  const [mode, setMode] = useState<"cash" | "upi" | "bank">("cash");
+  const [mode, setMode] = useState<WagePaymentMode>("cash");
   const [date, setDate] = useState(today);
-  // Kept apart so switching "Paid by" never carries a UPI ID into the cash note or back.
   const [reference, setReference] = useState("");
-  const [cashNote, setCashNote] = useState("");
+  const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string>();
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    const found = firstProblem([
-      [!workerId, "Pick a worker."],
-      [!rupeesToPaise(amount), "Enter the amount in rupees."],
-      [
-        referenceProblem(mode, reference, cashNote) !== undefined,
-        referenceProblem(mode, reference, cashNote) ?? "",
-      ],
-    ]);
-    setProblem(found);
-    if (found) return;
-    save.mutate({
+    if (save.isPending) return;
+    const parsed = CreateWagePaymentInput.safeParse({
       workerId,
-      amountPaise: rupeesToPaise(amount) as number,
+      amountPaise: rupeesToPaise(amount),
       kind,
       mode,
       paidOn: date,
-      // The contract has no payment note yet (request 22), so the cash note travels as the reference.
-      reference: mode === "cash" ? cashNote.trim() : reference.trim(),
+      note,
+      reference: mode === "cash" ? undefined : reference.trim() || undefined,
     });
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      setProblem(
+        issue?.path[0] === "note"
+          ? "Add a payment note."
+          : (issue?.message ?? "Check the payment details."),
+      );
+      return;
+    }
+    setProblem(undefined);
+    save.mutate(parsed.data);
   }
 
   return (
@@ -351,33 +346,28 @@ function PayForm({
               <option value="cash">Cash</option>
               <option value="upi">UPI</option>
               <option value="bank">Bank</option>
+              <option value="cheque">Cheque</option>
             </NativeSelect>
           )}
         </Field>
       </div>
-      {mode === "cash" ? (
-        <Field label="Note" hint="Who received the cash, and where.">
-          {(id) => (
-            <Input
-              id={id}
-              maxLength={160}
-              value={cashNote}
-              onChange={(e) => setCashNote(e.target.value)}
-            />
-          )}
-        </Field>
-      ) : (
+      {mode !== "cash" && (
         <Field label={referenceRules[mode].label} hint={referenceRules[mode].hint}>
           {(id) => (
             <Input
               id={id}
-              inputMode={mode === "upi" ? "numeric" : "text"}
+              inputMode={mode === "bank" ? "text" : "numeric"}
               value={reference}
               onChange={(e) => setReference(e.target.value)}
             />
           )}
         </Field>
       )}
+      <Field label="Note" hint={mode === "cash" ? "Who received the cash, and where." : undefined}>
+        {(id) => (
+          <Input id={id} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} />
+        )}
+      </Field>
       <FormError error={problem ?? save.error} />
       {save.isSuccess && !save.isPending ? <SavedNotice>Payment recorded.</SavedNotice> : null}
       <Button type="submit" size="lg" className="w-full" disabled={save.isPending}>

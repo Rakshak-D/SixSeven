@@ -186,6 +186,7 @@ export const deliveryLogistics = createRouter<AuthEnv>()
           id,
           deliveryId,
           c.req.valid("form").photo,
+          c.req.valid("form").capturedAt,
         ),
         201,
       );

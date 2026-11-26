@@ -2,8 +2,7 @@
 
 ## Final release integration authorization
 
-The technical lead authorized scoped frontend, backend and end-to-end verification changes for final integration. Preserve the existing visual design and teammate work. Normal ownership resumes outside this release task.
-
+The technical lead authorized scoped frontend, backend and end-to-end test changes for final integration. Preserve the existing visual design and teammate work. Normal ownership resumes outside this release task.
 
 Maintained by Codex. This is the coordination source of truth; Claude records frontend work only in FRONTEND_LEDGER.md.
 
