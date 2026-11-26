@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Phone } from "lucide-react";
 import { useState } from "react";
 import { Field, FormError, NativeSelect, SavedNotice } from "@/components/forms";
@@ -9,7 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInvite, useSentInvitations, useTeam } from "@/hooks/use-team";
-import { CreateProjectInvitationInput } from "@/shared/schemas/projects";
+import { api } from "@/lib/api/client";
+import {
+  CreateProjectInvitationInput,
+  MyPhoneResponse,
+  UpdateMyPhoneInput,
+} from "@/shared/schemas/projects";
 
 const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 const card = "rounded-[1.75rem] border bg-card p-5 sm:p-6";
@@ -80,6 +86,63 @@ function InviteForm({ projectId }: { projectId: string }) {
   );
 }
 
+function MyPhone() {
+  const client = useQueryClient();
+  const [phone, setPhone] = useState("");
+  const save = useMutation({
+    mutationFn: (phone: string | null) =>
+      api("PATCH", "/me", {
+        body: UpdateMyPhoneInput.parse({ phone }),
+        schema: MyPhoneResponse,
+      }),
+    onSuccess: (result) => {
+      setPhone(result.phone ?? "");
+      return client.invalidateQueries({ predicate: ({ queryKey }) => queryKey[1] === "team" });
+    },
+  });
+  return (
+    <section className={card} aria-label="My phone number">
+      <h2 className="text-3xl">My phone number</h2>
+      <p className="text-sm text-muted-foreground">
+        Shared with your project teams. This does not verify phone ownership.
+      </p>
+      <form
+        className="mt-3 space-y-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!save.isPending) save.mutate(phone);
+        }}
+      >
+        <Field label="Indian mobile number">
+          {(id) => (
+            <Input
+              id={id}
+              type="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+            />
+          )}
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={!phone.trim() || save.isPending}>
+            Save contact number
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={save.isPending}
+            onClick={() => save.mutate(null)}
+          >
+            Remove contact number
+          </Button>
+        </div>
+        <FormError error={save.error} />
+        {save.isSuccess ? <SavedNotice>Contact updated.</SavedNotice> : null}
+      </form>
+    </section>
+  );
+}
+
 /** Everyone on the project, with tap-to-call. The engineer also invites from here. */
 export function TeamPage() {
   const project = useCurrentProject();
@@ -125,6 +188,7 @@ export function TeamPage() {
             </ul>
           )}
         </section>
+        <MyPhone />
         {project.role === "engineer" ? <InviteForm projectId={project.id} /> : null}
       </div>
     </div>

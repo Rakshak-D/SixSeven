@@ -24,6 +24,7 @@ import {
   SetAutopayInput,
   type Supplier,
 } from "@/lib/supplier-payments";
+import { ApproveSupplierPaymentsInput } from "@/shared/schemas/supplier-payments";
 
 /** One text or number box of a payment form. */
 type Box = { key: string; label: string; initial?: string; numeric?: boolean; hint?: string };
@@ -125,7 +126,7 @@ export function AddSupplierForm({ projectId, onDone }: Common) {
       boxes={[
         { key: "name", label: "Supplier name", hint: "As written on their bills." },
         { key: "gstin", label: "GSTIN" },
-        { key: "account", label: "Bank account number", numeric: true },
+        { key: "account", label: "Synthetic bank account number", numeric: true },
       ]}
       body={(v, note) => ({ ...v, note })}
       submit="Add supplier"
@@ -162,7 +163,7 @@ export function BankChangeForm({ projectId, supplier, onDone }: Common & { suppl
       projectId={projectId}
       path={`${supplierPath(supplier.id)}/bank-change`}
       schema={BankChangeInput}
-      boxes={[{ key: "account", label: "New account number", numeric: true }]}
+      boxes={[{ key: "account", label: "New synthetic account number", numeric: true }]}
       body={(v, note) => ({ account: v.account, note })}
       submit="Record the change"
       saved="Change recorded. Payments to this supplier are held."
@@ -254,6 +255,25 @@ export function DecisionForm({
       onDone={onDone}
     >
       <p className="text-ink-2">{summary}</p>
+    </WriteForm>
+  );
+}
+
+export function BatchPaymentForm({ projectId, ids, onDone }: Common & { ids: string[] }) {
+  return (
+    <WriteForm
+      projectId={projectId}
+      path="/payments/approve"
+      schema={ApproveSupplierPaymentsInput}
+      body={(_, note) => ({ ids, note })}
+      submit="Approve selected mock payments"
+      saved="Mock payments recorded"
+      onDone={onDone}
+    >
+      <p className="text-ink-2">
+        The server checks all {ids.length} selected payments together. If any fails, the batch is
+        not recorded.
+      </p>
     </WriteForm>
   );
 }

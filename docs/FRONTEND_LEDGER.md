@@ -590,3 +590,5 @@ proposed method + path, fields, priority / blocking.
 - #9, #21, #22 and #27: wage modes, required notes and capture times are FRONTEND_IMPLEMENTED after PRs #29, #41 and #42. The wage, proposal, camera and upload-specific browser flows remain NOT_VERIFIED.
 - #13–19 and #25: supplier and delivery reads, mock payment controls, typed bag codes, steel evidence and owner review flags have backend contracts. Live browser verification is pending. Delegation remains NOT_IMPLEMENTED.
 - #29–30: Ask Slate uses the shared request and response, including an explicit offline result. Rectangular concrete estimates are BACKEND_IMPLEMENTED. Live provider output is NOT_VERIFIED.
+
+- Follow-up: #5, #6 and #13-14 are LIVE_VERIFIED for worker lifecycle, scheduled acceptance, tracked material creation, typed bag verification, usage and duplicate-code rejection in phone and desktop browser runs. Expected-delivery rejection, phone settings, evidence and batch payments still need workflow-specific browser checks.

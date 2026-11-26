@@ -17,11 +17,13 @@ import {
   type Supplier,
   type SupplierPayment,
 } from "@/lib/supplier-payments";
+import { mocksEnabled } from "@/mocks";
 import {
   AddSupplierForm,
   ApproveForm,
   AutopayForm,
   BankChangeForm,
+  BatchPaymentForm,
   DecisionForm,
   OrderForm,
   PauseForm,
@@ -33,12 +35,14 @@ const HISTORY = 6;
 type Open =
   | { kind: "add" }
   | { kind: "pause" }
+  | { kind: "batch"; ids: string[] }
   | { kind: "approve" | "bank" | "autopay" | "order"; supplier: Supplier }
   | { kind: "decide"; payment: SupplierPayment; approve: boolean };
 
 const titles: Record<Open["kind"], string> = {
   add: "Add a supplier",
   pause: "Autopay",
+  batch: "Review selected payments",
   approve: "Check and approve",
   bank: "Bank account changed",
   autopay: "Autopay limits",
@@ -52,15 +56,20 @@ export function SupplierPayments({ projectId }: { projectId: string }) {
   const materials = useMaterials(projectId);
   const [open, setOpen] = useState<Open | null>(null);
 
+  const [selected, setSelected] = useState<string[]>([]);
+
   if (overview.isPending) return <Skeleton className="h-96 rounded-[1.75rem]" />;
   if (overview.isError) return <FormError error={overview.error} />;
 
   const { paused, suppliers, orders, payments }: PaymentsOverview = overview.data;
   const waiting = payments.filter((p) => p.status === "pending");
+  const selectedPending = waiting
+    .filter((payment) => selected.includes(payment.id))
+    .map((payment) => payment.id);
   const settled = payments.filter((p) => p.status !== "pending").slice(0, HISTORY);
   const material = (id: string) => materials.data?.find((m) => m.id === id);
   const billLine = (p: SupplierPayment) =>
-    `${material(p.materialId)?.name ?? "Material"} · ${formatQty(p.qty)} at ${formatPaise(p.unitPricePaise)} = ${formatPaise(Math.round(p.qty * p.unitPricePaise))}`;
+    `${material(p.materialId)?.name ?? "Material"} · ${formatQty(p.qty)} at ${formatPaise(p.unitPricePaise)}`;
   const now = new Date();
   const changing = suppliers.filter((s) => bankChanging(s, now));
   const close = () => setOpen(null);
@@ -68,7 +77,7 @@ export function SupplierPayments({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-6">
       <p className="rounded-2xl border border-warning/50 bg-warning/10 px-4 py-3 font-semibold text-[15px]">
-        Mock payments on demo data. No real money moves, and Slate never holds money.
+        Mock supplier payments. No real money moves.
       </p>
 
       {changing.map((s) => (
@@ -105,6 +114,21 @@ export function SupplierPayments({ projectId }: { projectId: string }) {
             {waiting.map((p) => (
               <li key={p.id} className="py-4">
                 <p className="font-semibold">{p.supplierName}</p>
+                {!mocksEnabled ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(p.id)}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setSelected((current) =>
+                          checked ? [...current, p.id] : current.filter((id) => id !== p.id),
+                        );
+                      }}
+                    />
+                    Select {p.supplierName} payment for batch approval
+                  </label>
+                ) : null}
                 <p className="num text-[15px] text-ink-2">{billLine(p)}</p>
                 <p className="text-[15px] text-muted-foreground">Engineer: “{p.verifiedNote}”</p>
                 <p className="mt-1 font-semibold text-[15px] text-warning">{p.heldBecause}</p>
@@ -128,6 +152,14 @@ export function SupplierPayments({ projectId }: { projectId: string }) {
         )}
       </section>
 
+      {!mocksEnabled && selectedPending.length > 0 ? (
+        <Button
+          disabled={selectedPending.length > 100}
+          onClick={() => setOpen({ kind: "batch", ids: selectedPending })}
+        >
+          Review {selectedPending.length} selected payments
+        </Button>
+      ) : null}
       <section className={card} aria-label="Suppliers">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-3xl">Suppliers</h2>
@@ -248,6 +280,16 @@ export function SupplierPayments({ projectId }: { projectId: string }) {
         ) : null}
         {open?.kind === "order" ? (
           <OrderForm projectId={projectId} supplier={open.supplier} onDone={close} />
+        ) : null}
+        {open?.kind === "batch" ? (
+          <BatchPaymentForm
+            projectId={projectId}
+            ids={open.ids}
+            onDone={() => {
+              setSelected([]);
+              close();
+            }}
+          />
         ) : null}
         {open?.kind === "decide" ? (
           <DecisionForm

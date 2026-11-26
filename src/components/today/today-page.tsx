@@ -16,6 +16,7 @@ import {
 } from "@/components/forms";
 import { PhotoPicker, photoProblem } from "@/components/photos/photo-picker";
 import { useCurrentProject } from "@/components/shell/project-context";
+import { ExpectedDeliveries } from "@/components/today/expected-deliveries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +37,7 @@ import { todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise, formatQty } from "@/lib/format";
 import { ChallanPhotoResponse, CreateChallanPhotoInput } from "@/shared/schemas/deliveries";
 import { effectiveValue, FixSheet, type FixTarget } from "./fix-sheet";
+import { ProjectSetup } from "./project-setup";
 
 const eyebrow = "font-semibold text-muted-foreground text-xs uppercase tracking-[0.1em]";
 const card = "rounded-[1.75rem] border bg-card p-5 sm:p-6";
@@ -68,6 +70,8 @@ export function TodayPage() {
         <ChangeList projectId={project.id} viewer={project.role} mine />
       </div>
 
+      {project.role === "contractor" ? <ProjectSetup projectId={project.id} /> : null}
+
       <Tabs
         value={tab}
         onValueChange={(next) => router.replace(`${pathname}?log=${next}`, { scroll: false })}
@@ -86,6 +90,11 @@ export function TodayPage() {
         {tab === "attendance" ? <AttendanceForm projectId={project.id} today={today} /> : null}
         <TodayEntries projectId={project.id} today={today} kind={tab} onFix={setFix} />
       </div>
+      {tab === "delivery" ? (
+        <div className="mt-4">
+          <ExpectedDeliveries projectId={project.id} canDecide />
+        </div>
+      ) : null}
       <FixSheet projectId={project.id} target={fix} onClose={() => setFix(null)} />
     </div>
   );
