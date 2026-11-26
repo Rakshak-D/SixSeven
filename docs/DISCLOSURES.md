@@ -36,3 +36,11 @@ The supplier workflow uses synthetic account details and a mock payment provider
 ## Final release AI configuration
 
 Ask Slate uses the existing optional Gemini, Groq, NVIDIA or explicitly configured HTTPS compatible provider. Select a model before enabling provider calls. Prototype mode uses labelled fixed samples. Live mode without provider settings reports offline. The separate rectangular concrete estimator uses local formulas and no provider. No live provider call was verified in this release checkpoint.
+
+## Invite sign-up (known limitation)
+
+`POST /api/v1/invitations/signup` creates an account for any email that has a pending invitation and no account. Email ownership is not verified, so anyone who knows an invited address can claim it first, and the 409 reply reveals whether an invitation is pending. Acceptable for the hackathon build; a public build needs a single-use emailed token or email verification, plus rate limiting.
+
+## Revit quantity import
+
+`src/lib/boq.ts` reads the .xlsx quantity export in the browser with `fflate` (MIT). Revit .rvt files are not parsed or stored.
