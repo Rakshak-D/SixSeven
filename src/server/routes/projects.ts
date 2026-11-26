@@ -8,6 +8,7 @@ import {
   CreateProjectInvitationInput,
   InvitationSignUpInput,
   InvitationSignUpResponse,
+  MyPermissionsResponse,
   MyPhoneResponse,
   ProjectInvitationQuery,
   ProjectInvitationResponse,
@@ -29,6 +30,7 @@ import {
 } from "../services/invitations";
 import {
   addProjectMember,
+  canCreateProjects,
   createProject,
   listProjects,
   listProjectTeam,
@@ -241,6 +243,23 @@ export const projects = createRouter<AuthEnv>()
     }),
     async (c) =>
       c.json(await listProjectTeam(getDatabase().db, c.get("actor"), c.req.valid("param").id), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/me/permissions",
+      tags: ["projects"],
+      middleware: auth,
+      responses: {
+        200: {
+          description: "What the caller may do outside a project",
+          content: json(MyPermissionsResponse),
+        },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json({ canCreateProjects: await canCreateProjects(getDatabase().db, c.get("actor")) }, 200),
   )
   .openapi(
     createRoute({

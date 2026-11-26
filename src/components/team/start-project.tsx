@@ -8,7 +8,12 @@ import { Field, FormError, firstProblem, rupeesToPaise } from "@/components/form
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAcceptInvitation, useCreateProject, useMyInvitations } from "@/hooks/use-team";
+import {
+  useAcceptInvitation,
+  useCreateProject,
+  useMyInvitations,
+  useMyPermissions,
+} from "@/hooks/use-team";
 import { todayIst } from "@/lib/dates";
 
 const roleName = { owner: "owner", contractor: "contractor" } as const;
@@ -53,9 +58,11 @@ export function Invitations() {
   );
 }
 
-/** Whoever starts a project is its site engineer. */
+/** Whoever starts a project is its site engineer. Owners and contractors never see this. */
 export function StartProject() {
   const [open, setOpen] = useState(false);
+  const permissions = useMyPermissions();
+  if (!permissions.data?.canCreateProjects) return null;
   return (
     <>
       <Button size="lg" onClick={() => setOpen(true)}>

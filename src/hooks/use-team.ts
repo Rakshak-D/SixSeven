@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import { failIfInvalid } from "@/lib/api/validate";
+import { mocksEnabled } from "@/mocks";
 import {
   CreateProjectInput,
   CreateProjectInvitationInput,
+  MyPermissionsResponse,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
   ProjectMemberResponse,
@@ -18,6 +20,16 @@ export const useTeam = (projectId: string) =>
       api("GET", `/projects/${encodeURIComponent(projectId)}/members`, {
         schema: ProjectTeamResponse,
       }),
+  });
+
+/** Whether the signed-in person may start a project (engineers only). Demo data always may. */
+export const useMyPermissions = () =>
+  useQuery({
+    queryKey: ["me", "permissions"],
+    queryFn: () =>
+      mocksEnabled
+        ? { canCreateProjects: true }
+        : api("GET", "/me/permissions", { schema: MyPermissionsResponse }),
   });
 
 export function useCreateProject() {

@@ -36,7 +36,8 @@ All rows below have an available shared contract. The four project operations ar
 
 | Priority | Method and path | Role | Query | Body | Success | Additional conflict behavior |
 |---|---|---|---|---|---|---|
-| P0 | POST /projects | Authenticated creator becomes engineer for this project | — | projects.CreateProjectInput | 201 projects.ProjectResponse | — |
+| P0 | POST /projects | Engineers only: accounts that are an engineer on every project they belong to, or new accounts with no projects and no invitations. The creator becomes engineer for the project | — | projects.CreateProjectInput | 201 projects.ProjectResponse | 403 for anyone who is, or is invited as, an owner or contractor |
+| P0 | GET /me/permissions | Authenticated caller | — | — | 200 projects.MyPermissionsResponse | — |
 | P0 | GET /projects | Authenticated, own memberships only | — | — | 200 projects.ProjectsResponse | — |
 | P0 | GET /projects/:id | Members | — | — | 200 projects.ProjectResponse | — |
 | P0 | POST /projects/:id/members | Contractor on a legacy contractor-created project | — | projects.AddProjectMemberInput | 201 projects.ProjectMemberResponse | CONFLICT if already a member. Unknown account gives 404. |

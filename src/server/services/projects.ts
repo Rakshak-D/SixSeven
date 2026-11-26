@@ -1,7 +1,7 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { user } from "@/db/auth-schema";
 import type { Db, Transaction } from "@/db/client";
-import { auditLog, projectMembers, projects } from "@/db/schema";
+import { auditLog, projectInvitations, projectMembers, projects } from "@/db/schema";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
@@ -86,6 +86,36 @@ export async function updateMyPhone(
   return updated;
 }
 
+/**
+ * Only engineers start projects: accounts that are engineers on every project they belong to, or a
+ * new account with no projects and no invitations. Anyone who is, or is invited as, an owner or
+ * contractor anywhere cannot.
+ */
+export async function canCreateProjects(db: Db | Transaction, actor: Actor) {
+  const roles = await db
+    .select({ role: projectMembers.role })
+    .from(projectMembers)
+    .where(eq(projectMembers.userId, actor.userId));
+  if (roles.some(({ role }) => role !== "engineer")) return false;
+  if (roles.length) return true;
+  const [account] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, actor.userId));
+  if (!account) return false;
+  const [invited] = await db
+    .select({ id: projectInvitations.id })
+    .from(projectInvitations)
+    .where(
+      and(
+        sql`lower(${projectInvitations.email}) = ${account.email.toLowerCase()}`,
+        isNull(projectInvitations.acceptedAt),
+      ),
+    )
+    .limit(1);
+  return !invited;
+}
+
 export async function createProject(
   db: Db,
   actor: Actor,
@@ -93,6 +123,9 @@ export async function createProject(
 ): Promise<ProjectResponse> {
   const id = crypto.randomUUID();
   return db.transaction(async (tx) => {
+    if (!(await canCreateProjects(tx, actor))) {
+      throw new ApiError(403, ErrorCode.FORBIDDEN, "Only site engineers can start a project");
+    }
     const project = { id, ...input };
     const role = "engineer";
     await tx.insert(projects).values({ ...project, createdBy: actor.userId });

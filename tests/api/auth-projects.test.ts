@@ -14,6 +14,7 @@ import {
   SignInResponse,
 } from "@/shared/schemas/auth";
 import {
+  MyPermissionsResponse,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
   ProjectMemberResponse,
@@ -248,10 +249,10 @@ describe("projects and scoped access", () => {
   };
 
   it("creates a project and membership atomically, and scopes roles and listings per project", async () => {
-    const owner = await login(DemoAccountEmail.owner);
+    const creator = await login(DemoAccountEmail.engineer);
     const unauthorized = await call("/projects", undefined, input);
     await error(unauthorized, 401, "UNAUTHENTICATED");
-    const response = await call("/projects", owner.cookie, input);
+    const response = await call("/projects", creator.cookie, input);
     expect(response.status).toBe(201);
     const created = ProjectResponse.parse(await response.json());
     expect(created.role).toBe("engineer");
@@ -262,18 +263,18 @@ describe("projects and scoped access", () => {
       .select()
       .from(projectMembers)
       .where(
-        and(eq(projectMembers.projectId, created.id), eq(projectMembers.userId, owner.userId)),
+        and(eq(projectMembers.projectId, created.id), eq(projectMembers.userId, creator.userId)),
       );
     expect(member?.role).toBe("engineer");
     const audit = await db.select().from(auditLog).where(eq(auditLog.projectId, created.id));
     expect(audit.map(({ entity }) => entity).sort()).toEqual(["member", "project"]);
-    expect(audit.every(({ actorId }) => actorId === owner.userId)).toBe(true);
+    expect(audit.every(({ actorId }) => actorId === creator.userId)).toBe(true);
 
-    const own = ProjectsResponse.parse(await (await call("/projects", owner.cookie)).json());
+    const own = ProjectsResponse.parse(await (await call("/projects", creator.cookie)).json());
     expect(own).toEqual(
       expect.arrayContaining([
         created,
-        expect.objectContaining({ id: "demo-greenfield", role: "owner" }),
+        expect.objectContaining({ id: "demo-greenfield", role: "engineer" }),
       ]),
     );
     expect(own.some(({ id }) => id === "demo-isolated")).toBe(false);
@@ -281,7 +282,7 @@ describe("projects and scoped access", () => {
     const other = ProjectsResponse.parse(await (await call("/projects", isolated.cookie)).json());
     expect(other.map(({ id }) => id)).toEqual(["demo-isolated"]);
     expect(
-      ProjectResponse.parse(await (await call(`/projects/${created.id}`, owner.cookie)).json()),
+      ProjectResponse.parse(await (await call(`/projects/${created.id}`, creator.cookie)).json()),
     ).toEqual(created);
     await error(await call(`/projects/${created.id}`, isolated.cookie), 404, "NOT_FOUND");
     await error(await call("/projects/missing-project", isolated.cookie), 404, "NOT_FOUND");
@@ -503,8 +504,21 @@ describe("projects and scoped access", () => {
     expect(ProjectMemberResponse.parse(await accepted.json()).role).toBe("contractor");
   });
 
+  it("lets only engineers start a project", async () => {
+    const permissions = async (cookie: string) =>
+      MyPermissionsResponse.parse(await (await call("/me/permissions", cookie)).json());
+    const engineer = await login(DemoAccountEmail.engineer);
+    expect(await permissions(engineer.cookie)).toEqual({ canCreateProjects: true });
+    for (const role of ["owner", "contractor"] as const) {
+      const { cookie } = await login(DemoAccountEmail[role]);
+      expect(await permissions(cookie)).toEqual({ canCreateProjects: false });
+      await error(await call("/projects", cookie, input), 403, "FORBIDDEN");
+    }
+    await error(await call("/me/permissions"), 401, "UNAUTHENTICATED");
+  });
+
   it("rolls back a project and its creator membership when audit recording fails", async () => {
-    const { cookie } = await login(DemoAccountEmail.contractor);
+    const { cookie } = await login(DemoAccountEmail.engineer);
     const { db, sql } = getDatabase();
     const name = `Rollback ${crypto.randomUUID()}`;
     await sql`create function slate_test_reject_project_audit() returns trigger language plpgsql as $$

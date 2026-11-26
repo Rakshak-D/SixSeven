@@ -69,7 +69,7 @@ API tests (`tests/api`) need `SLATE_TEST_DATABASE=1` and a loopback database nam
 | `SLATE_MIGRATION_DATABASE` | Must equal the database name before `db:migrate` runs |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
 | `BETTER_AUTH_URL` | The one origin sign-in accepts, e.g. `http://localhost:3000`. `share.sh` swaps it for the tunnel address |
-| `SLATE_DEMO_SEED`, `SLATE_DEMO_PASSWORD` | Seed switch and the demo accounts' password |
+| `SLATE_DEMO_SEED`, `SLATE_DEMO_PASSWORD` | Seed switch and the demo accounts' password (8–64 characters). Change it and restart the server (or run `pnpm db:seed`): the demo accounts follow it |
 | `UPLOAD_DIR` | Private folder for uploaded photos |
 | `NEXT_PUBLIC_USE_MOCKS` | `0` = live database, `1` = in-browser demo data (dev only) |
 | `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL` | Ask Slate and AI checklists (section 6) |
@@ -82,9 +82,9 @@ person picks **Invited? Create your account** on `/login`, signs up, then accept
 
 | Role | Sees and does |
 |---|---|
-| Engineer | Creates projects; **Set up the project** on home (Revit .xlsx import, add material, write checklist); reviews tasks; verifies deliveries; invites on Team; no wage amounts |
-| Contractor | **Today** (delivery, usage, attendance, Fix); **Stock**; **Wages** (pay, add/remove workers); works checklist tasks |
-| Owner | Home (budget, spend, approvals with a note); **Money** (suppliers, orders, mock payments, autopay); **Logs** |
+| Engineer | The only role that starts projects; **Set up the project** on home (Revit .xlsx import, add material, write checklist); reviews tasks; verifies deliveries; invites on Team; no wage amounts |
+| Contractor | **Today** (delivery, usage, attendance, Fix); **Stock**; **Wages** (pay, add/remove workers); works checklist tasks. Cannot start projects |
+| Owner | Home (budget, spend, approvals with a note); **Money** (suppliers, orders, mock payments, autopay); **Logs**. Cannot start projects |
 
 Walkthroughs for both demos (seeded project, new project) are in [DEMO.md](DEMO.md).
 
@@ -113,8 +113,11 @@ List the models your key can use:
 curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $AI_API_KEY"
 ```
 
-Limits: 10 questions per user per minute, 20 s timeout, 1500 output tokens. Answers are not
-engineering sign-off; check any quantity it gives.
+Ask Slate answers in under about 80 words and declines anything off-topic. It cannot see project
+records and points to the right screen instead. Concrete and brick-wall quantities come from two
+deterministic server calculators (`src/server/ai/calculations.ts`: dry-volume factor 1.54 for
+concrete, 1.33 for mortar, 50 kg bag = 0.035 m³); the model only reports their numbers. Limits: 10
+questions per user per minute, 20 s timeout. Answers are not engineering sign-off.
 
 ## 7. Share with other laptops (Cloudflare tunnel)
 
@@ -204,6 +207,10 @@ curl -b jar $B/api/v1/projects
 #### `POST /invitations/{id}/accept`
 - **200**: { userId: string, role: `owner` \| `contractor` \| `engineer` }
 - **Errors:** 400, 401, 403, 404, 409, 500
+
+#### `GET /me/permissions`
+- **200**: { canCreateProjects: boolean }
+- **Errors:** 400, 401, 403, 404, 500
 
 #### `PATCH /me`
 - **Body** (JSON): { phone: string }

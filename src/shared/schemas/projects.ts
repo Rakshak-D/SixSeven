@@ -52,6 +52,8 @@ export const UpdateMyPhoneInput = z.strictObject({
   phone: IndianMobileInput.nullable(),
 });
 export const MyPhoneResponse = z.strictObject({ phone: IndianMobile.nullable() });
+/** What the signed-in person may do outside any one project. */
+export const MyPermissionsResponse = z.strictObject({ canCreateProjects: z.boolean() });
 export const ProjectTeamResponse = z.array(
   ProjectMemberResponse.extend({
     name: Label,
@@ -79,6 +81,7 @@ export type AddProjectMemberInput = z.infer<typeof AddProjectMemberInput>;
 export type ProjectMemberResponse = z.infer<typeof ProjectMemberResponse>;
 export type UpdateMyPhoneInput = z.infer<typeof UpdateMyPhoneInput>;
 export type MyPhoneResponse = z.infer<typeof MyPhoneResponse>;
+export type MyPermissionsResponse = z.infer<typeof MyPermissionsResponse>;
 export type ProjectTeamResponse = z.infer<typeof ProjectTeamResponse>;
 export type CreateProjectInput = z.infer<typeof CreateProjectInput>;
 export type ProjectResponse = z.infer<typeof ProjectResponse>;
