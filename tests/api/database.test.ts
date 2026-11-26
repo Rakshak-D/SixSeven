@@ -55,11 +55,14 @@ it("upgrades a separate empty database with only the original baseline applied",
         'adjustments_project_target_guard'
       )`;
     expect(guards).toHaveLength(6);
+    expect(
+      await upgrade`select to_regclass('public.supplier_payments') is not null as present`,
+    ).toEqual([{ present: true }]);
   } finally {
     await upgrade.end();
     await sql`drop database ${sql(database)}`;
   }
-});
+}, 25_000);
 
 it("creates project-scoped append-only attendance, wage and correction tables", async () => {
   const { sql } = getDatabase();

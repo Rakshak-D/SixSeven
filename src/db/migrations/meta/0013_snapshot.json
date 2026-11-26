@@ -1,5 +1,5 @@
 {
-  "id": "42cd8a3e-924e-4abe-a085-47e745157b69",
+  "id": "612ba55e-96f0-4806-a00a-31b555b86184",
   "prevId": "15f1b88d-7477-42d8-986c-650aa175e3e5",
   "version": "7",
   "dialect": "postgresql",
@@ -1380,6 +1380,111 @@
       },
       "isRLSEnabled": false
     },
+    "public.delivery_verifications": {
+      "name": "delivery_verifications",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_id": {
+          "name": "delivery_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "verified_by": {
+          "name": "verified_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bag_code_count": {
+          "name": "bag_code_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verified_qty": {
+          "name": "verified_qty",
+          "type": "numeric(14, 3)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "delivery_verification_movement": {
+          "name": "delivery_verification_movement",
+          "tableFrom": "delivery_verifications",
+          "tableTo": "stock_movements",
+          "columnsFrom": [
+            "project_id",
+            "delivery_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "delivery_verification_actor": {
+          "name": "delivery_verification_actor",
+          "tableFrom": "delivery_verifications",
+          "tableTo": "project_members",
+          "columnsFrom": [
+            "project_id",
+            "verified_by"
+          ],
+          "columnsTo": [
+            "project_id",
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "delivery_verification_scope": {
+          "name": "delivery_verification_scope",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "delivery_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "delivery_verification_count": {
+          "name": "delivery_verification_count",
+          "value": "\"delivery_verifications\".\"bag_code_count\" between 0 and 5000"
+        },
+        "delivery_verification_qty": {
+          "name": "delivery_verification_qty",
+          "value": "\"delivery_verifications\".\"verified_qty\" > 0 and (\"delivery_verifications\".\"bag_code_count\" = 0 or \"delivery_verifications\".\"bag_code_count\" = \"delivery_verifications\".\"verified_qty\")"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.expected_deliveries": {
       "name": "expected_deliveries",
       "schema": "",
@@ -1715,6 +1820,114 @@
       },
       "isRLSEnabled": false
     },
+    "public.material_bag_codes": {
+      "name": "material_bag_codes",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_id": {
+          "name": "delivery_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_by": {
+          "name": "consumed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "bag_code_delivery_scope": {
+          "name": "bag_code_delivery_scope",
+          "tableFrom": "material_bag_codes",
+          "tableTo": "delivery_verifications",
+          "columnsFrom": [
+            "project_id",
+            "delivery_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "delivery_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "bag_code_material_scope": {
+          "name": "bag_code_material_scope",
+          "tableFrom": "material_bag_codes",
+          "tableTo": "materials",
+          "columnsFrom": [
+            "project_id",
+            "material_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "bag_code_usage_scope": {
+          "name": "bag_code_usage_scope",
+          "tableFrom": "material_bag_codes",
+          "tableTo": "stock_movements",
+          "columnsFrom": [
+            "project_id",
+            "consumed_by"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "material_bag_codes_project_id_code_pk": {
+          "name": "material_bag_codes_project_id_code_pk",
+          "columns": [
+            "project_id",
+            "code"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "bag_code_consumption_pair": {
+          "name": "bag_code_consumption_pair",
+          "value": "(\"material_bag_codes\".\"consumed_by\" is null) = (\"material_bag_codes\".\"consumed_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.materials": {
       "name": "materials",
       "schema": "",
@@ -1724,6 +1937,13 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true
+        },
+        "tracks_bags": {
+          "name": "tracks_bags",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "project_id": {
           "name": "project_id",
@@ -3055,12 +3275,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -3177,14 +3391,6 @@
         "wage_payment_amount_paise_valid": {
           "name": "wage_payment_amount_paise_valid",
           "value": "\"wage_payments\".\"amount_paise\" between 1 and 9007199254740991"
-        },
-        "wage_payment_reference_by_mode": {
-          "name": "wage_payment_reference_by_mode",
-          "value": "case \"wage_payments\".\"mode\"::text\n      when 'cash' then \"wage_payments\".\"reference\" is null\n      when 'upi' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[0-9]{12}$'\n      when 'bank' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[A-Za-z0-9]{6,22}$'\n      when 'cheque' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[0-9]{6}$'\n      else false end"
-        },
-        "wage_payment_note_required": {
-          "name": "wage_payment_note_required",
-          "value": "\"wage_payments\".\"note\" is not null and char_length(btrim(\"wage_payments\".\"note\")) between 1 and 2000"
         }
       },
       "isRLSEnabled": false
@@ -3773,8 +3979,7 @@
       "values": [
         "cash",
         "upi",
-        "bank",
-        "cheque"
+        "bank"
       ]
     }
   },

@@ -96,8 +96,29 @@
     {
       "idx": 13,
       "version": "7",
-      "when": 1795650729474,
-      "tag": "0013_wage_payment_contract",
+      "when": 1795650908796,
+      "tag": "0013_bag_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795651294772,
+      "tag": "0014_supplier_mock_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795652231751,
+      "tag": "0015_checklist_steel_proof",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795652364284,
+      "tag": "0016_wage_payment_contract",
       "breakpoints": true
     }
   ]

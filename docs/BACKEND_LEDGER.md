@@ -14,6 +14,25 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Frontend handoff: in `src/lib/spends.ts`, add `cheque: "Cheque"` to `modeLabel` to resolve TS7053. In `src/components/wages/wages-page.tsx`, offer cheque, make UPI/bank/cheque references required with mode-specific validation, and keep references as strings to preserve leading zeros.
 - Keep the PR in draft until the frontend consumer changes and full CI passes. Regenerate this unmerged migration if another migration is integrated first.
 
+## Entry — Engineer steel-marking hold point
+
+- Request #15, 2026-11-26 IST, branch `be/steel-hold-point`. Flagged checklist items require project engineer evidence for the current contractor submission before acceptance. The API stores capture and receipt times and retains prior evidence.
+- PostgreSQL fresh migration and seed passed. All 9 project reporting API tests passed, including no-evidence rejection, role denial, cross-project privacy and original photo byte retrieval. Typecheck passed.
+- Frontend handoff: `src/hooks/use-project-data.ts` and `src/components/engineer/review-list.tsx` can use the new multipart evidence endpoint before acceptance. Checklist creation and approved additions accept `requiresSteelProof`.
+
+## Entry — Approved suppliers, mock payments and owner flags
+
+- Requests #16–19 and #25, 2026-11-26 IST, branch `be/supplier-mock-payments`, migration `0014_supplier_mock_payments`. Added owner-only supplier, bank-change, order, mandate, approval and payment reads. Verified deliveries enter the mock queue transactionally. Release consumes approved capacity and enforces applicable mandate caps. The owner summary exposes deterministic review flags.
+- No external gateway or real payment data is used. Bank account values are reduced to their last four digits before storage. Only project owners can manage or read these operations. Delegation is outside the owner-only approval policy.
+- Fresh migration, seed, upgrade, Biome, typecheck and all 23 focused stock and supplier tests passed. The concurrent supplier test first exposed a database lock conflict. A project lock compatible with foreign-key checks preserves serialization and resolved it.
+- Frontend handoff: use `src/shared/schemas/supplier-payments.ts` from `src/hooks/use-supplier-payments.ts` and replace the strict frontend mock-only response readers in `src/lib/supplier-payments.ts` before enabling live supplier data. Supplier edits return a mock receipt; refresh the overview for updated state. Mandate updates require `paused`. The verification queue does not disclose prices.
+
+## Entry — Delivery and material identity verification (#13–14)
+
+- Branch `be/bag-verification`, migration `0013_bag_verification`. Added the engineer queue, verification routes, project-unique codes and transactional usage consumption. Existing materials remain quantity-based unless tracking is set on creation. Tracked and verified quantity corrections require a separate reconciliation mechanism.
+- Fresh PostgreSQL migration, seed, baseline upgrade test, Biome, typecheck and all 164 local tests passed. The tests cover registration conflicts, unauthorized access, cross-material rejection and concurrent consumption.
+- Frontend handoff: switch `src/hooks/use-supplier-payments.ts` to `DeliveryVerificationQueue` and `DeliveryVerificationResponse`, send codes from `src/components/payments/verify-deliveries.tsx` for tracked materials, and collect them in the usage form. The verification queue omits prices. Supplier payment release is a separate backend change.
+
 ## Entry — Medical claims and bill photo contract
 
 - Branch `be/medical-evidence`, requests #23 and #27. Medical bill submissions use one `capturedAt` part per `billPhotos` part in matching order. This confirms the frontend ledger's multipart convention. The author and authorized reviewers can fetch private bill images.

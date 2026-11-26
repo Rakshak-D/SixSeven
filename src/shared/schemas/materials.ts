@@ -8,6 +8,7 @@ const MaterialFields = {
   unitCostPaise: Paise,
   tolerancePct: z.number().min(0).max(100),
   lowStockQty: Qty,
+  tracksBags: z.boolean().optional(),
 };
 export const CreateMaterialInput = z.strictObject(MaterialFields);
 export const MaterialResponse = z.strictObject({ id: Id, ...MaterialFields });

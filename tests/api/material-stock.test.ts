@@ -16,8 +16,13 @@ import {
   ExpectedDeliveriesResponse,
   ExpectedDeliveryResponse,
 } from "@/shared/schemas/deliveries";
-import { MaterialResponse, MaterialsResponse } from "@/shared/schemas/materials";
+import {
+  type CreateMaterialInput,
+  MaterialResponse,
+  MaterialsResponse,
+} from "@/shared/schemas/materials";
 import { StockMovementsResponse, StockResponse } from "@/shared/schemas/stock";
+import { SupplierPaymentsOverview } from "@/shared/schemas/supplier-payments";
 import { UsageResponse } from "@/shared/schemas/usages";
 import { WorkerResponse, WorkersResponse } from "@/shared/schemas/workers";
 import { testDatabase } from "./database-fixture";
@@ -93,7 +98,11 @@ async function failure(response: Response, status: number, code: string) {
   return body;
 }
 
-async function material(projectId = greenfield, actor = contractor, input = materialInput) {
+async function material(
+  projectId = greenfield,
+  actor = contractor,
+  input: CreateMaterialInput = materialInput,
+) {
   const response = await call(projectId, "materials", actor, input);
   expect(response.status).toBe(201);
   return MaterialResponse.parse(await response.json());
@@ -275,6 +284,209 @@ describe("project membership and contracts", () => {
 });
 
 describe("stock ledger", () => {
+  it("only releases verified mock supplier bills within order, mandate and weekly caps", async () => {
+    const item = await material();
+    const name = `Synthetic supplier ${crypto.randomUUID()}`;
+    const gstin = `99${crypto.randomUUID().replaceAll("-", "").slice(0, 13).toUpperCase()}`;
+    const path = `/projects/${greenfield}`;
+    const read = async (actor = owner) => {
+      const result = await apiMock("GET", `${path}/supplier-payments`, actor);
+      expect(result.status).toBe(200);
+      return SupplierPaymentsOverview.parse(await result.json());
+    };
+    const apiMock = (method: string, route: string, actor: { cookie: string }, body?: unknown) =>
+      app.request(`/api/v1${route}`, {
+        method,
+        headers: {
+          cookie: actor.cookie,
+          ...(body !== undefined && { "content-type": "application/json" }),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    const configure = {
+      name,
+      gstin,
+      account: "100000000042",
+      note: "Synthetic supplier for mock tests",
+    };
+    await failure(await apiMock("GET", `${path}/supplier-payments`, contractor), 403, "FORBIDDEN");
+    await failure(
+      await apiMock("POST", `${path}/suppliers`, contractor, configure),
+      403,
+      "FORBIDDEN",
+    );
+    expect((await apiMock("POST", `${path}/suppliers`, owner, configure)).status).toBe(201);
+    const details = (await read()).suppliers.find((row) => row.name === name);
+    expect(details).toMatchObject({ accountLast4: "0042", approved: false });
+    expect(details).not.toHaveProperty("account");
+    if (!details) throw new Error("Synthetic supplier was not identified");
+    const id = details.id;
+    expect(
+      (
+        await apiMock("POST", `/suppliers/${id}/approve`, owner, {
+          note: "Approved synthetic supplier",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await apiMock("POST", `${path}/orders`, owner, {
+          supplierId: id,
+          materialId: item.id,
+          qty: 10,
+          maxUnitPricePaise: 6_500,
+          note: "Approve synthetic order",
+        })
+      ).status,
+    ).toBe(201);
+    const mandate = {
+      enabled: true,
+      paused: false,
+      perBillCapPaise: 6_500,
+      perWeekCapPaise: 6_500,
+      note: "Enable one bill weekly",
+    };
+    expect((await apiMock("PUT", `/suppliers/${id}/autopay`, owner, mandate)).status).toBe(200);
+    const [first, second] = await Promise.all([
+      deliver(delivery(item.id, 1, name)),
+      deliver(delivery(item.id, 1, name)),
+    ]);
+    const verify = (id: string) =>
+      apiMock("POST", `${path}/deliveries/${id}/verify`, engineer, {
+        note: "Checked material on arrival",
+      });
+    expect(
+      await Promise.all([verify(first.id), verify(second.id)]).then((rows) =>
+        rows.map(({ status }) => status),
+      ),
+    ).toEqual([200, 200]);
+    const paid = (await read()).payments.filter((row) => row.supplierName === name);
+    expect(paid.map((row) => row.status).sort()).toEqual(["paid", "pending"]);
+    const pending = paid.find((row) => row.status === "pending");
+    expect(pending?.heldBecause).toMatch(/weekly/);
+    expect(paid.find((row) => row.status === "paid")).toMatchObject({
+      provider: "mock",
+      amountPaise: 6_500,
+      paidBy: "autopay",
+    });
+    await failure(
+      await apiMock("POST", `/supplier-payments/${pending?.id}/decision`, owner, {
+        approve: true,
+        note: "Try weekly cap",
+      }),
+      409,
+      "CONFLICT",
+    );
+    await failure(
+      await apiMock("POST", `/supplier-payments/${pending?.id}/decision`, contractor, {
+        approve: true,
+        note: "Unauthorized payment",
+      }),
+      403,
+      "FORBIDDEN",
+    );
+    expect(
+      (await apiMock("PUT", `/suppliers/${id}/autopay`, owner, { ...mandate, enabled: false }))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await apiMock("POST", `/suppliers/${id}/bank-change`, owner, {
+          account: "100000000043",
+          note: "Synthetic bank change",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await apiMock("POST", `/suppliers/${id}/bank-change/approve`, owner, {
+          note: "Start cooldown",
+        })
+      ).status,
+    ).toBe(200);
+    await failure(
+      await apiMock("POST", "/payments/approve", owner, {
+        ids: [pending?.id],
+        note: "Try during cooldown",
+      }),
+      409,
+      "CONFLICT",
+    );
+    expect((await read()).suppliers.find((row) => row.id === id)?.bankChange).toMatchObject({
+      accountLast4: "0043",
+      effectiveAt: expect.any(String),
+    });
+    const { sql } = getDatabase();
+    await sql`update suppliers set bank_effective_at = now() - interval '1 second' where id = ${id}`;
+    const approve = () =>
+      apiMock("POST", "/payments/approve", owner, {
+        ids: [pending?.id],
+        note: "Manual approval after cooldown",
+      });
+    expect((await Promise.all([approve(), approve()])).map(({ status }) => status).sort()).toEqual([
+      200, 409,
+    ]);
+    expect((await read()).orders.find((row) => row.supplierId === id)?.remainingQty).toBe(8);
+    const activity = ActivityResponse.parse(
+      await (await call(greenfield, "activity", contractor)).json(),
+    );
+    expect(activity.some(({ entity }) => entity.startsWith("supplier"))).toBe(false);
+    const ownerSummary = await (await call(greenfield, "summary", owner)).json();
+    expect(ownerSummary.fraudFlags).toContainEqual(
+      expect.objectContaining({ kind: "new_supplier", refId: id }),
+    );
+    const contractorSummary = await (await call(greenfield, "summary", contractor)).json();
+    expect(contractorSummary).not.toHaveProperty("fraudFlags");
+  });
+  it("binds verified bag codes to one project and material and consumes them once", async () => {
+    const item = await material(greenfield, contractor, {
+      ...materialInput,
+      unit: "bag",
+      tracksBags: true,
+    });
+    const different = await material(greenfield, contractor, {
+      ...materialInput,
+      unit: "bag",
+      tracksBags: true,
+    });
+    const deliveryRow = await deliver(delivery(item.id, 2));
+    const rejectedQty = await call(greenfield, "deliveries", contractor, delivery(item.id, 0.5));
+    await failure(rejectedQty, 400, "VALIDATION_ERROR");
+    const verify = (actor: { cookie: string }, id: string, codes: string[]) =>
+      app.request(`/api/v1/deliveries/${id}/bag-codes`, {
+        method: "POST",
+        headers: { cookie: actor.cookie, "content-type": "application/json" },
+        body: JSON.stringify({ codes }),
+      });
+    const codes = [crypto.randomUUID(), crypto.randomUUID()];
+    await failure(await verify(outsider, deliveryRow.id, codes), 404, "NOT_FOUND");
+    await failure(await verify(contractor, deliveryRow.id, codes), 403, "FORBIDDEN");
+    await failure(await verify(engineer, deliveryRow.id, [codes[0]]), 400, "VALIDATION_ERROR");
+    expect((await verify(engineer, deliveryRow.id, codes)).status).toBe(200);
+    const duplicate = await deliver(delivery(item.id, 1));
+    await failure(await verify(engineer, duplicate.id, [codes[0]]), 409, "CONFLICT");
+    const use = (id: string, bagCodes: string[]) =>
+      call(greenfield, "usages", contractor, {
+        ...usage(id, 1),
+        bagCodes,
+      });
+    await failure(await use(item.id, []), 400, "VALIDATION_ERROR");
+    await failure(await use(item.id, [crypto.randomUUID()]), 409, "BAG_CODE_UNKNOWN");
+    await failure(await use(different.id, [codes[0]]), 409, "BAG_CODE_WRONG_MATERIAL");
+    const concurrent = await Promise.all([use(item.id, [codes[0]]), use(item.id, [codes[0]])]);
+    expect(concurrent.map(({ status }) => status).sort()).toEqual([201, 409]);
+    const denied = concurrent.find(({ status }) => status === 409);
+    expect(ErrorResponse.parse(await denied?.json()).error.code).toBe("BAG_CODE_USED");
+    expect((await stock(item.id)).balance).toBe(2);
+    const bulk = await material();
+    await deliver(delivery(bulk.id, 1.5));
+    expect((await call(greenfield, "usages", contractor, usage(bulk.id, 0.5))).status).toBe(201);
+    const queue = await call(greenfield, "deliveries-to-verify", engineer);
+    expect(queue.status).toBe(200);
+    expect(await queue.json()).toContainEqual(
+      expect.objectContaining({ deliveryId: duplicate.id, tracksBags: true }),
+    );
+  });
   it("records expected delivery acceptance once and keeps rejected arrivals out of stock", async () => {
     const item = await material();
     const schedule = async () => {
@@ -607,7 +819,7 @@ describe("stock ledger", () => {
     // Include the foreign key dependents to exercise the append-only trigger itself.
     await expect(
       sql.begin(async (tx) => {
-        await tx`truncate table stock_movements, delivery_challan_photos, expected_deliveries`;
+        await tx`truncate table stock_movements, delivery_challan_photos, expected_deliveries, delivery_verifications, material_bag_codes, supplier_payments`;
         throw new Error("Stock movement truncation unexpectedly succeeded");
       }),
     ).rejects.toMatchObject({ code: "55000" });
