@@ -1,4 +1,6 @@
 // Client-only: import it from client components.
+
+import { cn } from "cn";
 import { XIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import type { ReactNode } from "react";
@@ -11,13 +13,22 @@ type SheetProps = {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  className?: string;
 };
 
 /**
  * A bottom sheet on phones and a right-side panel on desktop, on solid surfaces (no blur).
  * Radix Dialog handles focus trapping, Escape, the scrim click and screen-reader labelling.
  */
-export function Sheet({ open, onOpenChange, title, description, children, footer }: SheetProps) {
+export function Sheet({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  footer,
+  className,
+}: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -25,7 +36,10 @@ export function Sheet({ open, onOpenChange, title, description, children, footer
         <Dialog.Content
           // Without a description, tell Radix there is none instead of leaving a dangling id.
           {...(description ? {} : { "aria-describedby": undefined })}
-          className="fixed inset-x-2 bottom-2 z-50 flex max-h-[calc(100dvh-3.5rem)] flex-col rounded-[2.1rem] border bg-card text-card-foreground shadow-float outline-none data-[state=closed]:animate-sheet-down data-[state=open]:animate-sheet-up lg:inset-x-auto lg:top-4 lg:right-4 lg:bottom-4 lg:max-h-none lg:w-[400px] lg:data-[state=closed]:animate-panel-out lg:data-[state=open]:animate-panel-in"
+          className={cn(
+            "fixed inset-x-2 bottom-2 z-50 flex max-h-[calc(100dvh-3.5rem)] flex-col rounded-[2.1rem] border bg-card text-card-foreground shadow-float outline-none data-[state=closed]:animate-sheet-down data-[state=open]:animate-sheet-up lg:inset-x-auto lg:top-4 lg:right-4 lg:bottom-4 lg:max-h-none lg:w-[400px] lg:data-[state=closed]:animate-panel-out lg:data-[state=open]:animate-panel-in",
+            className,
+          )}
         >
           <div
             aria-hidden="true"

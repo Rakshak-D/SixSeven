@@ -25,6 +25,10 @@ One Next.js App Router application with Hono at `/api/v1`, `@hono/zod-openapi`, 
 ### M6 checklist verification and history
 
 Frontend requests #7 and #8 are approved. A contractor starts a task (todo → doing) and submits a note and private photos (doing or sent_back → waiting). An engineer accepts (waiting → done) or sends it back with a reason of at least ten characters (waiting → sent_back). Owners can read the evidence and history. All transitions and reviews record the actor and time. Engineer additions, renames and soft removals preserve prior values, reasons and evidence. Items awaiting review cannot be removed. Proposal decisions never change budgets or execute payments. M6 uses deterministic templates. External AI provider selection remains deferred.
+## Material identifiers
+
+A new material may opt in to tracked bags. The engineer registers a project-unique code per whole bag on a delivery. Contractor stock usage consumes those codes and inventory in one transaction. Bulk materials remain quantity-based. Verified quantities cannot change through an ordinary stock correction. A registered identifier records a claim about a physical bag. It does not prove the bag's contents.
+
 ## Approved change requests
 
 New deliveries, usages, checklist reviews, wage payments, proposal decisions and change-request actions require a nonblank note. Existing stricter reasons still apply. Historical records retain their original notes.
@@ -32,3 +36,13 @@ New deliveries, usages, checklist reviews, wage payments, proposal decisions and
 Request #20 supersedes direct checklist add, rename and removal and direct attendance adjustments. Checklist changes, attendance corrections and medical expenses use an append-only decision history with a server-derived actor, role, note and timestamp. Engineer requests require a contractor vote before an owner decision. A contractor-authored attendance or medical request goes to the owner directly. Only the author can reopen a contractor rejection. The owner decision is final and an acceptance applies the change once in the same transaction. The contractor task evidence and engineer review workflow stays separate.
 
 Actual attendance and paid attendance entitlement are distinct. Only a medical emergency may authorize a full paid day. Medical bill reimbursements use the mock provider, have an owner-approved amount no greater than the bill, and count once in other expenses and weekly spending. Bill photos are visible only to the author and authorized project reviewers.
+
+## Steel-marking hold point
+
+Flag applicable checklist items at creation or through an approved checklist addition. A flagged item requires a project engineer to upload private steel-marking photos before accepting the current contractor submission. The evidence documents the reported brand, BIS mark and mill test certificate markings. Sending back a submission preserves its evidence. A new contractor submission requires its own photos. The system records who uploaded the evidence and receipt times. Visual review does not independently verify material quality.
+
+## Mock supplier payments and owner review signals
+
+Only project owners maintain suppliers, confirm bank changes, approve orders and decide supplier payments. Engineer verification can queue a matching delivery and trigger mock autopay when its mandate is active. Contractor wage payments use a separate authorization path. Supplier payments require supplier approval, one approved order with sufficient remaining quantity, acceptable unit price, and compliance with applicable mandate caps. A bank change holds release until the owner confirms it and the 24-hour cooldown ends. Release consumes order capacity and records the mock receipt and audit event together. Synthetic bank data is masked and no funds move.
+
+Owner-only review signals cover suppliers added within seven IST calendar dates, pending or cooling-down bank changes, deliveries without engineer confirmation after two days, unit prices above 125% of the average of the previous three to five positive deliveries of that material, at least two reschedules for the same supplier and material within 30 days, and paid receipts missing verification. Database relationships guard the last condition during normal writes. These are deterministic prompts for review.

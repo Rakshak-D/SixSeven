@@ -1,6 +1,13 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db, Transaction } from "@/db/client";
-import { adjustments, attendance, stockMovements, wagePayments } from "@/db/schema";
+import {
+  adjustments,
+  attendance,
+  deliveryVerifications,
+  materials,
+  stockMovements,
+  wagePayments,
+} from "@/db/schema";
 import type { Actor } from "@/server/middleware/auth";
 import { ApiError } from "@/server/middleware/errors";
 import { ErrorCode } from "@/shared/errors";
@@ -99,11 +106,37 @@ export async function applyAdjustment(
         type: stockMovements.type,
         qty: stockMovements.qty,
         occurredOn: stockMovements.occurredOn,
+        tracksBags: materials.tracksBags,
       })
       .from(stockMovements)
+      .innerJoin(
+        materials,
+        and(
+          eq(materials.projectId, stockMovements.projectId),
+          eq(materials.id, stockMovements.materialId),
+        ),
+      )
       .where(and(eq(stockMovements.projectId, projectId), eq(stockMovements.id, input.targetId)))
-      .for("update");
+      .for("update", { of: stockMovements });
     if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, "Stock movement not found");
+    const [verification] =
+      target.type === "delivery"
+        ? await tx
+            .select({ id: deliveryVerifications.deliveryId })
+            .from(deliveryVerifications)
+            .where(
+              and(
+                eq(deliveryVerifications.projectId, projectId),
+                eq(deliveryVerifications.deliveryId, target.id),
+              ),
+            )
+        : [];
+    if (target.tracksBags || verification)
+      throw new ApiError(
+        409,
+        ErrorCode.CONFLICT,
+        "A tracked or verified movement cannot be corrected by quantity alone",
+      );
     if (target.type === "adjustment") {
       throw new ApiError(
         400,

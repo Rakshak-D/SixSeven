@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
+import { AssistantSheet } from "@/components/assistant/assistant-sheet";
 import { SlateMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,7 @@ import { useProjects } from "@/hooks/use-projects";
 import { ApiClientError } from "@/lib/api/client";
 import { mocksEnabled } from "@/mocks";
 import { ActionSheet } from "./action-sheet";
-import { AiAssistantWidget } from "./ai-assistant-widget";
+import { AssistantButton } from "./assistant-button";
 import { Dock } from "./dock";
 import { activeTabIndex, roleNav } from "./nav";
 import { ProjectProvider } from "./project-context";
@@ -46,6 +47,7 @@ function ShellMessage({
 export function AppShell({ projectId, children }: { projectId: string; children: ReactNode }) {
   const pathname = usePathname();
   const projects = useProjects();
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
 
   if (projects.isPending) {
@@ -84,6 +86,7 @@ export function AppShell({ projectId, children }: { projectId: string; children:
   const nav = roleNav[project.role];
   const activeIndex = activeTabIndex(pathname, project.id, nav.tabs);
   const openAction = () => setActionOpen(true);
+  const openAssistant = () => setAssistantOpen(true);
 
   return (
     <ProjectProvider value={project}>
@@ -93,8 +96,9 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         nav={nav}
         activeIndex={activeIndex}
         onAction={openAction}
+        onAssistant={openAssistant}
       />
-      <div className="flex items-center gap-1 px-2 pt-3 lg:hidden">
+      <div className="flex flex-wrap items-center gap-1 px-2 pt-3 sm:flex-nowrap lg:hidden">
         <Link
           href="/projects"
           aria-label="Slate, your projects"
@@ -105,10 +109,13 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         <Badge variant="outline" className="shrink-0">
           {roleLabel[project.role]}
         </Badge>
-        <div className="min-w-0 flex-1">
+        {/* On phones the project name gets its own row, so it stays readable. */}
+        <div className="order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-0">
           <ProjectSwitcher current={project} projects={projects.data} />
         </div>
+        <span aria-hidden="true" className="flex-1 sm:hidden" />
         {mocksEnabled ? <Badge variant="secondary">Demo</Badge> : null}
+        <AssistantButton onClick={openAssistant} />
         <ThemeToggle />
       </div>
       <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 pt-4 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:px-6 lg:pt-10 lg:pb-16">
@@ -121,7 +128,12 @@ export function AppShell({ projectId, children }: { projectId: string; children:
         open={actionOpen}
         onOpenChange={setActionOpen}
       />
-      <AiAssistantWidget />
+      <AssistantSheet
+        key={project.id}
+        project={project}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      />
     </ProjectProvider>
   );
 }

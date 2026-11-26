@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { mocksEnabled } from "@/mocks";
 import type { ProjectResponse } from "@/shared/schemas/projects";
+import { AssistantButton } from "./assistant-button";
 import { type RoleNav, tabHref } from "./nav";
 import { ProjectSwitcher } from "./project-switcher";
 
@@ -20,12 +21,14 @@ export function TopNav({
   nav,
   activeIndex,
   onAction,
+  onAssistant,
 }: {
   project: ProjectResponse;
   projects: ProjectResponse[];
   nav: RoleNav;
   activeIndex: number;
   onAction: () => void;
+  onAssistant: () => void;
 }) {
   const ActionIcon = nav.action.icon;
   return (
@@ -84,6 +87,7 @@ export function TopNav({
           <ActionIcon aria-hidden="true" />
           {nav.action.label}
         </Button>
+        <AssistantButton onClick={onAssistant} />
         <ThemeToggle />
       </div>
     </header>
