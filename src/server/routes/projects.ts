@@ -6,13 +6,17 @@ import {
   AddProjectMemberInput,
   CreateProjectInput,
   CreateProjectInvitationInput,
+  InvitationClosedResponse,
   InvitationSignUpInput,
   InvitationSignUpResponse,
   MyPermissionsResponse,
   MyPhoneResponse,
+  ProjectInvitationParams,
   ProjectInvitationQuery,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
+  ProjectMemberParams,
+  ProjectMemberRemovedResponse,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectsResponse,
@@ -24,8 +28,10 @@ import { type AuthEnv, requireActor } from "../middleware/auth";
 import {
   acceptProjectInvitation,
   createProjectInvitation,
+  declineProjectInvitation,
   listMyInvitations,
   listProjectInvitations,
+  revokeProjectInvitation,
   signUpInvited,
 } from "../services/invitations";
 import {
@@ -34,6 +40,7 @@ import {
   createProject,
   listProjects,
   listProjectTeam,
+  removeProjectMember,
   requireProjectAccess,
   updateMyPhone,
 } from "../services/projects";
@@ -225,6 +232,73 @@ export const projects = createRouter<AuthEnv>()
         await acceptProjectInvitation(getDatabase().db, c.get("actor"), c.req.valid("param").id),
         200,
       ),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/invitations/{id}/decline",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: IdParams },
+      responses: {
+        200: {
+          description: "Invitation declined and deleted",
+          content: json(InvitationClosedResponse),
+        },
+        ...errors,
+        409: error("Invitation already accepted"),
+      },
+    }),
+    async (c) =>
+      c.json(
+        await declineProjectInvitation(getDatabase().db, c.get("actor"), c.req.valid("param").id),
+        200,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "delete",
+      path: "/projects/{id}/invitations/{invitationId}",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: ProjectInvitationParams },
+      responses: {
+        200: {
+          description: "Pending invitation revoked and deleted (engineers)",
+          content: json(InvitationClosedResponse),
+        },
+        ...errors,
+        409: error("Invitation already accepted; remove the member instead"),
+      },
+    }),
+    async (c) => {
+      const { id, invitationId } = c.req.valid("param");
+      return c.json(
+        await revokeProjectInvitation(getDatabase().db, c.get("actor"), id, invitationId),
+        200,
+      );
+    },
+  )
+  .openapi(
+    createRoute({
+      method: "delete",
+      path: "/projects/{id}/members/{userId}",
+      tags: ["projects"],
+      middleware: auth,
+      request: { params: ProjectMemberParams },
+      responses: {
+        200: {
+          description: "Member removed; their records stay (engineers)",
+          content: json(ProjectMemberRemovedResponse),
+        },
+        ...errors,
+        409: error("Engineers cannot remove themselves"),
+      },
+    }),
+    async (c) => {
+      const { id, userId } = c.req.valid("param");
+      return c.json(await removeProjectMember(getDatabase().db, c.get("actor"), id, userId), 200);
+    },
   )
   .openapi(
     createRoute({

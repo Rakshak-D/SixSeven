@@ -68,10 +68,14 @@ export const projectMembers = pgTable(
       .references(() => user.id),
     role: projectRole().notNull(),
     createdAt: createdAt(),
+    /** Set when an engineer removes the person. The row stays because their records point at it. */
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedBy: text("removed_by").references(() => user.id),
   },
   (t) => [
     primaryKey({ columns: [t.projectId, t.userId] }),
     index("project_members_user_idx").on(t.userId, t.projectId),
+    check("project_member_removal", sql`(${t.removedAt} is null) = (${t.removedBy} is null)`),
   ],
 );
 
@@ -101,7 +105,7 @@ export const projectInvitations = pgTable(
       sql`(${t.email} is not null and ${t.phone} is null and ${t.email} = lower(btrim(${t.email})) and char_length(${t.email}) between 3 and 254)
         or (${t.phone} is not null and ${t.email} is null and ${t.phone} ~ '^[+]91[6-9][0-9]{9}$')`,
     ),
-    check("project_invitation_role", sql`${t.role} in ('owner', 'contractor')`),
+    check("project_invitation_role", sql`${t.role} in ('owner', 'contractor', 'engineer')`),
     check(
       "project_invitation_acceptance",
       sql`(${t.acceptedBy} is null) = (${t.acceptedAt} is null) and (${t.phone} is null or ${t.acceptedAt} is null)`,

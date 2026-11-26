@@ -60,6 +60,11 @@ describe("starting a project and invites", () => {
       status(() =>
         call("POST", `/projects/${made.id}/invitations`, { email: "c@d.in", role: "engineer" }),
       ),
+    ).toBe(200);
+    expect(
+      status(() =>
+        call("POST", `/projects/${made.id}/invitations`, { email: "e@f.in", role: "admin" }),
+      ),
     ).toBe(400);
   });
 
@@ -70,5 +75,25 @@ describe("starting a project and invites", () => {
       (call("GET", "/projects") as Project[]).find((p) => p.id === "demo-riverside")?.role,
     ).toBe("contractor");
     expect(status(() => call("POST", "/invitations/inv-riverside/accept"))).toBe(404);
+    expect(status(() => call("POST", "/invitations/inv-riverside/decline"))).toBe(404);
+  });
+
+  it("revokes a waiting invite and removes anyone but yourself", () => {
+    const made = call("POST", "/projects", details) as Project;
+    const sent = call("POST", `/projects/${made.id}/invitations`, {
+      email: "g@h.in",
+      role: "contractor",
+    }) as { id: string };
+    const revoke = () => call("DELETE", `/projects/${made.id}/invitations/${sent.id}`);
+    expect(revoke()).toEqual({ id: sent.id, outcome: "revoked" });
+    expect(status(revoke)).toBe(404);
+    type Member = { userId: string; role: string; isMe: boolean };
+    const team = call("GET", "/projects/demo-hillside/members") as Member[];
+    const me = team.find((m) => m.isMe);
+    const other = team.find((m) => !m.isMe);
+    if (!me || !other) throw new Error("demo team needs two people");
+    expect(status(() => call("DELETE", `/projects/demo-hillside/members/${me.userId}`))).toBe(409);
+    call("DELETE", `/projects/demo-hillside/members/${other.userId}`);
+    expect(call("GET", "/projects/demo-hillside/members")).toHaveLength(team.length - 1);
   });
 });

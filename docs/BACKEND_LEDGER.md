@@ -2,6 +2,13 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Several engineers, decline, revoke and remove (2026-11-26)
+
+- Branch `fix/team-membership` (stacked on `fix/e2e-prototype`, PR #52). Migration `0018_team_membership`: invitations allow the `engineer` role; `project_members` gains `removed_at`/`removed_by` (paired by a check). Additive; no existing rows change.
+- Routes: `POST /invitations/:id/decline`, `DELETE /projects/:id/invitations/:invitationId`, `DELETE /projects/:id/members/:userId`. Team rows gain `isMe`. Declined and revoked invitations are deleted with an audit entry. Removal keeps the row (about 10 foreign keys point at it), deletes the accepted invitation so the person can be invited back, and locks the project row so engineers removing each other cannot leave none. Removed members get 404 and leave lists; accepting a new invitation restores the same row with the new role.
+- Verified: `slate_demo` migrated to 0018 (19 applied). Fresh disposable `slate_test`: migrate, seed twice, 72 of 74 API tests passed, including the new flow test. Two failures predate this branch: `material-stock` "requires contractors…" (201 vs 403, also red in PR #52's CI at a2c4849), and `project-reporting` "binds drafts…", which expects the AI fallback but gets a real AI draft because the local `.env` has an AI key (it passes in CI). Biome, typecheck and 110 source tests passed.
+- Limits: removal and invitation events do not appear in the activity feed (its entity/action allowlist excludes them). Pending items authored by a removed person stay as they are.
+
 ## Entry — Required operational notes (#21)
 
 - Final release: proposal notes and development fixtures updated. The 100 source tests and TypeScript passed before the final main sync.

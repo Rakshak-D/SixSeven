@@ -50,6 +50,7 @@ async function lockDeliveryForVerification(
       and(
         eq(projectMembers.projectId, stockMovements.projectId),
         eq(projectMembers.userId, actor.userId),
+        isNull(projectMembers.removedAt),
       ),
     )
     .where(

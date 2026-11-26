@@ -11,17 +11,20 @@ import { Input } from "@/components/ui/input";
 import {
   useAcceptInvitation,
   useCreateProject,
+  useDeclineInvitation,
   useMyInvitations,
   useMyPermissions,
 } from "@/hooks/use-team";
 import { todayIst } from "@/lib/dates";
 
-const roleName = { owner: "owner", contractor: "contractor" } as const;
+const roleName = { owner: "owner", contractor: "contractor", engineer: "site engineer" } as const;
 
 /** Projects you are invited to. Nothing is shared with you until you accept. */
 export function Invitations() {
   const invitations = useMyInvitations(true);
   const accept = useAcceptInvitation();
+  const decline = useDeclineInvitation();
+  const busy = accept.isPending || decline.isPending;
   if (!invitations.data?.length) return null;
   return (
     <section className="mt-8" aria-label="Your invitations">
@@ -40,19 +43,34 @@ export function Invitations() {
                   Join as {roleName[i.role]} · invited {"email" in i ? i.email : i.phone}
                 </span>
               </span>
-              <Button
-                disabled={accept.isPending}
-                onClick={() =>
-                  accept.mutate(i.id, { onSuccess: () => toast.success(`Joined ${i.projectName}`) })
-                }
-              >
-                Accept
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    decline.mutate(i.id, {
+                      onSuccess: () => toast.success(`Declined ${i.projectName}`),
+                    })
+                  }
+                >
+                  Decline
+                </Button>
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    accept.mutate(i.id, {
+                      onSuccess: () => toast.success(`Joined ${i.projectName}`),
+                    })
+                  }
+                >
+                  Accept
+                </Button>
+              </div>
             </li>
           ))}
       </ul>
       <div className="mt-3">
-        <FormError error={accept.error} />
+        <FormError error={accept.error ?? decline.error} />
       </div>
     </section>
   );
@@ -73,7 +91,7 @@ export function StartProject() {
         open={open}
         onOpenChange={setOpen}
         title="Start a project"
-        description="You become its site engineer, then invite the owner and the contractor."
+        description="You become its site engineer, then invite the owner, the contractor and any other engineers."
       >
         {open ? <ProjectForm /> : null}
       </Sheet>
