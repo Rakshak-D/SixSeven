@@ -274,6 +274,7 @@ describe("project financial summary", () => {
         qty,
         unitCostPaise,
         supplier: `Synthetic ${crypto.randomUUID()}`,
+        note: "Synthetic delivery report",
         challanNo: crypto.randomUUID(),
         occurredOn,
       });
@@ -283,6 +284,7 @@ describe("project financial summary", () => {
     const recordUsage = async (materialId: string, qty: number, occurredOn: string) => {
       const response = await api(`/projects/${projectId}/usages`, contractor, {
         materialId,
+        note: "Synthetic usage report",
         qty,
         occurredOn,
       });
@@ -854,11 +856,19 @@ describe("M6 proposals and checklist verification", () => {
     expect(created.status).toBe(201);
     const proposal = ProposalResponse.parse(await created.json());
     const decision = `/proposals/${proposal.id}/decision`;
-    await expectError(await api(decision, contractor, { decision: "approve" }), 403, "FORBIDDEN");
-    await expectError(await api(decision, outsider, { decision: "approve" }), 404, "NOT_FOUND");
+    await expectError(
+      await api(decision, contractor, { decision: "approve", note: "Owner decision checked" }),
+      403,
+      "FORBIDDEN",
+    );
+    await expectError(
+      await api(decision, outsider, { decision: "approve", note: "Owner decision checked" }),
+      404,
+      "NOT_FOUND",
+    );
     const results = await Promise.all([
-      api(decision, owner, { decision: "approve" }),
-      api(decision, owner, { decision: "reject" }),
+      api(decision, owner, { decision: "approve", note: "Owner decision checked" }),
+      api(decision, owner, { decision: "reject", note: "Owner rejected the proposal" }),
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
     const listed = (await (await api(path, contractor)).json()) as unknown[];
@@ -1017,12 +1027,20 @@ describe("M6 proposals and checklist verification", () => {
     const progressId = submitted.history.find((event) => event.kind === "submitted")?.progressId;
     expect(submitted.verificationStatus).toBe("waiting");
     await expectError(
-      await api(`${path}/review`, contractor, { decision: "accept", progressId }),
+      await api(`${path}/review`, contractor, {
+        decision: "accept",
+        progressId,
+        note: "Reviewed task evidence",
+      }),
       403,
       "FORBIDDEN",
     );
     await expectError(
-      await api(`${path}/review`, owner, { decision: "accept", progressId }),
+      await api(`${path}/review`, owner, {
+        decision: "accept",
+        progressId,
+        note: "Reviewed task evidence",
+      }),
       403,
       "FORBIDDEN",
     );
@@ -1040,13 +1058,25 @@ describe("M6 proposals and checklist verification", () => {
     const latest = resubmitted.history.at(-1)?.progressId;
     expect(latest).not.toBe(progressId);
     await expectError(
-      await api(`${path}/review`, engineer, { decision: "accept", progressId }),
+      await api(`${path}/review`, engineer, {
+        decision: "accept",
+        progressId,
+        note: "Reviewed task evidence",
+      }),
       409,
       "CONFLICT",
     );
     const reviews = await Promise.all([
-      api(`${path}/review`, engineer, { decision: "accept", progressId: latest }),
-      api(`${path}/review`, engineer, { decision: "accept", progressId: latest }),
+      api(`${path}/review`, engineer, {
+        decision: "accept",
+        progressId: latest,
+        note: "Reviewed latest evidence",
+      }),
+      api(`${path}/review`, engineer, {
+        decision: "accept",
+        progressId: latest,
+        note: "Reviewed latest evidence",
+      }),
     ]);
     expect(reviews.map((r) => r.status).sort()).toEqual([200, 409]);
     const requestPath = `/projects/${project}/change-requests`;

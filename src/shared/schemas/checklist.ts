@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Id, Label, Timestamp } from "./common";
+import { Id, Label, Note, Timestamp } from "./common";
 import { PhotoFile, PhotoResponse } from "./progress";
 
 export const ChecklistPhase = z.enum([
@@ -99,7 +99,7 @@ export const ReviewChecklistItemInput = z.discriminatedUnion("decision", [
   z.strictObject({
     decision: z.literal("accept"),
     progressId: Id,
-    note: z.string().trim().max(2000).optional(),
+    note: Note,
   }),
   z.strictObject({ decision: z.literal("send_back"), progressId: Id, note: ChecklistChangeReason }),
 ]);

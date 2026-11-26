@@ -2,6 +2,15 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Required operational notes (#21)
+
+- Final release: proposal notes and development fixtures updated. The 100 source tests and TypeScript passed before the final main sync.
+- Branch `be/required-operation-notes`. New delivery and usage writes, checklist acceptance and proposal decisions require `Note`. Proposal decisions store the note in their audit event. Historical responses remain readable. Change-request actions already require notes and wage payment notes are in #29.
+- Frontend handoff: add a nonblank decision note to the proposal flow in `src/components/owner/approvals-list.tsx` and submit it through `src/hooks/use-project-data.ts`. Verify that all delivery, usage and checklist review submissions and fixtures send notes. Keep the rollout in draft until the proposal consumer is ready.
+
+- The hosted check found six legacy fixtures missing newly required notes in `src/mocks/routes.test.ts`. Frontend must update proposal, stock and checklist-review requests and test fixtures before this draft can merge.
+- Verified the refreshed backend contract on disposable PostgreSQL. Fresh migrations, seed and all 44 auth, stock and reporting API tests passed. The frontend fixture and proposal rollout blockers above still apply.
+
 ## Entry — Photo capture timestamps (#27)
 
 - Branch `be/photo-capture-times`. New progress, checklist completion and challan uploads require an ISO `capturedAt` per image. It must be no more than ten minutes before receipt or 30 seconds ahead. Migration `0013_photo_capture_times` preserves existing metadata and constrains the new capture/receipt pairs in PostgreSQL. Medical uses the same timestamp validator.

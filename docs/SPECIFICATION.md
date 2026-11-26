@@ -31,6 +31,8 @@ A new material may opt in to tracked bags. The engineer registers a project-uniq
 
 ## Approved change requests
 
+New deliveries, usages, checklist reviews, wage payments, proposal decisions and change-request actions require a nonblank note. Existing stricter reasons still apply. Historical records retain their original notes.
+
 Request #20 supersedes direct checklist add, rename and removal and direct attendance adjustments. Checklist changes, attendance corrections and medical expenses use an append-only decision history with a server-derived actor, role, note and timestamp. Engineer requests require a contractor vote before an owner decision. A contractor-authored attendance or medical request goes to the owner directly. Only the author can reopen a contractor rejection. The owner decision is final and an acceptance applies the change once in the same transaction. The contractor task evidence and engineer review workflow stays separate.
 
 Actual attendance and paid attendance entitlement are distinct. Only a medical emergency may authorize a full paid day. Medical bill reimbursements use the mock provider, have an owner-approved amount no greater than the bill, and count once in other expenses and weekly spending. Bill photos are visible only to the author and authorized project reviewers.

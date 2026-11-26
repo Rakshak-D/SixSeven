@@ -1,4 +1,5 @@
 // Client-only: imported from client components.
+import { useState } from "react";
 import { toast } from "sonner";
 import { ChangeList } from "@/components/approvals/change-list";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { ApiClientError } from "@/lib/api/client";
 import { actionFor } from "@/lib/change-requests";
 import { istDateOf } from "@/lib/dates";
 import { formatPaise, formatShortDate } from "@/lib/format";
-import type { ProposalResponse } from "@/shared/schemas/proposals";
+import { DecideProposalInput, type ProposalResponse } from "@/shared/schemas/proposals";
 
 function impact(p: ProposalResponse) {
   if (p.costImpactPaise === 0) return "No cost change";
@@ -18,6 +19,7 @@ function impact(p: ProposalResponse) {
 
 /** Proposed changes: pending ones first with approve and reject, then the decided ones. */
 export function ApprovalsList({ projectId }: { projectId: string }) {
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const proposals = useProposals(projectId);
   const decide = useDecideProposal(projectId);
   const changes = useChangeRequests(projectId);
@@ -30,8 +32,10 @@ export function ApprovalsList({ projectId }: { projectId: string }) {
   const decided = proposals.data.filter((p) => p.status !== "pending");
 
   function choose(p: ProposalResponse, decision: "approve" | "reject") {
+    const input = DecideProposalInput.safeParse({ decision, note: notes[p.id] ?? "" });
+    if (!input.success || decide.isPending) return;
     decide.mutate(
-      { proposalId: p.id, decision },
+      { proposalId: p.id, ...input.data },
       {
         onSuccess: (r) =>
           toast.success(`${r.status === "approved" ? "Approved" : "Rejected"}: ${r.title}`),
@@ -51,7 +55,7 @@ export function ApprovalsList({ projectId }: { projectId: string }) {
       ) : pending.length === 0 ? null : (
         <ul className="space-y-3">
           {pending.map((p) => {
-            const busy = decide.isPending && decide.variables?.proposalId === p.id;
+            const busy = decide.isPending || !notes[p.id]?.trim();
             return (
               <li key={p.id} className="animate-rise rounded-3xl border bg-secondary p-4">
                 <p className="font-semibold text-[17px]">{p.title}</p>
@@ -64,6 +68,19 @@ export function ApprovalsList({ projectId }: { projectId: string }) {
                 <p className="text-[13px] text-muted-foreground">
                   Proposed {formatShortDate(istDateOf(p.createdAt))}
                 </p>
+                <label className="mt-3 block text-sm font-medium">
+                  Decision note
+                  <textarea
+                    className="mt-1 block w-full rounded-xl border bg-background px-3 py-2"
+                    required
+                    maxLength={2000}
+                    value={notes[p.id] ?? ""}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setNotes((current) => ({ ...current, [p.id]: value }));
+                    }}
+                  />
+                </label>
                 <div className="mt-3 flex gap-2">
                   <Button className="flex-1" disabled={busy} onClick={() => choose(p, "approve")}>
                     Approve

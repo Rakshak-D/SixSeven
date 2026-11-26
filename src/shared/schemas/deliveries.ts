@@ -9,7 +9,7 @@ export const CreateDeliveryInput = z.strictObject({
   supplier: Label,
   challanNo: Label,
   occurredOn: IsoDate,
-  note: Note.optional(),
+  note: Note,
 });
 export const DeliveryResponse = z.strictObject({
   id: Id,

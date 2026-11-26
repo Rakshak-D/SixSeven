@@ -114,11 +114,19 @@ function delivery(
   supplier = "Synthetic Supplier",
   challanNo = crypto.randomUUID().toString(),
 ) {
-  return { materialId, qty, supplier, challanNo, occurredOn: date, unitCostPaise: 6_500 };
+  return {
+    materialId,
+    qty,
+    supplier,
+    challanNo,
+    occurredOn: date,
+    unitCostPaise: 6_500,
+    note: "Synthetic delivery",
+  };
 }
 
 function usage(materialId: string, qty: number) {
-  return { materialId, qty, occurredOn: date };
+  return { materialId, qty, occurredOn: date, note: "Synthetic usage" };
 }
 
 async function deliver(

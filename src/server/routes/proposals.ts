@@ -105,7 +105,8 @@ export const proposals = createRouter<AuthEnv>()
     async (c) => {
       const { id } = c.req.valid("param");
       const actor = c.get("actor");
-      const status = c.req.valid("json").decision === "approve" ? "approved" : "rejected";
+      const { decision, note } = c.req.valid("json");
+      const status = decision === "approve" ? "approved" : "rejected";
       return c.json(
         await getDatabase().db.transaction(async (tx) => {
           const [proposal] = await tx
@@ -127,6 +128,7 @@ export const proposals = createRouter<AuthEnv>()
             action: status,
             entity: "proposal",
             entityId: id,
+            payload: { note },
           });
           return publicProposal(row);
         }),

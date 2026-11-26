@@ -105,7 +105,7 @@ All rows below have an available shared contract. The four project operations ar
 
 CreateDeliveryInput
 ```json
-{"materialId":"mat-cement","qty":60.125,"unitCostPaise":41500,"supplier":"Metro Building Supply","challanNo":"CH-1024","occurredOn":"2026-11-25"}
+{"materialId":"mat-cement","qty":60.125,"unitCostPaise":41500,"supplier":"Metro Building Supply","challanNo":"CH-1024","occurredOn":"2026-11-25","note":"Received at the south gate"}
 ```
 
 DeliveryResponse

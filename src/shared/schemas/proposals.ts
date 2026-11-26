@@ -3,7 +3,10 @@ import { Id, Label, Note, SignedPaise, Timestamp } from "./common";
 
 const proposal = { title: Label, description: Note, costImpactPaise: SignedPaise };
 export const CreateProposalInput = z.strictObject(proposal);
-export const DecideProposalInput = z.strictObject({ decision: z.enum(["approve", "reject"]) });
+export const DecideProposalInput = z.strictObject({
+  decision: z.enum(["approve", "reject"]),
+  note: Note,
+});
 export const ProposalResponse = z.discriminatedUnion("status", [
   z.strictObject({
     ...proposal,

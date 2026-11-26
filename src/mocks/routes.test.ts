@@ -110,16 +110,28 @@ describe("demo mocks", () => {
       ) as { id: string };
     expect(
       status(() =>
-        call("POST", `/proposals/${pending(engineer.id).id}/decision`, { decision: "approve" }),
+        call("POST", `/proposals/${pending(engineer.id).id}/decision`, {
+          decision: "approve",
+          note: "Reviewed proposal",
+        }),
       ),
     ).toBe(403);
     const target = pending(owner.id).id;
     expect(
-      (call("POST", `/proposals/${target}/decision`, { decision: "reject" }) as { status: string })
-        .status,
+      (
+        call("POST", `/proposals/${target}/decision`, {
+          decision: "reject",
+          note: "Reviewed proposal",
+        }) as { status: string }
+      ).status,
     ).toBe("rejected");
     expect(
-      status(() => call("POST", `/proposals/${target}/decision`, { decision: "approve" })),
+      status(() =>
+        call("POST", `/proposals/${target}/decision`, {
+          decision: "approve",
+          note: "Reviewed proposal",
+        }),
+      ),
     ).toBe(409);
   });
 
@@ -149,6 +161,7 @@ describe("contractor writes", () => {
       supplier: "Test Traders",
       challanNo: "T-1",
       occurredOn: today,
+      note: "Recorded for the site ledger",
     };
     expect((call("POST", `${base}/deliveries`, body) as { balance: number }).balance).toBe(
       before + 10,
@@ -163,14 +176,24 @@ describe("contractor writes", () => {
     const m = materials()[1].id;
     const balance = stockOf(m);
     try {
-      call("POST", `${base}/usages`, { materialId: m, qty: balance + 1, occurredOn: today });
+      call("POST", `${base}/usages`, {
+        materialId: m,
+        qty: balance + 1,
+        occurredOn: today,
+        note: "Recorded for the site ledger",
+      });
       throw new Error("should refuse");
     } catch (e) {
       expect(e).toBeInstanceOf(MockError);
       expect((e as MockError).code).toBe("INSUFFICIENT_STOCK");
       expect((e as MockError).details).toEqual({ materialId: m, balance });
     }
-    const used = call("POST", `${base}/usages`, { materialId: m, qty: 0.5, occurredOn: today }) as {
+    const used = call("POST", `${base}/usages`, {
+      materialId: m,
+      qty: 0.5,
+      occurredOn: today,
+      note: "Recorded for the site ledger",
+    }) as {
       balance: number;
     };
     expect(used.balance).toBeCloseTo(balance - 0.5, 3);
@@ -194,6 +217,7 @@ describe("contractor writes", () => {
           materialId: materials()[0].id,
           qty: -1,
           occurredOn: today,
+          note: "Recorded for the site ledger",
         }),
       ),
     ).toBe(400);
@@ -249,6 +273,7 @@ describe("engineer review of checklist proof", () => {
       status(() =>
         call("POST", `/checklist-items/${item.id}/review`, {
           decision: "accept",
+          note: "Inspected the submitted work",
           progressId: proofOf(item),
         }),
       ),
@@ -273,6 +298,7 @@ describe("engineer review of checklist proof", () => {
       status(() =>
         call("POST", `/checklist-items/${item.id}/review`, {
           decision: "accept",
+          note: "Inspected the submitted work",
           progressId: "an-older-proof",
         }),
       ),
@@ -287,6 +313,7 @@ describe("engineer review of checklist proof", () => {
       status(() =>
         call("POST", `/checklist-items/${item.id}/review`, {
           decision: "accept",
+          note: "Inspected the submitted work",
           progressId: proofOf(item),
         }),
       ),
@@ -298,7 +325,11 @@ describe("engineer review of checklist proof", () => {
     const any = lists[0].items[0];
     expect(
       status(() =>
-        call("POST", `/checklist-items/${any.id}/review`, { decision: "accept", progressId: "x" }),
+        call("POST", `/checklist-items/${any.id}/review`, {
+          decision: "accept",
+          note: "Inspected the submitted work",
+          progressId: "x",
+        }),
       ),
     ).toBe(403);
   });
