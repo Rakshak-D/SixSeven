@@ -17,6 +17,7 @@ const visibleEntities = new Set([
   "supplierBankChange",
   "supplierOrder",
   "supplierRule",
+  "supplierDelegation",
   "supplierPayment",
   "usage",
   "attendance",

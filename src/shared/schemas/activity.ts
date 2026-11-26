@@ -17,6 +17,7 @@ export const ActivityResponse = z.array(
       "supplierBankChange",
       "supplierOrder",
       "supplierRule",
+      "supplierDelegation",
       "supplierPayment",
       "usage",
       "attendance",

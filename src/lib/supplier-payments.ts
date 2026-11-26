@@ -69,7 +69,7 @@ export const SupplierPayment = z.strictObject({
   amountPaise: Paise,
   /** Why it waits for the owner; null once autopay released it. */
   heldBecause: z.string().nullable(),
-  paidBy: z.enum(["autopay", "owner"]).nullable(),
+  paidBy: z.enum(["autopay", "owner", "delegate"]).nullable(),
   decidedAt: Timestamp.nullable(),
   decisionNote: z.string().nullable(),
 });

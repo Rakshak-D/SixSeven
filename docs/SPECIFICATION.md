@@ -50,3 +50,7 @@ Owner-only review signals cover suppliers added within seven IST calendar dates,
 ## Final release AI behavior
 
 Ask Slate answers read-only construction questions. The server derives project metadata and role and limits provider requests. The project material estimator uses rectangular concrete dimensions and a caller-supplied mix ratio with explicit wastage. It provides an indicative material estimate that requires professional verification.
+
+## Additional release rules
+
+Phone invitation redemption requires SMS provider verification of the current account number. Owners may grant one project engineer a total mock payment allowance, replace the grant or revoke it. Delegated decisions use the existing supplier order and payment limits. Owners retain supplier management and contractors remain excluded. Native camera recognition supplements typed bag codes on supported browsers.

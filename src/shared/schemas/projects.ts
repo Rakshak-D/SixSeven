@@ -75,3 +75,10 @@ export type ProjectTeamResponse = z.infer<typeof ProjectTeamResponse>;
 export type CreateProjectInput = z.infer<typeof CreateProjectInput>;
 export type ProjectResponse = z.infer<typeof ProjectResponse>;
 export type ProjectsResponse = z.infer<typeof ProjectsResponse>;
+
+export const PhoneVerificationStatus = z.strictObject({
+  phone: IndianMobile.nullable(),
+  verified: z.boolean(),
+  available: z.boolean(),
+});
+export const VerifyPhoneCodeInput = z.strictObject({ code: z.string().regex(/^[0-9]{4,10}$/) });

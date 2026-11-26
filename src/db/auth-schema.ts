@@ -12,10 +12,17 @@ export const user = pgTable(
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text(),
     phone: text(),
+    verifiedPhone: text("verified_phone").unique(),
+    phoneVerificationSid: text("phone_verification_sid"),
+    phoneVerificationStarted: authTime("phone_verification_started"),
     createdAt: authTime("created_at").notNull().defaultNow(),
     updatedAt: authTime("updated_at").notNull().defaultNow(),
   },
   (t) => [
+    check(
+      "user_verified_phone_matches",
+      sql`${t.verifiedPhone} is null or (${t.phone} is not null and ${t.verifiedPhone} = ${t.phone})`,
+    ),
     check("user_indian_mobile", sql`${t.phone} is null or ${t.phone} ~ '^[+]91[6-9][0-9]{9}$'`),
   ],
 );

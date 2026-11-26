@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "@/app/api/auth/[...auth]/route";
 import { account, session } from "@/db/auth-schema";
 import { getDatabase } from "@/db/client";
@@ -456,6 +456,39 @@ describe("projects and scoped access", () => {
       expect(ProjectInvitationsResponse.parse(await ownInvitations.json())).not.toContainEqual(
         phone,
       );
+      const sid = `VE${"1".repeat(32)}`;
+      vi.stubEnv("TWILIO_ACCOUNT_SID", `AC${"2".repeat(32)}`);
+      vi.stubEnv("TWILIO_VERIFY_SERVICE_SID", `VA${"3".repeat(32)}`);
+      vi.stubEnv("TWILIO_AUTH_TOKEN", "synthetic-test-token");
+      const provider = vi.fn(async (url: string, request: RequestInit) => {
+        const start = url.endsWith("/Verifications");
+        const fields = request.body as URLSearchParams;
+        if (start) expect(fields.get("To")).toBe("+919876543210");
+        else expect(fields.get("VerificationSid")).toBe(sid);
+        return Response.json({
+          sid,
+          to: "+919876543210",
+          status: start || fields.get("Code") !== "456789" ? "pending" : "approved",
+        });
+      });
+      vi.stubGlobal("fetch", provider);
+      try {
+        const verify = "/me/phone-verification";
+        expect((await call(`${verify}/start`, isolated.cookie, {})).status).toBe(200);
+        expect((await call(`${verify}/start`, isolated.cookie, {})).status).toBe(429);
+        expect((await call(`${verify}/check`, isolated.cookie, { code: "000000" })).status).toBe(
+          400,
+        );
+        expect((await call(phoneAccept, isolated.cookie, {})).status).toBe(404);
+        const checked = await call(`${verify}/check`, isolated.cookie, { code: "456789" });
+        expect(checked.status).toBe(200);
+        expect(await checked.json()).toMatchObject({ verified: true });
+        expect((await call(phoneAccept, isolated.cookie, {})).status).toBe(200);
+        expect((await call(phoneAccept, isolated.cookie, {})).status).toBe(409);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
     } finally {
       expect((await setContact(null)).status).toBe(200);
     }

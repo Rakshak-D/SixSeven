@@ -79,7 +79,12 @@ export async function updateMyPhone(
   const canonical = phone === null ? null : normalizeIndianMobile(phone);
   const [updated] = await db
     .update(user)
-    .set({ phone: canonical, updatedAt: sql`now()` })
+    .set({
+      phone: canonical,
+      verifiedPhone: sql`case when ${user.phone} is not distinct from ${canonical} then ${user.verifiedPhone} else null end`,
+      phoneVerificationSid: sql`case when ${user.phone} is not distinct from ${canonical} then ${user.phoneVerificationSid} else null end`,
+      updatedAt: sql`now()`,
+    })
     .where(eq(user.id, actor.userId))
     .returning({ phone: user.phone });
   if (!updated) throw new ApiError(401, ErrorCode.UNAUTHENTICATED, "Sign in to continue");

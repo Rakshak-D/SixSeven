@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { SupplierDelegation } from "@/components/payments/supplier-delegation";
 import { VerifyDeliveries } from "@/components/payments/verify-deliveries";
 import { Sheet } from "@/components/sheet";
 import { useCurrentProject } from "@/components/shell/project-context";
@@ -144,6 +145,7 @@ export function EngineerHome() {
 
       <ExpectedDeliveries projectId={id} canDecide={false} />
       <VerifyDeliveries projectId={id} />
+      <SupplierDelegation owner={false} projectId={id} />
 
       <section className={card} aria-label="Recent activity">
         <h2 className="text-3xl">Recent activity</h2>

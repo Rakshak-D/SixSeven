@@ -246,7 +246,9 @@ export function SupplierPayments({ projectId }: { projectId: string }) {
                       ? "Declined"
                       : p.paidBy === "autopay"
                         ? "Paid by autopay (mock)"
-                        : "Paid by you (mock)"}
+                        : p.paidBy === "delegate"
+                          ? "Paid by your delegate (mock)"
+                          : "Paid by you (mock)"}
                     {p.decidedAt ? ` · ${formatShortDate(istDateOf(p.decidedAt))}` : ""}
                     {p.decisionNote ? ` · “${p.decisionNote}”` : ""}
                   </span>

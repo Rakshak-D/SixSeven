@@ -5,3 +5,7 @@ allowBuilds:
 permissions:
   ai:
     skills: false
+
+overrides:
+  "@ts-morph/common>minimatch": 11.0.1
+  "@esbuild-kit/core-utils>esbuild": 0.25.12

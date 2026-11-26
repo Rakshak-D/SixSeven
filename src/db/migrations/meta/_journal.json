@@ -127,6 +127,20 @@
       "when": 1795653509013,
       "tag": "0017_photo_capture_times",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795656296427,
+      "tag": "0018_verified_phone_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795656357407,
+      "tag": "0019_supplier_delegation",
+      "breakpoints": true
     }
   ]
 }

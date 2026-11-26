@@ -59,11 +59,13 @@ Run the PowerShell launcher regressions from an isolated worktree with an initia
 
 ## Contributor instructions
 
-AGENTS.md is canonical. Root and nested CLAUDE.md files reference the corresponding AGENTS.md. docs/API.md is the canonical contract and is written by Codex. docs/FRONTEND_LEDGER.md is maintained only by Claude after its initialization. Read docs/devops.md for local tool and data paths.
+AGENTS.md is canonical. Root and nested CLAUDE.md files reference the corresponding AGENTS.md. Both full-stack collaborators may maintain the canonical API contract and ledgers for authorized tasks. Read docs/devops.md for local tool and data paths.
 
 Ask Slate is optional and shows an offline state until AI_PROVIDER, AI_MODEL and AI_API_KEY are configured. Use a provider-supported model and its own API key. For an explicitly selected OpenAI-compatible provider, set AI_BASE_URL to its approved HTTPS API origin. Checklist generation keeps its labelled template fallback. The concrete calculator uses local formulas and runs offline from the provider.
 
 Supplier payments and medical reimbursements use a mock provider. Use synthetic account data when demonstrating these workflows. No funds move.
+
+Phone invitation redemption needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID for a Twilio Verify service configured for SMS. Verified recipients can accept from the project list. Camera bag scanning requires a secure browser context. Slate uses native barcode detection when available and a bundled ZXing decoder otherwise. Typed codes remain available.
 
 ## Dependency licenses
 

@@ -213,3 +213,9 @@ The owner summary may include `fraudFlags` with the detected condition, descript
 
 - `POST /projects/:id/ai/chat` accepts up to 20 user or assistant messages with up to 4,000 characters each. The last turn must be a user turn. Project name, location and role come from the authenticated membership. Responses identify `ai` or `offline`. The browser labels prototype samples separately. Provider failures return 503 and the in-process quota returns 429 after ten requests per user per minute. Replicas and restarts do not share that quota.
 - `POST /projects/:id/ai/calculate-materials` accepts three dimensions with units, a cement–sand–aggregate ratio and optional wastage percent, including zero. It returns a deterministic rectangular concrete estimate and its assumptions. Other shapes, reinforcement and masonry are outside this calculator. Have an engineer check the estimate before procurement or construction.
+
+## Phone verification and delegated mock payments
+
+Signed-in users save the number through the existing contact route. GET /me/phone-verification reports provider availability and ownership status. POST /me/phone-verification/start sends an SMS. POST /me/phone-verification/check takes a numeric code. Provider approval must match the account's stored challenge and current number. A change clears verification. Only verified ownership allows phone invitation listing and acceptance.
+
+GET and PUT /projects/:id/supplier-delegation read and manage the owner's single revocable engineer grant. A grant sets a total spending cap. The engineer can read eligible bills through GET /projects/:id/delegated-payments and approve one through POST /projects/:id/delegated-payments/:paymentId with a note. Approval consumes the grant and approved order atomically and applies existing bank holds and payment caps. Contractors have no access.

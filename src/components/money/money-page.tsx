@@ -2,6 +2,7 @@
 
 import { Download } from "lucide-react";
 import { useState } from "react";
+import { SupplierDelegation } from "@/components/payments/supplier-delegation";
 import { SupplierPayments } from "@/components/payments/supplier-payments";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { Button } from "@/components/ui/button";
@@ -173,7 +174,12 @@ export function MoneyPage() {
         </div>
       )}
 
-      {project.role === "owner" ? <SupplierPayments projectId={project.id} /> : null}
+      {project.role === "owner" ? (
+        <>
+          <SupplierPayments projectId={project.id} />
+          <SupplierDelegation owner projectId={project.id} />
+        </>
+      ) : null}
 
       <section className="animate-rise rounded-[1.75rem] border bg-card p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

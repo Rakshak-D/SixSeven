@@ -333,3 +333,7 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - PRs #29, #41 and #42 are merged. The published migration order is 0016 wage payments then 0017 capture timestamps.
 - Release work adds shared chat and calculator contracts, server-derived authorized context, bounded provider calls and deterministic concrete estimates. No live provider key was used.
 - Windows live startup and two browser onboarding and access tests passed on the isolated local release environment. Broader feature verification remains pending.
+
+## Completion implementation
+
+Added phone verification with account-bound Twilio challenges, owner-managed supplier delegation, and database migrations 0018–0019. Added native scan controls and reschedule history. Neither ignored environment contained Twilio or AI provider credentials at preflight.
