@@ -291,7 +291,9 @@ test("three real sessions preserve project access and wage privacy after reload"
         await expected.getByLabel("Arrival note").fill("Synthetic delivery for the release test");
         await expected.getByRole("button", { name: "Record arrival" }).click();
         await expect(expected.getByText(/Synthetic release supplier.*accepted/)).toBeVisible();
-        await expected.getByText("Challan evidence", { exact: true }).click();
+        const challanEvidence = expected.getByText("Challan evidence", { exact: true });
+        await challanEvidence.evaluate((element) => element.scrollIntoView({ block: "center" }));
+        await challanEvidence.click();
         await expected.getByRole("button", { name: "Take photo", exact: true }).click();
         await expected.getByRole("button", { name: "Capture", exact: true }).click();
         await expected.getByRole("button", { name: "Attach challan photo" }).click();
