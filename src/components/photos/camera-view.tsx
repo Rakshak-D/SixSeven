@@ -41,7 +41,10 @@ function snapshot(video: HTMLVideoElement): Promise<File | null> {
       (blob) =>
         resolve(
           blob
-            ? new File([blob], `photo-${taken.replace(/[:.]/g, "-")}.jpg`, { type: "image/jpeg" })
+            ? new File([blob], `photo-${taken.replace(/[:.]/g, "-")}.jpg`, {
+                type: "image/jpeg",
+                lastModified: Date.parse(taken),
+              })
             : null,
         ),
       "image/jpeg",
