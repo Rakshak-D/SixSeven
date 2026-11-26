@@ -78,3 +78,7 @@ The repository currently contains one Next.js App Router app, Hono at /api/v1, D
 ## Next authorized milestone
 
 Await the next specification-authorized milestone. Keep frontend request items #4–9 and #11 open for separate product review; M5 did not change the project creator role, add invitation workflows, or replace checklist state transitions.
+
+## Final completion direction
+
+Both collaborators may work across the full stack on authorized tasks. Keep human approval and existing PR safeguards. The ordinary root checkout uses the existing PostgreSQL data and the live launcher.

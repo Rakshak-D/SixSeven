@@ -39,6 +39,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Audit dependencies
+        run: pnpm audit
       - name: Lint + format (Biome)
         run: pnpm exec biome ci
       - run: pnpm typecheck

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Phone } from "lucide-react";
 import { useState } from "react";
 import { Field, FormError, NativeSelect, SavedNotice } from "@/components/forms";
@@ -11,11 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInvite, useSentInvitations, useTeam } from "@/hooks/use-team";
 import { api } from "@/lib/api/client";
+import { mocksEnabled } from "@/mocks";
 import {
   CreateProjectInvitationInput,
   MyPhoneResponse,
+  PhoneVerificationStatus,
   UpdateMyPhoneInput,
 } from "@/shared/schemas/projects";
+import { VerifyPhone } from "./verify-phone";
 
 const roleLabel = { owner: "Owner", contractor: "Contractor", engineer: "Engineer" } as const;
 const card = "rounded-[1.75rem] border bg-card p-5 sm:p-6";
@@ -40,8 +43,8 @@ function InviteForm({ projectId }: { projectId: string }) {
     <section className={card} aria-label="Invite someone">
       <h2 className="text-3xl">Invite someone</h2>
       <p className="mt-1 text-[15px] text-muted-foreground">
-        Email invitees sign in and accept. Tell them about the invitation directly. Phone redemption
-        requires verified ownership and is currently unavailable.
+        Email invitees sign in and accept. Tell them about the invitation directly. Phone invitees
+        authenticate and verify their number by SMS before accepting.
       </p>
       <form onSubmit={submit} noValidate className="mt-4 space-y-4">
         <Field label="Their email or mobile number">
@@ -88,16 +91,26 @@ function InviteForm({ projectId }: { projectId: string }) {
 
 function MyPhone() {
   const client = useQueryClient();
-  const [phone, setPhone] = useState("");
+  const [draft, setPhone] = useState<string>();
+  const status = useQuery({
+    queryKey: ["phone-verification"],
+    enabled: !mocksEnabled,
+    queryFn: () => api("GET", "/me/phone-verification", { schema: PhoneVerificationStatus }),
+  });
+  const phone = draft ?? status.data?.phone ?? "";
   const save = useMutation({
     mutationFn: (phone: string | null) =>
       api("PATCH", "/me", {
         body: UpdateMyPhoneInput.parse({ phone }),
         schema: MyPhoneResponse,
       }),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       setPhone(result.phone ?? "");
-      return client.invalidateQueries({ predicate: ({ queryKey }) => queryKey[1] === "team" });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["phone-verification"] }),
+        client.invalidateQueries({ queryKey: ["invitations"] }),
+        client.invalidateQueries({ predicate: ({ queryKey }) => queryKey[1] === "team" }),
+      ]);
     },
   });
   return (
@@ -136,7 +149,7 @@ function MyPhone() {
             Remove contact number
           </Button>
         </div>
-        <FormError error={save.error} />
+        <FormError error={status.error ?? save.error} />
         {save.isSuccess ? <SavedNotice>Contact updated.</SavedNotice> : null}
       </form>
     </section>
@@ -189,6 +202,7 @@ export function TeamPage() {
           )}
         </section>
         <MyPhone />
+        <VerifyPhone />
         {project.role === "engineer" ? <InviteForm projectId={project.id} /> : null}
       </div>
     </div>

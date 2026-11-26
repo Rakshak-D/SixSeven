@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { user } from "@/db/auth-schema";
 import type { Db, Transaction } from "@/db/client";
 import { projectInvitations, projectMembers, projects } from "@/db/schema";
@@ -48,13 +48,17 @@ function present({
   });
 }
 
-async function accountEmail(db: Db | Transaction, actor: Actor) {
-  const [account] = await db
-    .select({ email: user.email })
+async function accountContact(db: Db | Transaction, actor: Actor, lock = false) {
+  const query = db
+    .select({ email: user.email, verifiedPhone: user.verifiedPhone })
     .from(user)
     .where(eq(user.id, actor.userId));
+  const [account] = await (lock ? query.for("update") : query);
   if (!account) throw new ApiError(401, ErrorCode.UNAUTHENTICATED, "Sign in to continue");
-  return account.email.toLowerCase();
+  return or(
+    eq(projectInvitations.email, account.email.toLowerCase()),
+    account.verifiedPhone ? eq(projectInvitations.phone, account.verifiedPhone) : undefined,
+  );
 }
 
 export async function createProjectInvitation(
@@ -102,12 +106,12 @@ export async function createProjectInvitation(
 }
 
 export async function listMyInvitations(db: Db, actor: Actor) {
-  const email = await accountEmail(db, actor);
+  const contact = await accountContact(db, actor);
   const rows = await db
     .select({ ...invitationFields, projectName: projects.name })
     .from(projectInvitations)
     .innerJoin(projects, eq(projects.id, projectInvitations.projectId))
-    .where(and(eq(projectInvitations.email, email), isNull(projectInvitations.acceptedAt)))
+    .where(and(contact, isNull(projectInvitations.acceptedAt)))
     .orderBy(desc(projectInvitations.createdAt), desc(projectInvitations.id));
   return rows.map(present);
 }
@@ -140,8 +144,8 @@ export async function listProjectInvitations(
 
 export async function acceptProjectInvitation(db: Db, actor: Actor, id: string) {
   return db.transaction(async (tx) => {
-    const email = await accountEmail(tx, actor);
-    const target = and(eq(projectInvitations.id, id), eq(projectInvitations.email, email));
+    const contact = await accountContact(tx, actor, true);
+    const target = and(eq(projectInvitations.id, id), contact);
     const [invitation] = await tx
       .update(projectInvitations)
       .set({ acceptedBy: actor.userId, acceptedAt: sql`now()` })

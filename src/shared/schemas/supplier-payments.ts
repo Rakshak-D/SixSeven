@@ -94,7 +94,7 @@ export const SupplierPaymentResponse = z.strictObject({
   status: SupplierPaymentStatus,
   amountPaise: Paise,
   heldBecause: z.string().nullable(),
-  paidBy: z.enum(["autopay", "owner"]).nullable(),
+  paidBy: z.enum(["autopay", "owner", "delegate"]).nullable(),
   decidedAt: Timestamp.nullable(),
   decisionNote: Note.nullable(),
 });
@@ -124,3 +124,15 @@ export type ApproveSupplierPaymentsInput = z.infer<typeof ApproveSupplierPayment
 export type SupplierPaymentsQuery = z.infer<typeof SupplierPaymentsQuery>;
 export type SupplierPaymentResponse = z.infer<typeof SupplierPaymentResponse>;
 export type SupplierPaymentsOverview = z.infer<typeof SupplierPaymentsOverview>;
+
+export const ChangeSupplierDelegationInput = z.discriminatedUnion("action", [
+  SupplierNoteInput.extend({ action: z.literal("grant"), engineerId: Id, capPaise: PositivePaise }),
+  SupplierNoteInput.extend({ action: z.literal("revoke") }),
+]);
+export type ChangeSupplierDelegationInput = z.infer<typeof ChangeSupplierDelegationInput>;
+export const SupplierDelegationResponse = z
+  .strictObject({ engineerId: Id, capPaise: PositivePaise, remainingPaise: Paise })
+  .nullable();
+export const DelegatedPaymentsResponse = z.array(
+  z.strictObject({ id: Id, supplierName: Label, amountPaise: PositivePaise }),
+);

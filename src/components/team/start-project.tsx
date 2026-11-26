@@ -23,7 +23,7 @@ export function Invitations() {
       <h2 className="text-3xl">Invitations</h2>
       <ul className="mt-3 space-y-3">
         {invitations.data
-          .filter((i) => "email" in i && i.status === "pending")
+          .filter((i) => i.status === "pending")
           .map((i) => (
             <li
               key={i.id}

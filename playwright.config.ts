@@ -30,7 +30,11 @@ export default defineConfig({
   timeout: 90000,
   expect: { timeout: 15000 },
   testDir: "./tests/e2e",
-  use: { baseURL: externalBaseURL ?? "http://localhost:3000", trace: "retain-on-failure" },
+  use: {
+    baseURL: externalBaseURL ?? "http://localhost:3000",
+    trace: "retain-on-failure",
+    launchOptions: { args: ["--use-fake-device-for-media-stream"] },
+  },
   projects: [
     { name: "phone", use: { ...devices["Pixel 7"] } },
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },

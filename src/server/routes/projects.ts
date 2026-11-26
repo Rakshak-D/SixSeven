@@ -7,6 +7,7 @@ import {
   CreateProjectInput,
   CreateProjectInvitationInput,
   MyPhoneResponse,
+  PhoneVerificationStatus,
   ProjectInvitationQuery,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
@@ -15,6 +16,7 @@ import {
   ProjectsResponse,
   ProjectTeamResponse,
   UpdateMyPhoneInput,
+  VerifyPhoneCodeInput,
 } from "@/shared/schemas/projects";
 import { createRouter } from "../lib/router";
 import { type AuthEnv, requireActor } from "../middleware/auth";
@@ -24,6 +26,11 @@ import {
   listMyInvitations,
   listProjectInvitations,
 } from "../services/invitations";
+import {
+  checkPhoneVerification,
+  phoneVerificationStatus,
+  startPhoneVerification,
+} from "../services/phone-verification";
 import {
   addProjectMember,
   createProject,
@@ -235,4 +242,62 @@ export const projects = createRouter<AuthEnv>()
     }),
     async (c) =>
       c.json(await updateMyPhone(getDatabase().db, c.get("actor"), c.req.valid("json")), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/me/phone-verification",
+      middleware: auth,
+      tags: ["projects"],
+      responses: {
+        200: { description: "Phone verification status", content: json(PhoneVerificationStatus) },
+        ...errors,
+        409: error("Phone conflict"),
+        429: error("Retry later"),
+        503: error("SMS verification unavailable"),
+      },
+    }),
+    async (c) =>
+      c.json(await phoneVerificationStatus(getDatabase().db, c.get("actor").userId), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/me/phone-verification/start",
+      middleware: auth,
+      tags: ["projects"],
+      responses: {
+        200: { description: "Phone verification status", content: json(PhoneVerificationStatus) },
+        ...errors,
+        409: error("Phone conflict"),
+        429: error("Retry later"),
+        503: error("SMS verification unavailable"),
+      },
+    }),
+    async (c) => c.json(await startPhoneVerification(getDatabase().db, c.get("actor").userId), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/me/phone-verification/check",
+      middleware: auth,
+      tags: ["projects"],
+      request: { body: { required: true, content: json(VerifyPhoneCodeInput) } },
+      responses: {
+        200: { description: "Phone verification status", content: json(PhoneVerificationStatus) },
+        ...errors,
+        409: error("Phone conflict"),
+        429: error("Retry later"),
+        503: error("SMS verification unavailable"),
+      },
+    }),
+    async (c) =>
+      c.json(
+        await checkPhoneVerification(
+          getDatabase().db,
+          c.get("actor").userId,
+          c.req.valid("json").code,
+        ),
+        200,
+      ),
   );

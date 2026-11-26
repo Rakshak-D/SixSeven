@@ -18,6 +18,8 @@ import {
   RejectExpectedDeliveryInput,
 } from "@/shared/schemas/deliveries";
 
+import { ChallanEvidence } from "./challan-evidence";
+
 export function ExpectedDeliveries({
   projectId,
   canDecide,
@@ -124,8 +126,17 @@ export function ExpectedDeliveries({
             <p>
               {entry.supplier} · {entry.qty} · {entry.expectedOn} · {entry.status}
             </p>
+            {entry.rescheduledOn ? (
+              <p className="text-sm">Rescheduled to {entry.rescheduledOn}</p>
+            ) : null}
             {entry.rejectionReason ? (
               <p className="text-sm text-muted-foreground">{entry.rejectionReason}</p>
+            ) : null}
+            {canDecide && entry.deliveryId ? (
+              <details>
+                <summary className="w-fit cursor-pointer text-sm">Challan evidence</summary>
+                <ChallanEvidence projectId={projectId} deliveryId={entry.deliveryId} />
+              </details>
             ) : null}
             {canDecide && entry.status === "pending" ? (
               <Arrival entry={entry} projectId={projectId} />
@@ -144,6 +155,7 @@ function Arrival({ entry, projectId }: { entry: ExpectedDeliveryResponse; projec
   const [challan, setChallan] = useState("");
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
+  const [newDate, setNewDate] = useState("");
   const [date, setDate] = useState(todayIst);
   const path = `/expected-deliveries/${encodeURIComponent(entry.id)}`;
   const refresh = () => client.invalidateQueries({ queryKey: [projectId] });
@@ -166,7 +178,7 @@ function Arrival({ entry, projectId }: { entry: ExpectedDeliveryResponse; projec
   const reject = useMutation({
     mutationFn: () =>
       api("POST", `${path}/reject`, {
-        body: RejectExpectedDeliveryInput.parse({ reason }),
+        body: RejectExpectedDeliveryInput.parse({ reason, newDate: newDate || undefined }),
         schema: ExpectedDeliveryResponse,
       }),
     onSuccess: refresh,
@@ -230,6 +242,16 @@ function Arrival({ entry, projectId }: { entry: ExpectedDeliveryResponse; projec
       <div className="mt-3 space-y-3">
         <Field label="Rejection reason">
           {(id) => <Input id={id} value={reason} onChange={(ev) => setReason(ev.target.value)} />}
+        </Field>
+        <Field label="Reschedule date (optional)">
+          {(id) => (
+            <Input
+              id={id}
+              type="date"
+              value={newDate}
+              onChange={(event) => setNewDate(event.target.value)}
+            />
+          )}
         </Field>
         <Button
           variant="outline"

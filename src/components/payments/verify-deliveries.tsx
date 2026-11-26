@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Field, FormError, TextArea } from "@/components/forms";
+import { BagScanner } from "@/components/photos/bag-scanner";
 import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui/button";
 import { useDeliveriesToVerify, useVerifyDelivery } from "@/hooks/use-supplier-payments";
@@ -89,9 +90,20 @@ function VerifyForm({
         {(id) => <TextArea id={id} value={note} onChange={setNote} />}
       </Field>
       {delivery.tracksBags ? (
-        <Field label="Bag codes" hint="Enter one code per bag, one per line.">
-          {(id) => <TextArea id={id} value={codes} onChange={setCodes} />}
-        </Field>
+        <div className="space-y-2">
+          <Field label="Bag codes" hint="Enter one code per bag, one per line.">
+            {(id) => <TextArea id={id} value={codes} onChange={setCodes} />}
+          </Field>
+          <BagScanner
+            onCode={(code) =>
+              setCodes((current) =>
+                current.split(/\s+/).includes(code)
+                  ? current
+                  : [current.trim(), code].filter(Boolean).join("\n"),
+              )
+            }
+          />
+        </div>
       ) : null}
       <FormError error={verify.error} />
       <Button

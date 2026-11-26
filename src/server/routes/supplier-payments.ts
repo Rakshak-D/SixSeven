@@ -5,11 +5,14 @@ import { IdParams } from "@/shared/schemas/common";
 import {
   ApproveSupplierPaymentsInput,
   ChangeSupplierBankInput,
+  ChangeSupplierDelegationInput,
   CreateSupplierInput,
   CreateSupplierOrderInput,
   DecideSupplierPaymentInput,
+  DelegatedPaymentsResponse,
   PauseSupplierPaymentsInput,
   SetSupplierAutopayInput,
+  SupplierDelegationResponse,
   SupplierNoteInput,
   SupplierPaymentsOverview,
   SupplierPaymentsQuery,
@@ -22,10 +25,14 @@ import { createRouter } from "../lib/router";
 import type { AuthEnv } from "../middleware/auth";
 import {
   approveBankChange,
+  approveDelegatedPayment,
   approveSupplier,
+  changeSupplierDelegation,
   createSupplier,
   createSupplierOrder,
   decideSupplierPayments,
+  getSupplierDelegation,
+  listDelegatedPayments,
   listSuppliers,
   pauseSupplierPayments,
   requestBankChange,
@@ -279,4 +286,81 @@ export const supplierPaymentRoutes = createRouter<AuthEnv>()
         200,
       );
     },
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/projects/{id}/supplier-delegation",
+      tags,
+      middleware: projectAuth,
+      request: { params: IdParams },
+      responses: {
+        200: { description: "Supplier delegation", content: json(SupplierDelegationResponse) },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(await getSupplierDelegation(db(), c.get("actor"), c.req.valid("param").id), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "put",
+      path: "/projects/{id}/supplier-delegation",
+      tags,
+      middleware: projectAuth,
+      request: projectBody(ChangeSupplierDelegationInput),
+      responses: {
+        200: { description: "Supplier delegation", content: json(SupplierDelegationResponse) },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(
+        await changeSupplierDelegation(
+          db(),
+          c.get("actor"),
+          c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        200,
+      ),
+  )
+  .openapi(
+    createRoute({
+      method: "get",
+      path: "/projects/{id}/delegated-payments",
+      tags,
+      middleware: projectAuth,
+      request: { params: IdParams },
+      responses: {
+        200: { description: "Supplier delegation", content: json(DelegatedPaymentsResponse) },
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(await listDelegatedPayments(db(), c.get("actor"), c.req.valid("param").id), 200),
+  )
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/projects/{id}/delegated-payments/{paymentId}",
+      tags,
+      middleware: projectAuth,
+      request: {
+        params: IdParams.extend({ paymentId: IdParams.shape.id }),
+        body: { required: true, content: json(SupplierNoteInput) },
+      },
+      responses: { 200: mockWrite, ...errors },
+    }),
+    async (c) =>
+      c.json(
+        await approveDelegatedPayment(
+          db(),
+          c.get("actor"),
+          c.req.valid("param").id,
+          c.req.valid("param").paymentId,
+          c.req.valid("json").note,
+        ),
+        200,
+      ),
   );

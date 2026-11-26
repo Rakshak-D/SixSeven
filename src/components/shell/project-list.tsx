@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SlateLockup, SlateTagline } from "@/components/brand/logo";
 import { Invitations, StartProject } from "@/components/team/start-project";
+import { VerifyPhone } from "@/components/team/verify-phone";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +35,9 @@ export function ProjectList() {
             <StartProject />
           </div>
           <Invitations />
+          <div className="mt-4">
+            <VerifyPhone />
+          </div>
         </>
       ) : null}
 

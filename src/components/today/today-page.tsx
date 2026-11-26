@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -13,8 +12,9 @@ import {
   parseQty,
   rupeesToPaise,
   SavedNotice,
+  TextArea,
 } from "@/components/forms";
-import { PhotoPicker, photoProblem } from "@/components/photos/photo-picker";
+import { BagScanner } from "@/components/photos/bag-scanner";
 import { useCurrentProject } from "@/components/shell/project-context";
 import { ExpectedDeliveries } from "@/components/today/expected-deliveries";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,9 @@ import {
   useStock,
   useWorkers,
 } from "@/hooks/use-project-data";
-import { api } from "@/lib/api/client";
 import { todayIst } from "@/lib/dates";
 import { formatIsoDate, formatPaise, formatQty } from "@/lib/format";
-import { ChallanPhotoResponse, CreateChallanPhotoInput } from "@/shared/schemas/deliveries";
+import { ChallanEvidence } from "./challan-evidence";
 import { effectiveValue, FixSheet, type FixTarget } from "./fix-sheet";
 import { ProjectSetup } from "./project-setup";
 
@@ -241,55 +240,6 @@ function DeliveryForm({ projectId, today }: { projectId: string; today: string }
   );
 }
 
-function ChallanEvidence({ projectId, deliveryId }: { projectId: string; deliveryId: string }) {
-  const client = useQueryClient();
-  const [photos, setPhotos] = useState<File[]>([]);
-  const save = useMutation({
-    mutationFn: () => {
-      const problem = photoProblem(photos);
-      if (problem) throw new Error(problem);
-      const photo = photos[0];
-      const fields = CreateChallanPhotoInput.parse({
-        photo,
-        capturedAt: new Date(photo.lastModified).toISOString(),
-      });
-      const form = new FormData();
-      form.set("photo", fields.photo);
-      form.set("capturedAt", fields.capturedAt);
-      return api(
-        "POST",
-        `/projects/${encodeURIComponent(projectId)}/deliveries/${encodeURIComponent(deliveryId)}/challan-photo`,
-        {
-          body: form,
-          schema: ChallanPhotoResponse,
-        },
-      );
-    },
-    onSuccess: () => client.invalidateQueries({ queryKey: [projectId] }),
-  });
-  return (
-    <div className="space-y-2 border-t pt-3">
-      <p className="font-medium">Challan photo</p>
-      {save.isSuccess ? (
-        <SavedNotice>Challan evidence saved.</SavedNotice>
-      ) : (
-        <>
-          <PhotoPicker files={photos} onChange={setPhotos} max={1} />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!photos.length || save.isPending}
-            onClick={() => save.mutate()}
-          >
-            Attach challan photo
-          </Button>
-        </>
-      )}
-      <FormError error={save.error} />
-    </div>
-  );
-}
-
 function UsageForm({ projectId, today }: { projectId: string; today: string }) {
   const choice = useMaterialChoice(projectId);
   const save = useCreateUsage(projectId);
@@ -363,9 +313,20 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
         {(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
       {choice.material?.tracksBags ? (
-        <Field label="Registered bag codes" hint="Enter one code per bag, one per line.">
-          {(id) => <Input id={id} value={codes} onChange={(e) => setCodes(e.target.value)} />}
-        </Field>
+        <div className="space-y-2">
+          <Field label="Registered bag codes" hint="Enter one code per bag, one per line.">
+            {(id) => <TextArea id={id} value={codes} onChange={setCodes} />}
+          </Field>
+          <BagScanner
+            onCode={(code) =>
+              setCodes((current) =>
+                current.split(/\s+/).includes(code)
+                  ? current
+                  : [current.trim(), code].filter(Boolean).join("\n"),
+              )
+            }
+          />
+        </div>
       ) : null}
       <FormError error={problem ?? save.error} />
       {save.isSuccess && !save.isPending ? (
@@ -565,6 +526,12 @@ function TodayEntries({
                 <Pencil aria-hidden="true" />
                 Fix
               </Button>
+              {kind === "delivery" ? (
+                <details>
+                  <summary className="cursor-pointer text-sm">Evidence</summary>
+                  <ChallanEvidence projectId={projectId} deliveryId={row.id} />
+                </details>
+              ) : null}
             </li>
           ))}
         </ul>

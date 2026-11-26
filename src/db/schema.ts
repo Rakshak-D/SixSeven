@@ -104,7 +104,7 @@ export const projectInvitations = pgTable(
     check("project_invitation_role", sql`${t.role} in ('owner', 'contractor')`),
     check(
       "project_invitation_acceptance",
-      sql`(${t.acceptedBy} is null) = (${t.acceptedAt} is null) and (${t.phone} is null or ${t.acceptedAt} is null)`,
+      sql`(${t.acceptedBy} is null) = (${t.acceptedAt} is null)`,
     ),
   ],
 );
@@ -525,6 +525,29 @@ export const materialBagCodes = pgTable(
   ],
 );
 
+export const supplierDelegations = pgTable(
+  "supplier_delegations",
+  {
+    projectId: text("project_id")
+      .primaryKey()
+      .references(() => projects.id),
+    engineerId: text("engineer_id").notNull(),
+    capPaise: paise("cap_paise").notNull(),
+    remainingPaise: paise("remaining_paise").notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "supplier_delegate_member_fk",
+      columns: [t.projectId, t.engineerId],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    check(
+      "supplier_delegate_budget",
+      sql`${t.capPaise} between 1 and 9007199254740991 and ${t.remainingPaise} between 0 and ${t.capPaise}`,
+    ),
+  ],
+);
+
 export const supplierProjectRules = pgTable("supplier_project_rules", {
   projectId: text("project_id")
     .primaryKey()
@@ -610,7 +633,7 @@ export const supplierPayments = pgTable(
     orderId: text("order_id"),
     status: text().$type<"pending" | "paid" | "declined">().notNull().default("pending"),
     amountPaise: paise("amount_paise").notNull().default(0),
-    paidBy: text("paid_by").$type<"autopay" | "owner">(),
+    paidBy: text("paid_by").$type<"autopay" | "owner" | "delegate">(),
     decisionNote: text("decision_note"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -637,7 +660,7 @@ export const supplierPayments = pgTable(
       sql`
     (${t.status} = 'pending' and ${t.amountPaise} = 0 and ${t.decidedAt} is null and ${t.paidBy} is null)
     or (${t.status} = 'paid' and ${t.amountPaise} between 1 and 9007199254740991 and ${t.decidedAt} is not null and
-      ${t.paidBy} is not null and ${t.paidBy} in ('autopay','owner') and ${t.supplierId} is not null and ${t.orderId} is not null)
+      ${t.paidBy} is not null and ${t.paidBy} in ('autopay','owner','delegate') and ${t.supplierId} is not null and ${t.orderId} is not null)
     or (${t.status} = 'declined' and ${t.amountPaise} = 0 and ${t.decidedAt} is not null and ${t.paidBy} is null)
   `,
     ),

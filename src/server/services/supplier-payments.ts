@@ -3,8 +3,10 @@ import type { Db, Transaction } from "@/db/client";
 import {
   deliveryVerifications,
   materials,
+  projectMembers,
   projects,
   stockMovements,
+  supplierDelegations,
   supplierOrders,
   supplierPayments,
   supplierProjectRules,
@@ -13,6 +15,7 @@ import {
 import { ErrorCode } from "@/shared/errors";
 import {
   type ChangeSupplierBankInput,
+  type ChangeSupplierDelegationInput,
   type CreateSupplierInput,
   type CreateSupplierOrderInput,
   type SetSupplierAutopayInput,
@@ -404,15 +407,18 @@ async function release(
   tx: Transaction,
   actor: Actor,
   bill: Bill,
-  method: "autopay" | "owner",
+  method: "autopay" | "owner" | "delegate",
   note: string,
+  delegatedLimit?: number,
 ) {
   const now = new Date();
-  const current = await assess(tx, bill, method, now);
+  const current = await assess(tx, bill, method === "delegate" ? "owner" : method, now);
   if (current.reason !== null) {
-    if (method === "owner") throw conflict(current.reason);
-    return;
+    if (method !== "autopay") throw conflict(current.reason);
+    return 0;
   }
+  if (delegatedLimit !== undefined && current.amountPaise > delegatedLimit)
+    throw conflict("Delegated spending limit exceeded");
   const [order] = await tx
     .update(supplierOrders)
     .set({ remainingQty: sql`${supplierOrders.remainingQty} - ${bill.qty}::numeric` })
@@ -434,6 +440,7 @@ async function release(
     .returning({ id: supplierPayments.id });
   if (!payment) throw conflict("Supplier payment already decided");
   await audit(tx, actor, bill.payment.projectId, "supplierPayment", payment.id, "approved", note);
+  return current.amountPaise;
 }
 
 export async function queueSupplierPayment(
@@ -557,4 +564,127 @@ export async function supplierPaymentOverview(
     },
     { isolationLevel: "repeatable read", accessMode: "read only" },
   );
+}
+
+async function readGrant(db: Db | Transaction, projectId: string) {
+  const [grant] = await db
+    .select({
+      engineerId: supplierDelegations.engineerId,
+      capPaise: supplierDelegations.capPaise,
+      remainingPaise: supplierDelegations.remainingPaise,
+    })
+    .from(supplierDelegations)
+    .where(eq(supplierDelegations.projectId, projectId));
+  return grant ?? null;
+}
+
+export async function getSupplierDelegation(db: Db, actor: Actor, projectId: string) {
+  const member = await requireProjectAccess(db, actor, projectId, ["owner", "engineer"]);
+  const grant = await readGrant(db, projectId);
+  return member.role === "owner" || grant?.engineerId === actor.userId ? grant : null;
+}
+
+export async function changeSupplierDelegation(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+  input: ChangeSupplierDelegationInput,
+) {
+  return ownerWrite(db, actor, projectId, async (tx) => {
+    if (input.action === "revoke") {
+      const grant = await readGrant(tx, projectId);
+      if (!grant) throw missing("Delegation");
+      await tx.delete(supplierDelegations).where(eq(supplierDelegations.projectId, projectId));
+      await audit(
+        tx,
+        actor,
+        projectId,
+        "supplierRule",
+        grant.engineerId,
+        "updated",
+        `Revoked supplier delegation. ${input.note}`,
+      );
+      return null;
+    }
+    const [engineer] = await tx
+      .select({ id: projectMembers.userId })
+      .from(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, input.engineerId),
+          eq(projectMembers.role, "engineer"),
+        ),
+      );
+    if (!engineer) throw missing("Project engineer");
+    const grant = {
+      engineerId: engineer.id,
+      capPaise: input.capPaise,
+      remainingPaise: input.capPaise,
+    };
+    await tx
+      .insert(supplierDelegations)
+      .values({ projectId, ...grant })
+      .onConflictDoUpdate({ target: supplierDelegations.projectId, set: grant });
+    await audit(
+      tx,
+      actor,
+      projectId,
+      "supplierRule",
+      engineer.id,
+      "updated",
+      `Granted supplier delegation capped at ${input.capPaise} paise. ${input.note}`,
+    );
+    return grant;
+  });
+}
+
+export async function listDelegatedPayments(db: Db, actor: Actor, projectId: string) {
+  return db.transaction(
+    async (tx) => {
+      await requireProjectAccess(tx, actor, projectId, ["engineer"]);
+      const grant = await readGrant(tx, projectId);
+      if (grant?.engineerId !== actor.userId) return [];
+      const rows = [];
+      for (const bill of await billRows(tx, projectId, { status: "pending" })) {
+        const result = await assess(tx, bill, "owner", new Date());
+        if (
+          result.reason === null &&
+          result.amountPaise <= grant.remainingPaise &&
+          bill.supplierName
+        )
+          rows.push({
+            id: bill.payment.id,
+            supplierName: bill.supplierName,
+            amountPaise: result.amountPaise,
+          });
+      }
+      return rows;
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
+}
+
+export async function approveDelegatedPayment(
+  db: Db,
+  actor: Actor,
+  projectId: string,
+  id: string,
+  note: string,
+) {
+  return db.transaction(async (tx) => {
+    await requireProjectAccess(tx, actor, projectId, ["engineer"]);
+    await lockProject(tx, projectId);
+    const grant = await readGrant(tx, projectId);
+    if (grant?.engineerId !== actor.userId)
+      throw new ApiError(403, ErrorCode.FORBIDDEN, "An active owner delegation is required");
+    const [bill] = await billRows(tx, projectId, { status: "pending" }, id);
+    if (!bill) throw missing("Pending payment");
+    const amount = await release(tx, actor, bill, "delegate", note, grant.remainingPaise);
+    await tx
+      .update(supplierDelegations)
+      .set({ remainingPaise: grant.remainingPaise - amount })
+      .where(eq(supplierDelegations.projectId, projectId));
+    return done;
+  });
 }

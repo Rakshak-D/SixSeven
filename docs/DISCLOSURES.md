@@ -36,3 +36,9 @@ The supplier workflow uses synthetic account details and a mock payment provider
 ## Final release AI configuration
 
 Ask Slate uses the existing optional Gemini, Groq, NVIDIA or explicitly configured HTTPS compatible provider. Select a model before enabling provider calls. Prototype mode uses labelled fixed samples. Live mode without provider settings reports offline. The separate rectangular concrete estimator uses local formulas and no provider. No live provider call was verified in this release checkpoint.
+
+## SMS verification
+
+Optional Twilio Verify sends and checks SMS codes. No live SMS was requested during development. Automated checks stub provider responses while exercising PostgreSQL ownership and invitation transitions. Camera barcode detection uses the browser capability where supported.
+
+ZXing library 0.23.0 (Apache-2.0) is bundled locally as a camera decoder fallback. It does not send images to an external service.

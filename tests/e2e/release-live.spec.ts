@@ -6,8 +6,35 @@ async function signIn(browser: Browser, page: Page, role: keyof typeof DemoAccou
   const context = await browser.newContext({
     baseURL: new URL(page.url()).origin,
     viewport: page.viewportSize() ?? undefined,
+    permissions: ["camera"],
   });
   try {
+    await context.addInitScript((role) => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 640;
+        canvas.height = 480;
+        const drawing = canvas.getContext("2d");
+        if (!drawing) throw new Error("Cannot create the simulated camera");
+        const stream = canvas.captureStream(15);
+        const render = () => {
+          if (!stream.active) return;
+          drawing.fillStyle = "#345678";
+          drawing.fillRect(0, 0, canvas.width, canvas.height);
+          requestAnimationFrame(render);
+        };
+        render();
+        return stream;
+      };
+      Object.defineProperty(globalThis, "BarcodeDetector", {
+        configurable: true,
+        value: class {
+          async detect() {
+            return [{ rawValue: role === "engineer" ? "release-a" : "release-b" }];
+          }
+        },
+      });
+    }, role);
     const signedIn = await context.newPage();
     await signedIn.goto("/login");
     await signedIn.getByLabel("Email").fill(DemoAccountEmail[role]);
@@ -25,7 +52,7 @@ async function signIn(browser: Browser, page: Page, role: keyof typeof DemoAccou
   }
 }
 
-test.use({ trace: "off", screenshot: "off", video: "off" });
+test.use({ actionTimeout: 15000, trace: "off", screenshot: "off", video: "off" });
 
 test("three real sessions preserve project access and wage privacy after reload", async ({
   browser,
@@ -253,17 +280,47 @@ test("three real sessions preserve project access and wage privacy after reload"
         await contractorPage.keyboard.press("Escape");
         await contractorPage.getByRole("tab", { name: "Delivery" }).click();
         const expected = contractorPage.getByRole("region", { name: "Expected deliveries" });
-        await expected.getByText("Schedule delivery", { exact: true }).click();
+        await expected.getByText("Schedule delivery", { exact: true }).press("Enter");
         await expected.getByLabel("Expected quantity").fill("2");
         await expected.getByLabel("Expected supplier").fill("Synthetic release supplier");
-        await expected.getByRole("button", { name: "Save schedule" }).click();
+        await expected.getByRole("button", { name: "Save schedule" }).press("Enter");
         await expect(expected.getByText(/Synthetic release supplier.*pending/)).toBeVisible();
-        await expected.getByText("Record arrival or rejection").click();
+        await expected.getByText("Record arrival or rejection").press("Enter");
         await expected.getByLabel("Unit cost (₹)").fill("450");
         await expected.getByLabel("Challan number").fill("RELEASE-1");
         await expected.getByLabel("Arrival note").fill("Synthetic delivery for the release test");
-        await expected.getByRole("button", { name: "Record arrival" }).click();
+        await expected.getByRole("button", { name: "Record arrival" }).press("Enter");
         await expect(expected.getByText(/Synthetic release supplier.*accepted/)).toBeVisible();
+        const challanEvidence = expected.getByText("Challan evidence", { exact: true });
+        await challanEvidence.press("Enter");
+        await expected.getByRole("button", { name: "Take photo", exact: true }).press("Enter");
+        const capturePhoto = expected.getByRole("button", { name: "Capture", exact: true });
+        await expect(capturePhoto).toBeEnabled();
+        await capturePhoto.press("Enter");
+        await expected.getByRole("button", { name: "Attach challan photo" }).press("Enter");
+        await expect(expected.getByText("Challan evidence saved.")).toBeVisible();
+        const savedPhoto = await expected
+          .getByRole("link", { name: "Open saved photo" })
+          .getAttribute("href");
+        if (!savedPhoto) throw new Error("Expected protected challan photo link");
+        expect((await owner.request.get(savedPhoto)).status()).toBe(200);
+
+        await expected.getByLabel("Expected quantity").fill("1");
+        await expected.getByLabel("Expected supplier").fill("Rejected synthetic supplier");
+        await expected.getByRole("button", { name: "Save schedule" }).press("Enter");
+        const rejected = expected
+          .getByRole("listitem")
+          .filter({ hasText: "Rejected synthetic supplier" });
+        await rejected.getByText("Record arrival or rejection").press("Enter");
+        await rejected
+          .getByLabel("Rejection reason")
+          .fill("Truck did not arrive at the scheduled time");
+        const tomorrow = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Kolkata" }).format(
+          new Date(Date.now() + 86400000),
+        );
+        await rejected.getByLabel("Reschedule date (optional)").fill(tomorrow);
+        await rejected.getByRole("button", { name: "Reject expected delivery" }).press("Enter");
+        await expect(expected.getByText(`Rescheduled to ${tomorrow}`)).toBeVisible();
         const apiPath = `/api/v1${path}`;
         const overviewPath = `${apiPath}/supplier-payments`;
         expect((await contractor.request.get(overviewPath)).status()).toBe(403);
@@ -317,10 +374,12 @@ test("three real sessions preserve project access and wage privacy after reload"
         expect((await setCap(50000)).status()).toBe(200);
         const teamPath = new URL(desktop.url()).pathname;
         await desktop.goto(path);
-        await desktop.getByRole("button", { name: "Verify", exact: true }).click();
+        await desktop.getByRole("button", { name: "Verify", exact: true }).press("Enter");
         await desktop.getByLabel("Your note").fill("Counted both sealed bags on site");
+        await desktop.getByRole("button", { name: "Scan bag code" }).press("Enter");
+        await expect(desktop.getByLabel("Bag codes")).toHaveValue("release-a");
         await desktop.getByLabel("Bag codes").fill("release-a\nrelease-b");
-        await desktop.getByRole("button", { name: "It arrived as recorded" }).click();
+        await desktop.getByRole("button", { name: "It arrived as recorded" }).press("Enter");
         await expect(desktop.getByText("Every delivery is checked.")).toBeVisible();
         const initialPayments = await (await owner.request.get(overviewPath)).json();
         const [bill] = initialPayments.payments;
@@ -331,8 +390,34 @@ test("three real sessions preserve project access and wage privacy after reload"
           });
         expect((await decide()).status()).toBe(409);
         expect((await setCap(100000)).status()).toBe(200);
-        expect((await decide()).status()).toBe(200);
+        const ownerPage = owner.pages()[0];
+        await ownerPage.goto(`${path}/money`);
+        const grant = ownerPage.getByRole("region", { name: "Supplier payment delegation" });
+        await grant.getByRole("combobox", { name: "Delegate engineer" }).click();
+        await ownerPage.getByRole("option", { name: /Demo Engineer/ }).click();
+        await grant.getByLabel("Total delegation cap (₹)").fill("900");
+        await grant
+          .getByLabel("Delegation reason")
+          .fill("Approved single payment for the browser test");
+        await grant.getByRole("button", { name: "Grant or replace authority" }).click();
+        await expect(grant.getByText(/Remaining delegated authority/)).toBeVisible();
+        const delegated = desktop.getByRole("region", { name: "Supplier payment delegation" });
+        await desktop.reload();
+        await delegated
+          .getByLabel("Mock payment note")
+          .fill("Matched verified delivery to the approved order");
+        await delegated.getByRole("button", { name: "Approve mock payment" }).click();
+        await expect(delegated.getByRole("button", { name: "Approve mock payment" })).toHaveCount(
+          0,
+        );
         expect((await decide()).status()).toBe(409);
+        const remaining = await (await owner.request.get(`${apiPath}/supplier-delegation`)).json();
+        expect(remaining.remainingPaise).toBe(0);
+        await grant
+          .getByLabel("Delegation reason")
+          .fill("Revoke after releasing the approved mock payment");
+        await grant.getByRole("button", { name: "Revoke authority" }).click();
+        await expect(grant.getByText("No active grant.")).toBeVisible();
         const finalPayments = await (await owner.request.get(overviewPath)).json();
         expect(finalPayments.payments).toEqual([
           expect.objectContaining({
@@ -340,6 +425,7 @@ test("three real sessions preserve project access and wage privacy after reload"
             provider: "mock",
             status: "paid",
             amountPaise: 90000,
+            paidBy: "delegate",
           }),
         ]);
         await contractorPage.getByRole("tab", { name: "Usage" }).click();
@@ -350,6 +436,8 @@ test("three real sessions preserve project access and wage privacy after reload"
           await usage.getByLabel("Registered bag codes").fill("release-a");
           await usage.getByRole("button", { name: "Save usage" }).click();
         };
+        await usage.getByRole("button", { name: "Scan bag code" }).click();
+        await expect(usage.getByLabel("Registered bag codes")).toHaveValue("release-b");
         await fillUsage();
         await expect(usage.getByText(/Saved. On site now/)).toBeVisible();
         await fillUsage();
@@ -361,6 +449,16 @@ test("three real sessions preserve project access and wage privacy after reload"
         await desktop.goto(teamPath);
         await desktop.reload();
         await expect(desktop.getByText("Accepted", { exact: true })).toHaveCount(2);
+        const myPhone = desktop.getByRole("region", { name: "My phone number" });
+        await myPhone.getByLabel("Indian mobile number").fill("9876543210");
+        await myPhone.getByRole("button", { name: "Save contact number" }).click();
+        await expect(myPhone.getByText("Contact updated.")).toBeVisible();
+        await desktop.reload();
+        await expect(myPhone.getByLabel("Indian mobile number")).toHaveValue("+919876543210");
+        const contact = await (await engineer.request.get("/api/v1/me/phone-verification")).json();
+        expect(contact).toMatchObject({ phone: "+919876543210", verified: false });
+        await myPhone.getByRole("button", { name: "Remove contact number" }).click();
+        await expect(myPhone.getByLabel("Indian mobile number")).toHaveValue("");
       } finally {
         await contractor.close();
       }
