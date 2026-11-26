@@ -141,10 +141,10 @@ async function main() {
     SLATE_DEMO_SEED: "0",
   });
   const seedReady =
-    /^.{12,64}$/.test(env.SLATE_DEMO_PASSWORD ?? "") &&
+    /^.{8,64}$/.test(env.SLATE_DEMO_PASSWORD ?? "") &&
     !env.SLATE_DEMO_PASSWORD.startsWith("replace-with-");
   if (values.seed && !seedReady)
-    throw new Error("Set a local SLATE_DEMO_PASSWORD of 12–64 characters.");
+    throw new Error("Set a local SLATE_DEMO_PASSWORD of 8–64 characters.");
 
   await requireFreePort(appPort);
   const cache = localDirectory(".cache");
