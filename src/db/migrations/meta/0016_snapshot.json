@@ -1,5 +1,5 @@
 {
-  "id": "de1bf795-2ea1-49bb-8422-188b44c25667",
+  "id": "06b15acb-2c9b-4557-82a3-877f7213e542",
   "prevId": "edab3d6a-6fc5-431a-9e9f-60b64ee41bdc",
   "version": "7",
   "dialect": "postgresql",
@@ -1462,18 +1462,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "captured_at": {
-          "name": "captured_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "received_at": {
-          "name": "received_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "mime": {
           "name": "mime",
           "type": "text",
@@ -1543,10 +1531,6 @@
       },
       "policies": {},
       "checkConstraints": {
-        "challan_photo_capture_window": {
-          "name": "challan_photo_capture_window",
-          "value": "\n      (\"delivery_challan_photos\".\"captured_at\" is null and \"delivery_challan_photos\".\"received_at\" is null)\n      or (\"delivery_challan_photos\".\"captured_at\" is not null and \"delivery_challan_photos\".\"received_at\" is not null\n        and \"delivery_challan_photos\".\"captured_at\" between \"delivery_challan_photos\".\"received_at\" - interval '10 minutes' and \"delivery_challan_photos\".\"received_at\" + interval '30 seconds')"
-        },
         "delivery_challan_photo_media": {
           "name": "delivery_challan_photo_media",
           "value": "\"delivery_challan_photos\".\"size_bytes\" between 1 and 5000000 and \"delivery_challan_photos\".\"mime\" in ('image/jpeg', 'image/png', 'image/webp')"
@@ -2444,18 +2428,6 @@
           "primaryKey": true,
           "notNull": true
         },
-        "captured_at": {
-          "name": "captured_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "received_at": {
-          "name": "received_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "project_id": {
           "name": "project_id",
           "type": "text",
@@ -2558,10 +2530,6 @@
       },
       "policies": {},
       "checkConstraints": {
-        "progress_photo_capture_window": {
-          "name": "progress_photo_capture_window",
-          "value": "\n      (\"progress_photos\".\"captured_at\" is null and \"progress_photos\".\"received_at\" is null)\n      or (\"progress_photos\".\"captured_at\" is not null and \"progress_photos\".\"received_at\" is not null\n        and \"progress_photos\".\"captured_at\" between \"progress_photos\".\"received_at\" - interval '10 minutes' and \"progress_photos\".\"received_at\" + interval '30 seconds')"
-        },
         "progress_photo_mime_valid": {
           "name": "progress_photo_mime_valid",
           "value": "\"progress_photos\".\"mime\" in ('image/jpeg', 'image/png', 'image/webp')"
@@ -3985,6 +3953,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -4101,6 +4075,14 @@
         "wage_payment_amount_paise_valid": {
           "name": "wage_payment_amount_paise_valid",
           "value": "\"wage_payments\".\"amount_paise\" between 1 and 9007199254740991"
+        },
+        "wage_payment_reference_by_mode": {
+          "name": "wage_payment_reference_by_mode",
+          "value": "case \"wage_payments\".\"mode\"::text\n      when 'cash' then \"wage_payments\".\"reference\" is null\n      when 'upi' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[0-9]{12}$'\n      when 'bank' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[A-Za-z0-9]{6,22}$'\n      when 'cheque' then \"wage_payments\".\"reference\" is not null and \"wage_payments\".\"reference\" ~ '^[0-9]{6}$'\n      else false end"
+        },
+        "wage_payment_note_required": {
+          "name": "wage_payment_note_required",
+          "value": "\"wage_payments\".\"note\" is not null and char_length(btrim(\"wage_payments\".\"note\")) between 1 and 2000"
         }
       },
       "isRLSEnabled": false
@@ -4689,7 +4671,8 @@
       "values": [
         "cash",
         "upi",
-        "bank"
+        "bank",
+        "cheque"
       ]
     }
   },

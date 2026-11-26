@@ -19,7 +19,7 @@ export type Spend = {
   fixReason: string | null;
 };
 
-const modeLabel = { cash: "Cash", upi: "UPI", bank: "Bank" } as const;
+const modeLabel = { cash: "Cash", upi: "UPI", bank: "Bank", cheque: "Cheque" } as const;
 
 /** Money that left the project: material deliveries (quantity × unit cost) and wage payments. */
 export function buildSpends(input: {

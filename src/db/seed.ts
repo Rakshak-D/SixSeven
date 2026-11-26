@@ -358,8 +358,9 @@ async function seed() {
             amountPaise: 90_000,
             kind: "wage",
             mode: "bank",
+            note: "Synthetic worker payment",
             paidOn: "2026-11-22",
-            reference: "DEMO-WAGE-001",
+            reference: "DEMOWAGE001",
           },
         },
         {
@@ -369,6 +370,7 @@ async function seed() {
             amountPaise: 20_000,
             kind: "advance",
             mode: "cash",
+            note: "Synthetic worker payment",
             paidOn: "2026-11-23",
           },
         },

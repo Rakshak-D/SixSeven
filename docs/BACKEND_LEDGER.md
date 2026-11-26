@@ -9,11 +9,27 @@ Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 - Existing disposable PostgreSQL upgraded successfully. Biome, typecheck and 151 local tests passed before the final main sync. Full CI is required before integration.
 - Regenerated the unpublished migration as `0016_photo_capture_times` after the steel migration. Fresh migrations, seed and all 37 PostgreSQL stock, reporting and migration tests passed, including a baseline upgrade.
 
+## Entry — Request #22 wage notes and mode references
+
+- Branch: `be/wage-payment-modes`, PR #29. Published the existing `CreateWagePaymentInput` with required `note`, no cash reference and the mode-specific references. Exported `WagePaymentMode`. Historical reads accept null or absent notes and preserve original references.
+- Frontend handoff: `src/lib/spends.ts` must label `cheque`. Wage entry forms and mock fixtures must include a note and omit a cash reference. The UI should render a legacy note as absent. Reconciled on the medical baseline as `0013_wage_payment_contract`; fresh PostgreSQL migration, seed and 54 focused tests passed. Full typecheck still fails at src/components/wages/wages-page.tsx (missing note) and src/lib/spends.ts (missing cheque label). This remains a draft.
+- Regenerated the unpublished migration as `0016_wage_payment_contract` after the steel migration. Fresh migrations, seed and all 29 PostgreSQL labour, reporting and migration tests passed, including a baseline upgrade.
+
+## Entry — Request #9 wage payment modes
+
+- Timestamp: 2026-11-26 IST. Branch: `be/wage-payment-modes`.
+- Added cheque and mode-specific references on new wage and advance records. Clear validation errors return on `reference`. Preserved historical values by adding the PostgreSQL check as `NOT VALID`, which applies to new rows without scanning or rewriting old ones.
+- Frontend handoff: in `src/lib/spends.ts`, add `cheque: "Cheque"` to `modeLabel` to resolve TS7053. In `src/components/wages/wages-page.tsx`, offer cheque, make UPI/bank/cheque references required with mode-specific validation, and keep references as strings to preserve leading zeros.
+- Keep the PR in draft until the frontend consumer changes and full CI passes. Regenerate this unmerged migration if another migration is integrated first.
+
 ## Entry — Engineer steel-marking hold point
 
 - Request #15, 2026-11-26 IST, branch `be/steel-hold-point`. Flagged checklist items require project engineer evidence for the current contractor submission before acceptance. The API stores capture and receipt times and retains prior evidence.
 - PostgreSQL fresh migration and seed passed. All 9 project reporting API tests passed, including no-evidence rejection, role denial, cross-project privacy and original photo byte retrieval. Typecheck passed.
 - Frontend handoff: `src/hooks/use-project-data.ts` and `src/components/engineer/review-list.tsx` can use the new multipart evidence endpoint before acceptance. Checklist creation and approved additions accept `requiresSteelProof`.
+- 2026-11-26 IST. Supplier and steel work merged in #45 and #46. Disposable PostgreSQL passed a fresh install and an upgrade from migration 0013. The upgrade retained the verified delivery, added one pending mock bill and recorded no payment.
+- The combined suite passed all 170 tests with the local 25-second test timeout. Typecheck and Biome passed. The hosted checks for the two pull requests passed.
+- #29, #41 and #42 remain draft PRs while their frontend consumers and fixtures are updated. The wage and capture drafts each independently use migration 0016. The later one must be regenerated after the earlier one is merged.
 
 ## Entry — Approved suppliers, mock payments and owner flags
 
