@@ -2,6 +2,12 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Integrated backend status
+
+- 2026-11-26 IST. Supplier and steel work merged in #45 and #46. Disposable PostgreSQL passed a fresh install and an upgrade from migration 0013. The upgrade retained the verified delivery, added one pending mock bill and recorded no payment.
+- The combined suite passed all 170 tests with the local 25-second test timeout. Typecheck and Biome passed. The hosted checks for the two pull requests passed.
+- #29, #41 and #42 remain draft PRs while their frontend consumers and fixtures are updated. The wage and capture drafts each independently use migration 0016. The later one must be regenerated after the earlier one is merged.
+
 ## Entry — Engineer steel-marking hold point
 
 - Request #15, 2026-11-26 IST, branch `be/steel-hold-point`. Flagged checklist items require project engineer evidence for the current contractor submission before acceptance. The API stores capture and receipt times and retains prior evidence.
