@@ -1,73 +1,212 @@
-# Slate: Every Detail is Accounted For
+# Slate: every detail is accounted for
 
-Slate is a construction-site progress and material tracker. The approved repository baseline is documented in [docs/SPECIFICATION.md](docs/SPECIFICATION.md). [docs/API.md](docs/API.md) tracks contract availability and runtime readiness.
+Slate is a construction-site tracker for small builders and house owners, built by team SixSeven for
+Avishkar 2K26 (Full Stack Development, problem statement 21). It replaces the site notebook with one
+shared record of the work. It covers what material arrived and what was used, who worked and what
+they are owed, what changed on site, and where the money went. Every entry is checked on the server,
+and a mistake is corrected by a logged fix, never by changing the past.
 
-## Current architecture reference
+## The problem
 
-Slate uses one Next.js App Router application, Hono REST API at /api/v1, Drizzle with PostgreSQL, Better Auth, shared Zod schemas, and OpenAPI generation. This is the approved stack for implementation.
+Most home construction still runs on notebooks and verbal agreements. The contractor, the owner and
+the workers each keep their own version of what arrived, what was used, who worked and who was paid.
+Material goes missing between delivery and use, wages get disputed, and the owner pays for numbers
+nobody can check. A common fraud pattern: the contractor buys genuine material, shows the owner the
+real bill, resells the stock and builds with something cheaper.
 
-## Run Slate on Windows
+## What Slate does
 
-Install Node 24 with Corepack, PowerShell 7.2 or newer, and Docker Desktop in Linux container mode. Open Docker Desktop and wait for the engine. From the repository root, run:
+Three roles share one project. Each sees only what their job needs.
 
-```powershell
-.\start.ps1             # Keep the frontend mode configured in .env
-.\start.ps1 -Prototype  # Enable frontend mocks for this run
-.\start.ps1 -Live       # Disable frontend mocks for this run
-.\start.ps1 -Seed       # Explicitly apply the repeatable demo seed, then start
-.\start.ps1 -Live -Seed # Combine live mode and demo seeding
-.\stop.ps1              # Stop this launcher session
+| Role | Main screens | What they do |
+|---|---|---|
+| **Site engineer** | Home, Logs, Site, Stock · **Review** | Starts the project, imports Revit quantities (.xlsx), writes the checklist, invites the team. Verifies deliveries and bag codes, reviews task photos, uploads steel-marking photos. Sees no wage amounts. |
+| **Contractor** | Today, Stock, Site, Wages · **Log** | Logs deliveries, material usage and attendance from a phone. Works checklist tasks with photo proof. Pays wages and manages workers. |
+| **Owner** | Home, Logs, Site, Money · **Approvals** | Sees spend against budget and spend over time. Approves changes with a note. Manages suppliers, orders and (mock) supplier payments, and reviews flags. |
+
+Features in this build:
+
+- **Stock ledger.** Deliveries and usage are append-only stock movements. The balance can never go
+  negative, and over-use is refused with a 409. A supplier challan number can only be used once per
+  project.
+- **Bag codes.** A material can opt in to tracked bags. The engineer registers one code per bag on
+  delivery, and each code can be used only once, for that material in that project.
+- **Attendance and wages.** Half-day attendance, the worker's rate copied onto each entry, and wages
+  calculated on the server in integer paise. The wage sheet exports to PDF and CSV, and the CSV
+  export neutralises spreadsheet formulas.
+- **Corrections, not edits.** Database triggers block changes to past rows. A fix appends an
+  adjustment with a reason, the actor and the old and new values, so the original stays on record.
+- **Two-step approvals.** Checklist changes, attendance corrections and medical claims go to a vote:
+  the engineer asks, the contractor votes, and the owner makes the final call. An accepted change is
+  applied once, in the same transaction.
+- **Checklist with proof.** The contractor starts a task and submits a note with photos, and the
+  engineer accepts it or sends it back. Tasks marked for steel need photos of the steel markings
+  (brand, BIS mark, MTC number) before the engineer can accept them.
+- **Supplier payments (mock).** Only the owner approves suppliers, orders and payments. A payment
+  goes only to an approved supplier, for an engineer-verified delivery, within the approved order.
+  A bank-detail change holds payments until the owner confirms it and a 24-hour cooldown ends.
+- **Owner review flags.** Flags appear for new suppliers, pending bank changes, deliveries left
+  unverified for two days, unit prices above 125% of recent deliveries, repeated reschedules, and
+  paid receipts missing verification.
+- **Ask Slate.** An optional AI assistant for construction questions, with server-side concrete and
+  brick-wall quantity calculators. It has read-only access and never sees supplier or medical data.
+  The checklist can be drafted by AI, and falls back to a labelled template when no AI provider is
+  configured.
+
+Slate never holds or moves money. Supplier payments and medical reimbursements use a mock provider
+with synthetic account data, and the UI labels them as mock. Registered bag codes and photos record
+what people reported. They don't prove what is inside a bag. Collusion between a contractor and an
+engineer is not prevented, only made visible through flags and the audit trail.
+
+## Architecture
+
+One Next.js app serves both the screens and the API. A single set of Zod schemas defines every
+request and response, and both the browser and the server use it.
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI[Role screens<br/>React 19 + TanStack Query]
+  end
+  subgraph "Next.js 16 app (one process)"
+    Auth[Better Auth<br/>/api/auth]
+    API[Hono REST API<br/>/api/v1 + OpenAPI]
+    MW[Session → project role → Zod]
+    SVC[Services<br/>business rules + transactions]
+  end
+  UI -->|httpOnly session cookie| Auth
+  UI -->|JSON checked by shared Zod| API
+  API --> MW --> SVC
+  SVC --> DB[(PostgreSQL 16<br/>via Drizzle)]
+  SVC --> Files[Private photo storage]
+  SVC -.optional.-> AI[AI provider<br/>Groq · Gemini · NVIDIA NIM]
 ```
 
-The launcher creates `.env` only when missing and stores the generated demo password there. It initializes a verified empty demo database when a valid demo password is configured. To sign in, use that password with `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid`. An existing database is seeded only when you pass `-Seed`. After the launcher confirms the app responds and PostgreSQL is up, it prints the app, health and OpenAPI URLs. New configuration defaults to live mode. Use the printed application URL for sign-in so the browser origin matches BETTER_AUTH_URL. Choose -Prototype explicitly for development fixtures. No AI credentials are required to use the rest of Slate.
+How one save travels, using a delivery as the example:
 
-The app runs in the launcher terminal. Ctrl+C exits the app and leaves PostgreSQL running. Run `.\stop.ps1` from a second terminal while the launcher is active. It stops the app and stops PostgreSQL only if that launcher session started it. An already running database is reused and stays running. With no active launcher, the stop command leaves existing services running.
+1. The contractor's **Today** screen calls a TanStack Query hook, which sends JSON through the API client
+   to `POST /api/v1/projects/{id}/deliveries`.
+2. The Hono route checks the session, then the caller's role in that project. A project you aren't
+   in returns 404, and the wrong role returns 403. The body is validated against the shared Zod
+   schema.
+3. The service writes the stock movement, the cached balance and the audit entry in **one PostgreSQL
+   transaction**. Database CHECK constraints and triggers enforce the rules a second time.
+4. The browser validates the response against the same schema and refreshes the affected lists.
+   Other people's open screens catch up within 10 seconds.
 
-For a separate checkout, choose a unique `SLATE_COMPOSE_PROJECT` and unused ports. The port flags initialize a missing `.env`. Keep the same Compose project setting in both terminals:
+### Data integrity rules
 
-```powershell
-$env:SLATE_COMPOSE_PROJECT = 'slate-sandbox'
-.\start.ps1 -AppPort 3100 -DatabasePort 55432 -Live
+| Rule | How it is enforced |
+|---|---|
+| Stock never goes negative | Guarded `UPDATE … WHERE balance >= qty` plus a CHECK constraint; over-use returns 409 |
+| History can't be rewritten | Append-only tables protected by database triggers; corrections are new adjustment rows with a reason |
+| Money is exact | Integer paise (`bigint`) everywhere, never floats |
+| Each role sees its own data | `project_members` roles checked on every route; engineers get no wage breakdown |
+| Concurrent saves stay consistent | Transactions and row locks on stock, attendance and payments |
+| One error shape | `{ "error": { "code", "message", "details"? } }` for every failure |
+
+These are database guarantees, not cryptographic tamper evidence.
+
+### Tech stack
+
+| Layer | Choice |
+|---|---|
+| App | Next.js 16.4 (App Router), React 19.3, TypeScript 5 |
+| API | Hono 4 at `/api/v1`, `@hono/zod-openapi` (live spec at `/api/v1/doc`) |
+| Contract | Zod 4 schemas in `src/shared/schemas`, shared by browser and server |
+| Database | PostgreSQL 16, Drizzle ORM and drizzle-kit migrations, `postgres` driver |
+| Sign-in | Better Auth (email and password, invite-only sign-up, httpOnly session cookie) |
+| UI | Tailwind CSS 4, shadcn/ui on Radix, lucide icons, Recharts, sonner, next-themes |
+| Files | sharp (validates uploaded photos), PDFKit (wage sheet), fflate (Revit .xlsx import in the browser) |
+| AI | Vercel AI SDK 7: Groq, Gemini, NVIDIA NIM or any HTTPS OpenAI-compatible endpoint |
+| Quality | Biome 2, Vitest 5 (unit and PostgreSQL-backed API tests), Playwright, GitHub Actions CI |
+| Running | pnpm 12 via Corepack, Docker Compose for PostgreSQL, Cloudflare quick tunnel for sharing |
+
+### Code layout
+
+```text
+src/
+  app/              Next.js routes: /login, /projects, /projects/[id]/{logs,site,money,stock,wages,team}
+    api/[[...route]]/  hands every /api/v1 request to the Hono app
+  components/       screens by area (today, stock, wages, owner, money, engineer, site, payments, …)
+  hooks/            TanStack Query hooks for every API read and write
+  lib/              browser-safe helpers: API client, formatting, Revit parser
+  shared/schemas/   the API contract (Zod)
+  server/
+    routes/         one Hono module per resource: validate, authorise, call a service
+    services/       business rules, transactions, queries
+    middleware/     session check and error format
+    ai/             Ask Slate, checklist drafts, quantity calculators
+  db/               schema.ts, SQL migrations, demo seed
+tests/api/          API tests against a throwaway PostgreSQL
+tests/e2e/          Playwright browser tests
+docs/               specification, API contract, handbook, ledgers
 ```
 
-The launcher checks the authentication origin and database identity. It requires an empty database or the matching Slate migration history, and accepts only a loopback Compose `slate_demo` database (including suffixed demo names). For existing configurations, edit `.env` explicitly to change ports. Keep `DB_PORT` and `DATABASE_URL` in sync. Process environment values take precedence over `.env`. The launcher passes the resulting database credentials and identity to Compose, migrations, seeding and the app, ahead of Next.js dotenv overrides. Use a local Docker Desktop context. Project caches and PostgreSQL data are under `.cache`. Docker Desktop manages its images and container metadata.
+## Run it
 
-Run a script by absolute path from any working directory.
-
-## Run Slate on Linux or macOS
-
-Install Node 24, Corepack and a running local Docker Engine with Compose v2. Run from the repository root:
+You need Node 24 with Corepack and a running Docker Engine (Docker Desktop on Windows).
 
 ```bash
-./start.sh --live
-./start.sh --live --seed  # Seed an existing disposable demo database
+./start.sh            # Linux, macOS or WSL: live mode on http://localhost:3000
+./start.sh --seed     # same, and (re)apply the demo data
 ```
 
-The shell launcher always uses live APIs. It creates a missing `.env` with local credentials, verifies the checkout's Compose database before migrations and runs the app in the foreground. An empty demo database with a valid demo password is seeded on first startup. Use the same demo emails and local password described above. Ctrl+C stops the app, leaving PostgreSQL and its data in place. Use the printed health endpoint to confirm the app is ready.
+```powershell
+.\start.ps1 -Live     # Windows PowerShell 7.2+
+.\stop.ps1            # from a second terminal
+```
 
-For an isolated checkout set a unique `SLATE_COMPOSE_PROJECT`, and configure unused ports in `.env` using `DB_PORT`, `DATABASE_URL` and `BETTER_AUTH_URL`.
+The launcher creates `.env` with random local secrets the first time, starts PostgreSQL, installs
+packages from the lockfile, applies migrations, seeds a fresh database and starts the app. Sign in
+as `owner@demo.invalid`, `contractor@demo.invalid` or `engineer@demo.invalid` with the
+`SLATE_DEMO_PASSWORD` from your `.env`. Ctrl+C stops the app and leaves the database running.
 
-See [development setup](docs/devops.md) for manual setup and [API.md](docs/API.md) for endpoint status.
+Ask Slate is optional: set `AI_PROVIDER`, `AI_MODEL` and `AI_API_KEY` in `.env` to enable it.
+Without them the assistant shows an offline state, and everything else still works.
+
+Manual setup, resetting the demo data, sharing over a Cloudflare tunnel, troubleshooting and every
+endpoint's inputs and outputs are in the **[dev handbook](docs/HANDBOOK.md)**. Step-by-step demo
+walkthroughs are in [DEMO.md](docs/DEMO.md).
 
 ## Checks
 
-Use the non-mutating Biome CI command and typecheck before a commit. The full Vitest suite includes a health test that requires PostgreSQL; verify DATABASE_URL and use an isolated disposable database before database-backed checks. Do not use lint:fix as a check because it rewrites files.
+```bash
+pnpm lint        # Biome, no writes
+pnpm typecheck
+pnpm test        # Vitest; the API tests need a disposable loopback database named slate_test…
+pnpm test:e2e    # Playwright
+```
 
-The project switcher and project pages are present. Frontend requests go through the API client, which can serve supported development fixtures in prototype mode. Live mode sends those requests to the backend. For current screen and workflow coverage, see [the frontend ledger](docs/FRONTEND_LEDGER.md) and [API status](docs/API.md).
+Don't use `pnpm lint:fix` as a check: it rewrites files.
 
-Run the PowerShell launcher regressions from an isolated worktree with an initialized disposable Compose database and no running app. Pass the sandbox project and app port to `.\tests\windows-launcher.test.ps1 -Project slate-launcher-test-local -AppPort 3100`.
+## Known limits (hackathon build)
 
-## Contributor instructions
+- Payments are mock. A real build would use a licensed gateway (escrow or a UPI mandate), and only
+  after a legal check.
+- Invite sign-up doesn't verify email ownership yet. Anyone who knows an invited address can claim
+  it first. A public build needs emailed tokens and rate limiting.
+- Phone invitations can't grant access until phone verification exists.
+- Revit `.rvt` files are not read. Only the `.xlsx` quantity export is imported.
+- See [DISCLOSURES.md](docs/DISCLOSURES.md) for AI, dependency and data disclosures.
 
-AGENTS.md is canonical. Root and nested CLAUDE.md files reference the corresponding AGENTS.md. docs/API.md is the canonical contract and is written by Codex. docs/FRONTEND_LEDGER.md is maintained only by Claude after its initialization. Read docs/devops.md for local tool and data paths.
+## Docs
 
-Ask Slate is optional and shows an offline state until AI_PROVIDER, AI_MODEL and AI_API_KEY are configured. Use a provider-supported model and its own API key. For an explicitly selected OpenAI-compatible provider, set AI_BASE_URL to its approved HTTPS API origin. Checklist generation keeps its labelled template fallback. The concrete calculator uses local formulas and runs offline from the provider.
+| File | What |
+|---|---|
+| [SPECIFICATION.md](docs/SPECIFICATION.md) | Product and integrity rules |
+| [API.md](docs/API.md) | API contract: every route, who may call it, status |
+| [HANDBOOK.md](docs/HANDBOOK.md) | Run, share, fix, screens, code map, every endpoint |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Release architecture notes |
+| [DEMO.md](docs/DEMO.md) | Demo walkthroughs |
+| [DECISIONS.md](docs/DECISIONS.md) | Decision log |
+| [PROJECT_LEDGER.md](docs/PROJECT_LEDGER.md), [BACKEND_LEDGER.md](docs/BACKEND_LEDGER.md), [FRONTEND_LEDGER.md](docs/FRONTEND_LEDGER.md) | Milestones and verification records |
 
-Supplier payments and medical reimbursements use a mock provider. Use synthetic account data when demonstrating these workflows. No funds move.
+Contributors: [AGENTS.md](AGENTS.md) holds the canonical project rules.
 
 ## Dependency licenses
 
-The following is the inherited declared dependency/license inventory. Codex maintains it with any future approved dependency change; licenses have not been independently re-audited in M0.
+Declared licenses of direct dependencies (not independently audited).
 
 | Package | Declared licence | Use |
 |---|---|---|
@@ -81,6 +220,7 @@ The following is the inherited declared dependency/license inventory. Codex main
 | class-variance-authority | Apache-2.0 | runtime |
 | cn | MIT | runtime |
 | drizzle-orm | Apache-2.0 | runtime |
+| fflate | MIT | runtime |
 | hono | MIT | runtime |
 | lucide-react | ISC | runtime |
 | next | MIT | runtime |
@@ -112,6 +252,4 @@ The following is the inherited declared dependency/license inventory. Codex main
 
 ## License
 
-MIT, see LICENSE.
-
-M6 checklist drafts run deterministically from a local template. The inherited provider packages are present in the lockfile for deferred work. Running Slate and generating checklists require no AI provider credentials.
+MIT, see [LICENSE](LICENSE).

@@ -1,0 +1,60 @@
+# Overlay used by start.sh: runs Node tooling and the dev server in containers, so the host
+# only needs Docker. Always combined with docker-compose.yml, never used alone.
+#
+#   tools  one-off jobs (install, migrate, seed). Shares the db container's network, so
+#          the app's loopback-only safety checks see 127.0.0.1 as the database host.
+#   web    next dev for prototype (mocks on) and live (mocks off) modes.
+#
+# Everything the containers write stays under .cache/docker, which is git-ignored.
+x-node: &node
+  image: node:24-slim
+  working_dir: /app
+  user: "${SLATE_UID:-1000}:${SLATE_GID:-1000}"
+  volumes:
+    - .:/app
+    - ./.cache/docker/node_modules:/app/node_modules
+    - ./.cache/docker/next:/app/.next
+  environment: &node-env
+    HOME: /app/.cache/docker/home
+    COREPACK_HOME: /app/.cache/docker/corepack
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    npm_config_cache: /app/.cache/docker/npm
+    npm_config_store_dir: /app/.cache/docker/pnpm-store
+    PNPM_HOME: /app/.cache/docker/pnpm-home
+    NEXT_TELEMETRY_DISABLED: "1"
+    POSTGRES_DB: ${POSTGRES_DB:-slate_demo}
+    SLATE_MIGRATION_DATABASE: ${POSTGRES_DB:-slate_demo}
+    BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+    BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+    UPLOAD_DIR: /app/.cache/uploads
+
+services:
+  tools:
+    <<: *node
+    network_mode: "service:db"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *node-env
+      NODE_ENV: development
+      DATABASE_URL: postgres://slate:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@127.0.0.1:5432/${POSTGRES_DB:-slate_demo}
+      SLATE_DEMO_SEED: ${SLATE_DEMO_SEED_RUN:-}
+      SLATE_DEMO_PASSWORD: ${SLATE_DEMO_PASSWORD:-}
+
+  web:
+    <<: *node
+    environment:
+      <<: *node-env
+      NODE_ENV: development
+      DATABASE_URL: postgres://slate:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-slate_demo}
+      NEXT_PUBLIC_USE_MOCKS: ${SLATE_MOCKS:-0}
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+    command: ["sh", "-c", "corepack pnpm exec next dev --hostname 0.0.0.0 --port ${APP_PORT:-3000}"]
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:${APP_PORT:-3000}"
+    depends_on:
+      db:
+        condition: service_healthy
