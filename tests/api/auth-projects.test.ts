@@ -469,6 +469,40 @@ describe("projects and scoped access", () => {
     );
   });
 
+  it("lets only a pending email invitee create an account, once", async () => {
+    const engineer = await login(DemoAccountEmail.engineer);
+    const project = ProjectResponse.parse(
+      await (await call("/projects", engineer.cookie, input)).json(),
+    );
+    const email = `joiner-${crypto.randomUUID()}@example.test`;
+    const account = { email, name: "New Joiner", password: "joiner-pass-123" };
+    await error(await call("/invitations/signup", undefined, account), 409, "CONFLICT");
+    const invited = await call(`/projects/${project.id}/invitations`, engineer.cookie, {
+      email,
+      role: "contractor",
+    });
+    expect(invited.status).toBe(201);
+    const invitation = ProjectInvitationResponse.parse(await invited.json());
+    await error(
+      await call("/invitations/signup", undefined, { ...account, password: "short" }),
+      400,
+      "VALIDATION_ERROR",
+    );
+    expect((await call("/invitations/signup", undefined, account)).status).toBe(201);
+    await error(await call("/invitations/signup", undefined, account), 409, "CONFLICT");
+    const signIn = await authRequest("sign-in/email", {
+      body: { email, password: account.password },
+    });
+    expect(signIn.status).toBe(200);
+    const cookie = signIn.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .join("; ");
+    const accepted = await call(`/invitations/${invitation.id}/accept`, cookie, {});
+    expect(accepted.status).toBe(200);
+    expect(ProjectMemberResponse.parse(await accepted.json()).role).toBe("contractor");
+  });
+
   it("rolls back a project and its creator membership when audit recording fails", async () => {
     const { cookie } = await login(DemoAccountEmail.contractor);
     const { db, sql } = getDatabase();

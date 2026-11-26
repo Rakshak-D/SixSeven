@@ -6,6 +6,8 @@ import {
   AddProjectMemberInput,
   CreateProjectInput,
   CreateProjectInvitationInput,
+  InvitationSignUpInput,
+  InvitationSignUpResponse,
   MyPhoneResponse,
   ProjectInvitationQuery,
   ProjectInvitationResponse,
@@ -23,6 +25,7 @@ import {
   createProjectInvitation,
   listMyInvitations,
   listProjectInvitations,
+  signUpInvited,
 } from "../services/invitations";
 import {
   addProjectMember,
@@ -45,6 +48,24 @@ const errors = {
 };
 
 export const projects = createRouter<AuthEnv>()
+  .openapi(
+    createRoute({
+      method: "post",
+      path: "/invitations/signup",
+      tags: ["projects"],
+      request: { body: { required: true, content: json(InvitationSignUpInput) } },
+      responses: {
+        201: {
+          description: "Account created; sign in, then accept",
+          content: json(InvitationSignUpResponse),
+        },
+        400: error("Invalid request"),
+        409: error("No pending invitation for this email, or it already has an account"),
+        500: error("Unexpected error"),
+      },
+    }),
+    async (c) => c.json(await signUpInvited(getDatabase().db, c.req.valid("json")), 201),
+  )
   .openapi(
     createRoute({
       method: "post",

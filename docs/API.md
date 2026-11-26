@@ -43,10 +43,11 @@ All rows below have an available shared contract. The four project operations ar
 | P0 | POST /projects/:id/invitations | Engineer | — | projects.CreateProjectInvitationInput | 201 projects.ProjectInvitationResponse | 409 for an existing member or invitation |
 | P0 | GET /projects/:id/invitations | Engineer | projects.ProjectInvitationQuery | — | 200 projects.ProjectInvitationsResponse | — |
 | P0 | GET /invitations | Authenticated recipient | — | — | 200 projects.ProjectInvitationsResponse | — |
+| P0 | POST /invitations/signup | Public | — | projects.InvitationSignUpInput | 201 projects.InvitationSignUpResponse | 409 with one generic message when the email has no pending invitation or already has an account |
 | P0 | POST /invitations/:id/accept | Authenticated recipient | — | — | 200 projects.ProjectMemberResponse | 404 for another recipient's invitation, 409 if accepted or already a member |
 | P0 | GET /projects/:id/members | Members | — | — | 200 projects.ProjectTeamResponse | 404 for nonmembers |
 | P0 | PATCH /me | Authenticated caller | — | projects.UpdateMyPhoneInput | 200 projects.MyPhoneResponse | 400 for invalid numbers |
-| P0 | POST /projects/:id/materials | Contractor | — | materials.CreateMaterialInput | 201 materials.MaterialResponse | — |
+| P0 | POST /projects/:id/materials | Contractor, engineer | — | materials.CreateMaterialInput | 201 materials.MaterialResponse | — |
 | P0 | GET /projects/:id/materials | Members | — | — | 200 materials.MaterialsResponse | — |
 | P0 | POST /projects/:id/workers | Contractor | — | workers.CreateWorkerInput | 201 workers.WorkerResponse | — |
 | P0 | GET /projects/:id/workers | Owner, contractor | — | — | 200 workers.WorkersResponse | — |

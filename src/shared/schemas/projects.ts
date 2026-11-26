@@ -13,6 +13,14 @@ export const CreateProjectInvitationInput = z.union([
   z.strictObject({ email: z.string().trim().pipe(z.email().max(254)), role: InvitationRole }),
   z.strictObject({ phone: IndianMobileInput, role: InvitationRole }),
 ]);
+/** Public sign-up, allowed only for an email that has a pending invitation and no account. */
+export const InvitationSignUpInput = z.strictObject({
+  email: z.string().trim().pipe(z.email().max(254)),
+  name: z.string().trim().min(1).max(120),
+  password: z.string().min(8).max(128),
+});
+export const InvitationSignUpResponse = z.strictObject({ created: z.literal(true) });
+export type InvitationSignUpInput = z.infer<typeof InvitationSignUpInput>;
 export const ProjectInvitationStatus = z.enum(["pending", "accepted"]);
 export const ProjectInvitationQuery = z.strictObject({
   status: ProjectInvitationStatus.optional(),

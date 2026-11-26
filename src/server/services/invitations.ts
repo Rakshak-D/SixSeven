@@ -2,9 +2,11 @@ import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { user } from "@/db/auth-schema";
 import type { Db, Transaction } from "@/db/client";
 import { projectInvitations, projectMembers, projects } from "@/db/schema";
+import { createAuth } from "@/server/auth";
 import { ErrorCode } from "@/shared/errors";
 import {
   type CreateProjectInvitationInput,
+  type InvitationSignUpInput,
   normalizeIndianMobile,
   type ProjectInvitationQuery,
   ProjectInvitationResponse,
@@ -171,4 +173,39 @@ export async function acceptProjectInvitation(db: Db, actor: Actor, id: string) 
     });
     return member;
   });
+}
+
+/**
+ * Creates an account for someone invited by email. Refuses with one generic error when there is
+ * no pending invitation for the email or it already has an account, so the reply does not say which.
+ * Joining the project is still a separate, signed-in accept.
+ */
+export async function signUpInvited(db: Db, input: InvitationSignUpInput) {
+  const email = input.email.toLowerCase();
+  const created = await db.transaction(async (tx) => {
+    const [invite] = await tx
+      .select({ id: projectInvitations.id })
+      .from(projectInvitations)
+      .where(and(eq(projectInvitations.email, email), isNull(projectInvitations.acceptedAt)))
+      .limit(1)
+      .for("update");
+    if (!invite) return false;
+    const [account] = await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(sql`lower(${user.email}) = ${email}`);
+    if (account) return false;
+    await createAuth(tx, { provisioning: true }).api.signUpEmail({
+      body: { email, name: input.name, password: input.password },
+    });
+    return true;
+  });
+  if (!created) {
+    throw new ApiError(
+      409,
+      ErrorCode.CONFLICT,
+      "No pending invitation for this email, or it already has an account",
+    );
+  }
+  return { created: true as const };
 }
