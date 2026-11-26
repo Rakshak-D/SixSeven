@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { Id, IsoDate, Note, PositiveQty, Qty } from "./common";
+import { BagCodes } from "./deliveries";
 
 export const CreateUsageInput = z.strictObject({
   materialId: Id,
   qty: PositiveQty,
   occurredOn: IsoDate,
   note: Note.optional(),
+  bagCodes: BagCodes.optional(),
 });
 export const UsageResponse = z.strictObject({
   id: Id,

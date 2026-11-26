@@ -22,13 +22,16 @@ const materialFields = {
   unitCostPaise: materials.unitCostPaise,
   tolerancePct: materials.tolerancePct,
   lowStockQty: materials.lowStockQty,
+  tracksBags: materials.tracksBags,
 };
 
 function materialResponse(
   row: Pick<typeof materials.$inferSelect, keyof typeof materialFields>,
 ): MaterialResponse {
+  const { tracksBags, ...fields } = row;
   return {
-    ...row,
+    ...fields,
+    ...(tracksBags && { tracksBags: true }),
     plannedQty: Qty.parse(Number(row.plannedQty)),
     lowStockQty: Qty.parse(Number(row.lowStockQty)),
   };

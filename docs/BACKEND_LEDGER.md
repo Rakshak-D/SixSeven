@@ -2,6 +2,12 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Delivery and material identity verification (#13–14)
+
+- Branch `be/bag-verification`, migration `0013_bag_verification`. Added the engineer queue, verification routes, project-unique codes and transactional usage consumption. Existing materials remain quantity-based unless tracking is set on creation. Tracked and verified quantity corrections require a separate reconciliation mechanism.
+- Fresh PostgreSQL migration, seed, baseline upgrade test, Biome, typecheck and all 164 local tests passed. The tests cover registration conflicts, unauthorized access, cross-material rejection and concurrent consumption.
+- Frontend handoff: switch `src/hooks/use-supplier-payments.ts` to `DeliveryVerificationQueue` and `DeliveryVerificationResponse`, send codes from `src/components/payments/verify-deliveries.tsx` for tracked materials, and collect them in the usage form. The verification queue omits prices. Supplier payment release is a separate backend change.
+
 ## Entry — Medical claims and bill photo contract
 
 - Branch `be/medical-evidence`, requests #23 and #27. Medical bill submissions use one `capturedAt` part per `billPhotos` part in matching order. This confirms the frontend ledger's multipart convention. The author and authorized reviewers can fetch private bill images.

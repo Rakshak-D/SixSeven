@@ -25,6 +25,10 @@ One Next.js App Router application with Hono at `/api/v1`, `@hono/zod-openapi`, 
 ### M6 checklist verification and history
 
 Frontend requests #7 and #8 are approved. A contractor starts a task (todo → doing) and submits a note and private photos (doing or sent_back → waiting). An engineer accepts (waiting → done) or sends it back with a reason of at least ten characters (waiting → sent_back). Owners can read the evidence and history. All transitions and reviews record the actor and time. Engineer additions, renames and soft removals preserve prior values, reasons and evidence. Items awaiting review cannot be removed. Proposal decisions never change budgets or execute payments. M6 uses deterministic templates. External AI provider selection remains deferred.
+## Material identifiers
+
+A new material may opt in to tracked bags. The engineer registers a project-unique code per whole bag on a delivery. Contractor stock usage consumes those codes and inventory in one transaction. Bulk materials remain quantity-based. Verified quantities cannot change through an ordinary stock correction. A registered identifier records a claim about a physical bag. It does not prove the bag's contents.
+
 ## Approved change requests
 
 Request #20 supersedes direct checklist add, rename and removal and direct attendance adjustments. Checklist changes, attendance corrections and medical expenses use an append-only decision history with a server-derived actor, role, note and timestamp. Engineer requests require a contractor vote before an owner decision. A contractor-authored attendance or medical request goes to the owner directly. Only the author can reopen a contractor rejection. The owner decision is final and an acceptance applies the change once in the same transaction. The contractor task evidence and engineer review workflow stays separate.

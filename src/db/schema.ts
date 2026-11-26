@@ -243,6 +243,7 @@ export const materials = pgTable(
   "materials",
   {
     id: text().primaryKey(),
+    tracksBags: boolean("tracks_bags").notNull().default(false),
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id),
@@ -445,6 +446,68 @@ export const stockMovements = pgTable(
         and ${t.supplier} is null and ${t.challanNo} is null and ${t.unitCostPaise} is null)
     )`,
     ),
+  ],
+);
+
+export const deliveryVerifications = pgTable(
+  "delivery_verifications",
+  {
+    projectId: text("project_id").notNull(),
+    deliveryId: text("delivery_id").primaryKey(),
+    verifiedBy: text("verified_by").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().defaultNow(),
+    note: text().notNull(),
+    bagCodeCount: integer("bag_code_count").notNull(),
+    verifiedQty: quantity("verified_qty").notNull(),
+  },
+  (t) => [
+    unique("delivery_verification_scope").on(t.projectId, t.deliveryId),
+    foreignKey({
+      name: "delivery_verification_movement",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    foreignKey({
+      name: "delivery_verification_actor",
+      columns: [t.projectId, t.verifiedBy],
+      foreignColumns: [projectMembers.projectId, projectMembers.userId],
+    }),
+    check("delivery_verification_count", sql`${t.bagCodeCount} between 0 and 5000`),
+    check(
+      "delivery_verification_qty",
+      sql`${t.verifiedQty} > 0 and (${t.bagCodeCount} = 0 or ${t.bagCodeCount} = ${t.verifiedQty})`,
+    ),
+  ],
+);
+
+export const materialBagCodes = pgTable(
+  "material_bag_codes",
+  {
+    projectId: text("project_id").notNull(),
+    code: text().notNull(),
+    deliveryId: text("delivery_id").notNull(),
+    materialId: text("material_id").notNull(),
+    consumedBy: text("consumed_by"),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.code] }),
+    foreignKey({
+      name: "bag_code_delivery_scope",
+      columns: [t.projectId, t.deliveryId],
+      foreignColumns: [deliveryVerifications.projectId, deliveryVerifications.deliveryId],
+    }),
+    foreignKey({
+      name: "bag_code_material_scope",
+      columns: [t.projectId, t.materialId],
+      foreignColumns: [materials.projectId, materials.id],
+    }),
+    foreignKey({
+      name: "bag_code_usage_scope",
+      columns: [t.projectId, t.consumedBy],
+      foreignColumns: [stockMovements.projectId, stockMovements.id],
+    }),
+    check("bag_code_consumption_pair", sql`(${t.consumedBy} is null) = (${t.consumedAt} is null)`),
   ],
 );
 

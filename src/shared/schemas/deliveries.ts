@@ -63,3 +63,34 @@ export type RejectExpectedDeliveryInput = z.infer<typeof RejectExpectedDeliveryI
 export type ExpectedDeliveriesQuery = z.infer<typeof ExpectedDeliveriesQuery>;
 export type ExpectedDeliveryResponse = z.infer<typeof ExpectedDeliveryResponse>;
 export type ChallanPhotoResponse = z.infer<typeof ChallanPhotoResponse>;
+
+export const BagCode = z.string().trim().min(1).max(160);
+export const BagCodes = z
+  .array(BagCode)
+  .max(5000)
+  .refine((codes) => new Set(codes).size === codes.length, "Bag codes must be unique");
+export const VerifyDeliveryInput = z.strictObject({ note: Note, codes: BagCodes.optional() });
+export const RegisterBagCodesInput = z.strictObject({ codes: BagCodes, note: Note.optional() });
+export const DeliveryVerificationResponse = z.strictObject({
+  ok: z.literal(true),
+  deliveryId: Id,
+  verifiedBy: Id,
+  verifiedAt: Timestamp,
+  bagCodeCount: z.int().nonnegative(),
+});
+export const DeliveryVerificationQueue = z.array(
+  z.strictObject({
+    deliveryId: Id,
+    materialName: Label,
+    unit: Label,
+    qty: PositiveQty,
+    supplier: Label,
+    challanNo: Label,
+    occurredOn: IsoDate,
+    tracksBags: z.boolean(),
+  }),
+);
+export type VerifyDeliveryInput = z.infer<typeof VerifyDeliveryInput>;
+export type RegisterBagCodesInput = z.infer<typeof RegisterBagCodesInput>;
+export type DeliveryVerificationResponse = z.infer<typeof DeliveryVerificationResponse>;
+export type DeliveryVerificationQueue = z.infer<typeof DeliveryVerificationQueue>;
