@@ -113,6 +113,13 @@
       "when": 1795652231751,
       "tag": "0015_checklist_steel_proof",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795652364284,
+      "tag": "0016_wage_payment_contract",
+      "breakpoints": true
     }
   ]
 }

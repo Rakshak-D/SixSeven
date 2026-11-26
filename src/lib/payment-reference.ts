@@ -15,6 +15,12 @@ export const referenceRules = {
     pattern: /^[A-Za-z0-9]{6,22}$/,
     problem: "Enter the bank reference: 6 to 22 letters or digits.",
   },
+  cheque: {
+    label: "Cheque number",
+    hint: "6 digits, from the cheque.",
+    pattern: /^[0-9]{6}$/,
+    problem: "Enter the 6-digit cheque number.",
+  },
 } as const;
 
 export function referenceProblem(
