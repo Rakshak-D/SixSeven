@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ApiClientError, api } from "@/lib/api/client";
 import { type ChatTurn, historyToSend, MAX_MESSAGE_CHARS } from "@/lib/assistant";
 import { mocksEnabled } from "@/mocks";
+import { AssistantInput, AssistantResponse } from "@/shared/schemas/assistant";
 import type { ProjectResponse } from "@/shared/schemas/projects";
 import { Answer } from "./answer";
 
@@ -55,16 +56,15 @@ export function AssistantSheet({
     setError(null);
     setBusy(true);
     try {
-      const { reply } = await api<{ reply: string }>("POST", `/projects/${project.id}/ai/chat`, {
-        body: {
-          messages: historyToSend(next),
-          // The server builds its prompt from these until it reads them itself (ledger request 30).
-          projectContext: { name: project.name, location: project.location },
-        },
+      const answer = await api("POST", `/projects/${project.id}/ai/chat`, {
+        body: AssistantInput.parse({ messages: historyToSend(next) }),
+        schema: AssistantResponse,
       });
-      // The route refuses empty messages, so a stored empty reply would fail every later request.
-      if (!reply.trim()) throw new Error("Empty reply");
-      setTurns([...next, { role: "assistant", content: reply }]);
+      if (answer.source === "offline") {
+        setError(answer.message);
+        return;
+      }
+      setTurns([...next, { role: "assistant", content: answer.reply }]);
     } catch (cause) {
       // Kept out of the conversation, so a failure is never sent back as something it said.
       // A 4xx (signed out, not a member) says why; anything else gets the general line.

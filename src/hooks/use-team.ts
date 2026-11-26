@@ -2,12 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import { failIfInvalid } from "@/lib/api/validate";
 import {
+  CreateProjectInput,
   CreateProjectInvitationInput,
   ProjectInvitationResponse,
   ProjectInvitationsResponse,
-} from "@/lib/invitations";
-import {
-  CreateProjectInput,
   ProjectMemberResponse,
   ProjectResponse,
   ProjectTeamResponse,
@@ -56,11 +54,23 @@ export function useAcceptInvitation() {
   });
 }
 
-export const useInvite = (projectId: string) =>
-  useMutation({
+export const useSentInvitations = (projectId: string) =>
+  useQuery({
+    queryKey: [projectId, "invitations"],
+    queryFn: () =>
+      api("GET", `/projects/${encodeURIComponent(projectId)}/invitations`, {
+        schema: ProjectInvitationsResponse,
+      }),
+  });
+
+export function useInvite(projectId: string) {
+  const client = useQueryClient();
+  return useMutation({
     mutationFn: (input: CreateProjectInvitationInput) =>
       api("POST", `/projects/${encodeURIComponent(projectId)}/invitations`, {
         body: failIfInvalid(CreateProjectInvitationInput, input),
         schema: ProjectInvitationResponse,
       }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [projectId, "invitations"] }),
   });
+}

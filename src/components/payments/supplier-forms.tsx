@@ -195,6 +195,7 @@ export function AutopayForm({ projectId, supplier, onDone }: Common & { supplier
       ]}
       body={(v, note) => ({
         enabled,
+        paused: supplier.autopay.paused ?? false,
         perBillCapPaise: money(v.bill),
         perWeekCapPaise: money(v.week),
         note,

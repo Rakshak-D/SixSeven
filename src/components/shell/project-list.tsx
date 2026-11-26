@@ -28,11 +28,7 @@ export function ProjectList() {
       </header>
       <SlateTagline className="mt-3" />
       <h1 className="mt-12 animate-rise text-5xl sm:text-6xl">Your projects</h1>
-      {/*
-        Demo data only for now: the live server still makes the creator the contractor and has no
-        invitation routes (backend PR #30).
-      */}
-      {mocksEnabled && projects.isSuccess ? (
+      {projects.isSuccess ? (
         <>
           <div className="mt-6">
             <StartProject />

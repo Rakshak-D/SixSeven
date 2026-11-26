@@ -232,14 +232,21 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
   const choice = useMaterialChoice(projectId);
   const save = useCreateUsage(projectId);
   const [qty, setQty] = useState("");
+  const [codes, setCodes] = useState("");
+  const bagCodes = codes.split(/\s+/).filter(Boolean);
   const [date, setDate] = useState(today);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string>();
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (save.isPending) return;
     const found = firstProblem([
       [parseQty(qty) === undefined, "Enter the quantity used."],
+      [
+        Boolean(choice.material?.tracksBags) && bagCodes.length !== parseQty(qty),
+        "Enter one registered code per bag.",
+      ],
       [!note.trim(), "Say where it was used."],
     ]);
     setProblem(found);
@@ -250,11 +257,13 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
         qty: parseQty(qty) as number,
         occurredOn: date,
         note,
+        ...(choice.material?.tracksBags ? { bagCodes } : {}),
       },
       {
         onSuccess: () => {
           setQty("");
           setNote("");
+          setCodes("");
         },
       },
     );
@@ -291,6 +300,11 @@ function UsageForm({ projectId, today }: { projectId: string; today: string }) {
       <Field label="Where was it used?">
         {(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
+      {choice.material?.tracksBags ? (
+        <Field label="Registered bag codes" hint="Enter one code per bag, one per line.">
+          {(id) => <Input id={id} value={codes} onChange={(e) => setCodes(e.target.value)} />}
+        </Field>
+      ) : null}
       <FormError error={problem ?? save.error} />
       {save.isSuccess && !save.isPending ? (
         <SavedNotice>

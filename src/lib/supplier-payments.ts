@@ -28,6 +28,7 @@ export const Gstin = z
 
 export const Autopay = z.strictObject({
   enabled: z.boolean(),
+  paused: z.boolean().optional(),
   perBillCapPaise: Paise,
   perWeekCapPaise: Paise,
 });
@@ -80,6 +81,7 @@ export const PaymentsOverview = z.strictObject({
 });
 /** A delivery the engineer has not checked. No prices: the engineer sees quantities only. */
 export const DeliveryToVerify = z.strictObject({
+  tracksBags: z.boolean().optional(),
   deliveryId: Id,
   materialName: Label,
   unit: Label,

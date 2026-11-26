@@ -52,7 +52,7 @@ export const assistantRoutes: MockRoute[] = [
     respond: async ({ body }) => {
       await new Promise((done) => setTimeout(done, 600));
       const { messages } = body as { messages: { content: string }[] };
-      return { reply: sampleAnswer(messages.at(-1)?.content ?? "") };
+      return { source: "prototype", reply: sampleAnswer(messages.at(-1)?.content ?? "") };
     },
   },
 ];

@@ -173,10 +173,7 @@ export function MoneyPage() {
         </div>
       )}
 
-      {/* Owner only, and demo data only until the server has supplier payments. */}
-      {project.role === "owner" && mocksEnabled ? (
-        <SupplierPayments projectId={project.id} />
-      ) : null}
+      {project.role === "owner" ? <SupplierPayments projectId={project.id} /> : null}
 
       <section className="animate-rise rounded-[1.75rem] border bg-card p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
