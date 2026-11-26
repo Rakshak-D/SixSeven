@@ -173,6 +173,18 @@ Engineer requests start at `pending_contractor`. The contractor advances them to
 
 An attendance target ID references the attendance row. Actual half-days and paid entitlement are separate, and only a medical emergency allows a full-day pay override. Medical approval requires `payPaise` between 1 and the bill amount. Other decisions reject that field. Accepted medical requests identify `reimbursementProvider: "mock"`; no money moves. The expense is counted once on the incident date. Medical records and receipts are restricted to the author and the authorized contractor and owner reviewers. The server stores the capture and receipt times and allows up to ten minutes of age and 30 seconds of forward clock skew. A client timestamp does not authenticate camera provenance.
 
+## Steel-marking evidence
+
+Checklist creation and approved checklist additions may set `requiresSteelProof: true`. The existing review operation returns 409 `STEEL_PROOF_REQUIRED` if an engineer accepts a flagged item without evidence attached to the current contractor submission. Send-back remains available. A resubmission gets a new progress ID and requires a new set of evidence.
+
+| Operation | Role | Request and response |
+|---|---|---|
+| POST /checklist-items/:id/steel-proof | Engineer | Multipart `progressId`, `note`, one to three `photos` and exactly one ISO `capturedAt` per image in order. Returns 201 `SteelProofPhotos`. |
+| GET /checklist-items/:id/steel-proof | Members | Returns 200 `SteelProofPhotos`, including the progress ID for each photo. |
+| GET /checklist-items/:id/steel-proof/:photoId | Members | Protected JPEG, PNG or WebP with private, no-store caching. |
+
+Maximum 5,000,000 bytes per image. Captures more than ten minutes old or more than 30 seconds in the future are rejected. An item can have one upload per submission. Previous evidence remains readable. The server records receipt independently of the client timestamp. The upload records visual evidence and its submitting engineer. It cannot authenticate steel quality.
+
 ## Supplier orders and mock payments
 
 All operations in this section require owner membership in the resource's project. Cross-project resources return 404. Shared contracts are in `supplier-payments.ts`. The backend is implemented. The frontend still requires live API wiring.

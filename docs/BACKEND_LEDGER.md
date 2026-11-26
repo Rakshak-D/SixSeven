@@ -2,6 +2,12 @@
 
 Exclusive write ownership: Codex. Newest checkpoint first. Timestamp is IST.
 
+## Entry — Engineer steel-marking hold point
+
+- Request #15, 2026-11-26 IST, branch `be/steel-hold-point`. Flagged checklist items require project engineer evidence for the current contractor submission before acceptance. The API stores capture and receipt times and retains prior evidence.
+- PostgreSQL fresh migration and seed passed. All 9 project reporting API tests passed, including no-evidence rejection, role denial, cross-project privacy and original photo byte retrieval. Typecheck passed.
+- Frontend handoff: `src/hooks/use-project-data.ts` and `src/components/engineer/review-list.tsx` can use the new multipart evidence endpoint before acceptance. Checklist creation and approved additions accept `requiresSteelProof`.
+
 ## Entry — Approved suppliers, mock payments and owner flags
 
 - Requests #16–19 and #25, 2026-11-26 IST, branch `be/supplier-mock-payments`, migration `0014_supplier_mock_payments`. Added owner-only supplier, bank-change, order, mandate, approval and payment reads. Verified deliveries enter the mock queue transactionally. Release consumes approved capacity and enforces applicable mandate caps. The owner summary exposes deterministic review flags.
