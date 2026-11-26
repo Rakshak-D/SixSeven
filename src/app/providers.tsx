@@ -7,7 +7,14 @@ import { Toaster } from "@/components/ui/sonner";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { staleTime: 15_000, retry: 1 } } }),
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          // Other people change the same project from their own screens, and two windows side by
+          // side never fire a visibility change, so re-check every 10 s while the tab is visible.
+          queries: { staleTime: 5_000, refetchInterval: 10_000, retry: 1 },
+        },
+      }),
   );
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
